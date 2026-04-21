@@ -1,0 +1,1 @@
+ALTER TABLE public.departments ADD COLUMN parent_id uuid REFERENCES public.departments(id) ON DELETE SET NULL DEFAULT NULL;

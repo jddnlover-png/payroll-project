@@ -1,0 +1,1 @@
+ALTER TABLE organization_settings ADD COLUMN IF NOT EXISTS payroll_start_month TEXT DEFAULT NULL;

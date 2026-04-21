@@ -1,0 +1,1 @@
+ALTER TABLE public.daily_payroll_settings ADD COLUMN IF NOT EXISTS non_work_day_default_type text NOT NULL DEFAULT 'REST_DAY';

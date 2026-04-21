@@ -1,0 +1,1 @@
+ALTER TABLE public.payroll_records ADD COLUMN total_work_minutes numeric DEFAULT 0;

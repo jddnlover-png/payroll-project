@@ -1,0 +1,1 @@
+ALTER TABLE public.employees ADD COLUMN resignation_date date DEFAULT NULL;

@@ -1,0 +1,1 @@
+ALTER TABLE public.employees ADD COLUMN job_category TEXT NOT NULL DEFAULT 'office';

@@ -1,0 +1,11 @@
+
+ALTER TABLE public.daily_wage_snapshots 
+  ADD COLUMN IF NOT EXISTS tier1_minutes integer NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS tier2_minutes integer NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS tier3_minutes integer NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS tier1_pay integer NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS tier2_pay integer NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS tier3_pay integer NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS tier1_multiplier numeric NOT NULL DEFAULT 1.5,
+  ADD COLUMN IF NOT EXISTS tier2_multiplier numeric NOT NULL DEFAULT 2.0,
+  ADD COLUMN IF NOT EXISTS tier3_multiplier numeric NOT NULL DEFAULT 1.5;
