@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { useState } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -122,6 +124,16 @@ const menuItems: MenuItem[] = [
 const Index = () => {
   const [activeMenu, setActiveMenu] = useState("dashboard");
   const [activeSubMenu, setActiveSubMenu] = useState<string | null>(null);
+  useEffect(() => {
+    const testConnection = async () => {
+      const { data, error } = await supabase.from("employees").select("*").limit(1);
+
+      console.log("data:", data);
+      console.log("error:", error);
+    };
+
+    testConnection();
+  }, []);
   const [expandedMenus, setExpandedMenus] = useState<string[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const isMobile = useIsMobile();
