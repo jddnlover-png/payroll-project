@@ -122,6 +122,18 @@ const menuItems: MenuItem[] = [
 ];
 
 const Index = () => {
+  useEffect(() => {
+    console.log("🔥 실행됨");
+
+    const testConnection = async () => {
+      const { data, error } = await supabase.from("employees").select("*").limit(1);
+
+      console.log("data:", data);
+      console.log("error:", error);
+    };
+
+    testConnection();
+  }, []);
   const [activeMenu, setActiveMenu] = useState("dashboard");
   const [activeSubMenu, setActiveSubMenu] = useState<string | null>(null);
   useEffect(() => {
