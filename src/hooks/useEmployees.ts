@@ -39,12 +39,11 @@ export function useEmployees() {
   const queryClient = useQueryClient();
 
   const {
-    data,
-    isPending,
-    isFetching,
+    data: employees = [],
+    isLoading,
     error,
   } = useQuery({
-    queryKey: ["employees", currentOrganization?.id ?? "none"],
+    queryKey: ["employees", currentOrganization?.id],
     queryFn: async () => {
       if (!currentOrganization?.id) return [];
 
@@ -58,15 +57,10 @@ export function useEmployees() {
       return data as unknown as Employee[];
     },
     enabled: !!currentOrganization?.id,
-    placeholderData: (previousData) => previousData ?? [],
     staleTime: 1000 * 60 * 5,
-    gcTime: 1000 * 60 * 30,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
   });
 
-  const employees = data ?? [];
-  const activeEmployees = employees.filter((e) => e.is_active !== false);
+  const activeEmployees = employees.filter((e) => e.is_active);
 
   const addEmployee = useMutation({
     mutationFn: async (employee: Omit<EmployeeInsert, "organization_id">) => {
@@ -82,9 +76,9 @@ export function useEmployees() {
       return data;
     },
     onSuccess: () => {
-  queryClient.invalidateQueries({ queryKey: ["employees"] });
-  toast.success("직원이 등록되었습니다");
-},
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
+      toast.success("직원이 등록되었습니다");
+    },
     onError: (error: any) => {
       console.error("Error adding employee:", error);
       if (error.message?.includes("unique")) {
@@ -108,9 +102,9 @@ export function useEmployees() {
       return data;
     },
     onSuccess: () => {
-  queryClient.invalidateQueries({ queryKey: ["employees"] });
-  toast.success("직원 정보가 수정되었습니다");
-},
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
+      toast.success("직원 정보가 수정되었습니다");
+    },
     onError: (error) => {
       console.error("Error updating employee:", error);
       toast.error("직원 정보 수정 중 오류가 발생했습니다");
@@ -123,9 +117,9 @@ export function useEmployees() {
       if (error) throw error;
     },
     onSuccess: () => {
-  queryClient.invalidateQueries({ queryKey: ["employees"] });
-  toast.success("직원이 삭제되었습니다");
-},
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
+      toast.success("직원이 삭제되었습니다");
+    },
     onError: (error) => {
       console.error("Error deleting employee:", error);
       toast.error("직원 삭제 중 오류가 발생했습니다");
@@ -133,13 +127,12 @@ export function useEmployees() {
   });
 
   return {
-  employees,
-  activeEmployees,
-  isLoading: !!currentOrganization?.id && isPending && employees.length === 0,
-  isFetching,
-  error,
-  addEmployee,
-  updateEmployee,
-  deleteEmployee,
-};
+    employees,
+    activeEmployees,
+    isLoading,
+    error,
+    addEmployee,
+    updateEmployee,
+    deleteEmployee,
+  };
 }

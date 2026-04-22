@@ -32,7 +32,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
   const { user, loading: authLoading } = useAuth();
 
   const mountedRef = useRef(true);
-  const prevUserIdRef = useRef<string | null | undefined>(undefined);
+  const fetchedUserIdRef = useRef<string | null>(null);
 
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [currentOrganization, setCurrentOrganizationState] = useState<Organization | null>(null);
@@ -47,105 +47,47 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     mountedRef.current = true;
-    return () => { mountedRef.current = false; };
+    return () => {
+      mountedRef.current = false;
+    };
   }, []);
 
-  useEffect(() => {
-  console.log('[ORG] useEffect 실행 - authLoading:', authLoading, 'user?.id:', user?.id, 'prevUserIdRef:', prevUserIdRef.current);
+  const resetState = useCallback(() => {
+    fetchedUserIdRef.current = null;
+    safeSetState(() => {
+      setOrganizations([]);
+      setCurrentOrganizationState(null);
+      setCurrentRole(null);
+      setLoading(false);
+      setInitialized(false);
+    });
+  }, [safeSetState]);
 
-  if (authLoading) {
-    console.log('[ORG] authLoading 중 - 스킵');
-    return;
-  }
-
-  if (prevUserIdRef.current === user?.id) {
-    console.log('[ORG] user?.id 동일 - 스킵');
-    return;
-  }
-
-  prevUserIdRef.current = user?.id;
-  console.log('[ORG] fetch 시작');
+  const fetchOrganizations = useCallback(async () => {
+    if (authLoading) return;
 
     if (!user?.id) {
-      safeSetState(() => {
-        setOrganizations([]);
-        setCurrentOrganizationState(null);
-        setCurrentRole(null);
-        setLoading(false);
-        setInitialized(true);
-      });
+      fetchedUserIdRef.current = null;
+      resetState();
       return;
     }
 
-    // user?.id가 생긴 경우 fetch 실행
-    const run = async () => {
-  console.log('[ORG] run 시작');
-  safeSetState(() => setLoading(true));
+    if (fetchedUserIdRef.current === user.id) {
+      return;
+    }
 
-  try {
-    const { data: memberships, error: membershipsError } = await supabase
-      .from("organization_members")
-      .select("organization_id, is_owner")
-      .eq("user_id", user.id);
+    fetchedUserIdRef.current = user.id;
+    safeSetState(() => setLoading(true));
 
-    console.log('[ORG] memberships:', memberships, '에러:', membershipsError);
+    try {
+      const { data: memberships, error: membershipsError } = await supabase
+        .from("organization_members")
+        .select("organization_id, is_owner")
+        .eq("user_id", user.id);
 
-if (membershipsError) throw membershipsError;
+      if (membershipsError) throw membershipsError;
 
-if (!memberships || memberships.length === 0) {
-  console.log('[ORG] memberships 없음 - 종료');
-          safeSetState(() => {
-            setOrganizations([]);
-            setCurrentOrganizationState(null);
-            setCurrentRole(null);
-            setLoading(false);
-            setInitialized(true);
-          });
-          return;
-        }
-
-        const organizationIds = memberships.map((m) => m.organization_id);
-
-        const { data: orgs, error: orgsError } = await supabase
-  .from("organizations")
-  .select("id, name")
-  .in("id", organizationIds);
-
-console.log('[ORG] orgs:', orgs, '에러:', orgsError);
-if (orgsError) throw orgsError;
-
-const normalizedOrgs: Organization[] = (orgs ?? []).map((org) => ({
-  id: org.id,
-  name: org.name,
-}));
-
-const nextCurrent = normalizedOrgs[0] ?? null;
-console.log('[ORG] nextCurrent:', nextCurrent);
-let nextRole: string | null = null;
-
-        if (nextCurrent) {
-          const { data: roleRow, error: roleError } = await supabase
-            .from("user_roles")
-            .select("role")
-            .eq("user_id", user.id)
-            .eq("organization_id", nextCurrent.id)
-            .maybeSingle();
-
-          if (roleError) throw roleError;
-          nextRole = roleRow?.role ?? null;
-        }
-
-        console.log('[ORG] safeSetState 호출 직전 - mountedRef:', mountedRef.current);
-safeSetState(() => {
-  console.log('[ORG] safeSetState 내부 실행됨');
-  setOrganizations(normalizedOrgs);
-  setCurrentOrganizationState(nextCurrent);
-  setCurrentRole(nextRole);
-  setLoading(false);
-  setInitialized(true);
-});
-      } catch (error) {
-        console.error("OrganizationContext error:", error);
+      if (!memberships || memberships.length === 0) {
         safeSetState(() => {
           setOrganizations([]);
           setCurrentOrganizationState(null);
@@ -153,11 +95,60 @@ safeSetState(() => {
           setLoading(false);
           setInitialized(true);
         });
+        return;
       }
-    };
 
-    void run();
-  }, [user?.id, authLoading, safeSetState]);
+      const organizationIds = memberships.map((m) => m.organization_id);
+
+      const { data: orgs, error: orgsError } = await supabase
+        .from("organizations")
+        .select("id, name")
+        .in("id", organizationIds);
+
+      if (orgsError) throw orgsError;
+
+      const normalizedOrgs: Organization[] = (orgs ?? []).map((org) => ({
+        id: org.id,
+        name: org.name,
+      }));
+
+      const nextCurrent = normalizedOrgs[0] ?? null;
+      let nextRole: string | null = null;
+
+      if (nextCurrent) {
+        const { data: roleRow, error: roleError } = await supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", user.id)
+          .eq("organization_id", nextCurrent.id)
+          .maybeSingle();
+
+        if (roleError) throw roleError;
+        nextRole = roleRow?.role ?? null;
+      }
+
+      safeSetState(() => {
+        setOrganizations(normalizedOrgs);
+        setCurrentOrganizationState(nextCurrent);
+        setCurrentRole(nextRole);
+        setLoading(false);
+        setInitialized(true);
+      });
+    } catch (error) {
+      console.error("OrganizationContext error:", error);
+      safeSetState(() => {
+        setOrganizations([]);
+        setCurrentOrganizationState(null);
+        setCurrentRole(null);
+        setLoading(false);
+        setInitialized(true);
+      });
+    }
+  }, [user?.id, authLoading, resetState, safeSetState]);
+
+  useEffect(() => {
+    void fetchOrganizations();
+  }, [fetchOrganizations]);
 
   const setCurrentOrganization = useCallback(
     (org: Organization | null) => {
@@ -189,60 +180,9 @@ safeSetState(() => {
   );
 
   const refreshOrganizations = useCallback(async () => {
-    prevUserIdRef.current = undefined;
-    // user?.id를 다시 세팅해서 useEffect 재실행 유도
-    // 직접 run()을 호출하는 것과 동일한 효과
-    if (!user?.id) return;
-    
-    safeSetState(() => setLoading(true));
-
-    try {
-      const { data: memberships, error: membershipsError } = await supabase
-        .from("organization_members")
-        .select("organization_id, is_owner")
-        .eq("user_id", user.id);
-
-      if (membershipsError) throw membershipsError;
-
-      const organizationIds = (memberships ?? []).map((m) => m.organization_id);
-
-      const { data: orgs, error: orgsError } = await supabase
-        .from("organizations")
-        .select("id, name")
-        .in("id", organizationIds);
-
-      if (orgsError) throw orgsError;
-
-      const normalizedOrgs: Organization[] = (orgs ?? []).map((org) => ({
-        id: org.id,
-        name: org.name,
-      }));
-
-      const nextCurrent = normalizedOrgs[0] ?? null;
-      let nextRole: string | null = null;
-
-      if (nextCurrent && user?.id) {
-        const { data: roleRow } = await supabase
-          .from("user_roles")
-          .select("role")
-          .eq("user_id", user.id)
-          .eq("organization_id", nextCurrent.id)
-          .maybeSingle();
-        nextRole = roleRow?.role ?? null;
-      }
-
-      safeSetState(() => {
-        setOrganizations(normalizedOrgs);
-        setCurrentOrganizationState(nextCurrent);
-        setCurrentRole(nextRole);
-        setLoading(false);
-        setInitialized(true);
-      });
-    } catch (error) {
-      console.error("refreshOrganizations error:", error);
-      safeSetState(() => setLoading(false));
-    }
-  }, [user?.id, safeSetState]);
+    fetchedUserIdRef.current = null;
+    await fetchOrganizations();
+  }, [fetchOrganizations]);
 
   const value = useMemo<OrganizationContextType>(
     () => ({
