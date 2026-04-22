@@ -18,18 +18,19 @@ interface SettingsTabProps {
   section?: string;
 }
 
-export function SettingsTab({ section = "payroll-items" }: SettingsTabProps) {
+export function SettingsTab({ section = "payroll-items" }: SettingsTabProps = {}) {
   const { employees } = useEmployeeStore();
-  const hourlyEmployees = employees.filter((emp) => emp.payType === "hourly");
   const { settings, loading, saving, saveSettings } = useOrganizationSettings();
 
-  if (loading) {
+  if (loading || !settings) {
     return (
       <div className="space-y-6 max-w-4xl">
         <Skeleton className="h-48 w-full rounded-lg" />
       </div>
     );
   }
+
+  const hourlyEmployees = (employees ?? []).filter((emp) => emp.payType === "hourly");
 
   return (
     <div className="space-y-6 animate-fade-in max-w-4xl">

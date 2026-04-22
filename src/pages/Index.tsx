@@ -1,6 +1,5 @@
-import { useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { useState } from "react";
+import { useOrganization } from "@/contexts/OrganizationContext";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -122,30 +121,10 @@ const menuItems: MenuItem[] = [
 ];
 
 const Index = () => {
-  useEffect(() => {
-    console.log("🔥 실행됨");
+  const { currentOrganization, loading: organizationLoading } = useOrganization();
 
-    const testConnection = async () => {
-      const { data, error } = await supabase.from("employees").select("*").limit(1);
-
-      console.log("data:", data);
-      console.log("error:", error);
-    };
-
-    testConnection();
-  }, []);
   const [activeMenu, setActiveMenu] = useState("dashboard");
   const [activeSubMenu, setActiveSubMenu] = useState<string | null>(null);
-  useEffect(() => {
-    const testConnection = async () => {
-      const { data, error } = await supabase.from("employees").select("*").limit(1);
-
-      console.log("data:", data);
-      console.log("error:", error);
-    };
-
-    testConnection();
-  }, []);
   const [expandedMenus, setExpandedMenus] = useState<string[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const isMobile = useIsMobile();
@@ -187,9 +166,16 @@ const Index = () => {
   };
 
   const renderContent = () => {
-    switch (activeMenu) {
-      case "dashboard":
-        return <DashboardTab />;
+  switch (activeMenu) {
+    case "dashboard":
+  if (organizationLoading || !currentOrganization) {
+    return (
+      <div className="p-6">
+        <div className="h-32 rounded-lg border animate-pulse bg-muted/30" />
+      </div>
+    );
+  }
+  return <DashboardTab />;
       case "employees":
         return <EmployeeTab activeTab={activeSubMenu || "list"} />;
       case "payroll":
@@ -199,9 +185,21 @@ const Index = () => {
       case "reports":
         return <ReportsTab section={activeSubMenu || "charts"} />;
       case "settings":
-        return <SettingsTab section={activeSubMenu || "payroll-items"} />;
+  if (organizationLoading || !currentOrganization) {
+    return (
+      <div className="p-6">
+        <div className="h-32 rounded-lg border animate-pulse bg-muted/30" />
+      </div>
+    );
+  }
+  return (
+    <SettingsTab
+      key={`${currentOrganization.id}-${activeSubMenu || "payroll-items"}`}
+      section={activeSubMenu || "payroll-items"}
+    />
+  );
       default:
-        return <DashboardTab />;
+  return <DashboardTab />;
     }
   };
 

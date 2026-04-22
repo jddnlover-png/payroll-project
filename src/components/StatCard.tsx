@@ -25,7 +25,7 @@ export function StatCard({ title, value, variant, icon, active, onClick }: StatC
       onClick={onClick}
       onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') onClick(); } : undefined}
       className={cn(
-        'rounded-lg p-6 transition-all duration-200 hover:shadow-md animate-fade-in',
+        'rounded-lg p-6 transition-all duration-200 hover:shadow-md',
         variantStyles[variant],
         onClick && 'cursor-pointer hover:scale-[1.02] active:scale-[0.98]',
         active && 'ring-2 ring-primary shadow-md scale-[1.02]',
@@ -34,7 +34,7 @@ export function StatCard({ title, value, variant, icon, active, onClick }: StatC
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm font-medium opacity-80">{title}</p>
-          <p className="text-3xl font-bold mt-1">{value}명</p>
+          <p className="text-3xl font-bold mt-1">{value}명 (raw:{String(value)})</p>
         </div>
         {icon && <div className="text-2xl opacity-60">{icon}</div>}
       </div>

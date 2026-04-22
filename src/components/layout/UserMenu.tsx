@@ -18,14 +18,13 @@ export function UserMenu() {
   const { user, signOut } = useAuth();
 
   const handleSignOut = async () => {
-    try {
-      await signOut();
-      toast.success('로그아웃되었습니다');
-      navigate('/auth');
-    } catch (error) {
-      toast.error('로그아웃 중 오류가 발생했습니다');
-    }
-  };
+  try {
+    await signOut();
+    window.location.replace('/auth');
+  } catch (error) {
+    toast.error('로그아웃 중 오류가 발생했습니다');
+  }
+};
 
   const getInitials = () => {
     if (!user?.email) return 'U';

@@ -1,3 +1,4 @@
+import { supabase } from "@/integrations/supabase/client";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -45,15 +46,15 @@ function AppRoutes() {
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
-      <OrganizationProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <OrganizationProvider>
             <AppRoutes />
-          </BrowserRouter>
-        </TooltipProvider>
-      </OrganizationProvider>
+          </OrganizationProvider>
+        </BrowserRouter>
+      </TooltipProvider>
     </AuthProvider>
   </QueryClientProvider>
 );

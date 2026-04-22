@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Loader2, Mail, Lock, User, Building2, ArrowLeft } from 'lucide-react';
+import { Mail, Lock, User, Building2, ArrowLeft, Loader2 } from 'lucide-react';
 import { z } from 'zod';
 
 const emailSchema = z.string().email('올바른 이메일 주소를 입력해주세요');
@@ -447,9 +447,8 @@ export default function Auth() {
                 </div>
 
                 <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                  로그인
-                </Button>
+  {loading ? "로그인 중..." : "로그인"}
+</Button>
               </form>
             </TabsContent>
 
@@ -507,9 +506,8 @@ export default function Auth() {
                 </div>
 
                 <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                  회원가입
-                </Button>
+  {loading ? "회원가입 중..." : "회원가입"}
+</Button>
               </form>
             </TabsContent>
           </Tabs>

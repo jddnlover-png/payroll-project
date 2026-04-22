@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react';
-import { useEmployees } from '@/hooks/useEmployees';
 import { useAttendance } from '@/hooks/useAttendance';
 import { useLeaveRecords } from '@/hooks/useLeaveRecords';
 import { Button } from '@/components/ui/button';
@@ -34,7 +33,6 @@ interface AttendanceTableProps {
 }
 
 export function AttendanceTable({ highlightedEmployeeId }: AttendanceTableProps) {
-  const { employees: dbEmployees } = useEmployees();
   const today = new Date().toISOString().split('T')[0];
   const { attendance: dbAttendance, checkIn, checkOut } = useAttendance(today);
   const { leaveRecords } = useLeaveRecords();
@@ -123,45 +121,64 @@ export function AttendanceTable({ highlightedEmployeeId }: AttendanceTableProps)
           </TableRow>
         </TableHeader>
         <TableBody>
-          {grouped.length > 0 ? grouped.map(group => (
-            <>
-              <DepartmentGroupHeader
-                key={`header-${group.department}`}
-                department={group.department}
-                count={group.items.length}
-                isExpanded={!collapsedDepts.has(group.department)}
-                onToggle={() => toggleCollapse(group.department)}
-                colSpan={COL_SPAN}
-              />
-              {!collapsedDepts.has(group.department) && group.items.map(record => (
-                <TableRow key={record.id} id={`dashboard-row-${record.employeeId}`} data-highlighted={highlightedEmployeeId === record.employeeId || undefined}>
-                  <TableCell className="font-medium">{record.employeeNumber}</TableCell>
-                  <TableCell>{record.employeeName}</TableCell>
-                  <TableCell>{record.department}</TableCell>
-                  <TableCell>{record.checkIn || '-'}</TableCell>
-                  <TableCell>{record.checkOut || '-'}</TableCell>
-                  <TableCell>
-                    <Badge
-                      variant="secondary"
-                      className={cn('font-medium', statusConfig[record.status]?.class || '')}
-                    >
-                      {statusConfig[record.status]?.label || record.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      {!record.checkIn && (
-                        <Button size="sm" onClick={() => handleCheckIn(record.employeeId)}>출근</Button>
-                      )}
-                      {record.checkIn && !record.checkOut && (
-                        <Button size="sm" variant="outline" onClick={() => handleCheckOut(record.employeeId)}>퇴근</Button>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </>
-          )) : (
+          {grouped.length > 0 ? grouped.flatMap(group => {
+  const rows = [
+    <DepartmentGroupHeader
+      key={`header-${group.department}`}
+      department={group.department}
+      count={group.items.length}
+      isExpanded={!collapsedDepts.has(group.department)}
+      onToggle={() => toggleCollapse(group.department)}
+      colSpan={COL_SPAN}
+    />
+  ];
+
+  if (!collapsedDepts.has(group.department)) {
+    rows.push(
+      ...group.items.map(record => (
+        <TableRow
+          key={`row-${record.id}`}
+          id={`dashboard-row-${record.employeeId}`}
+          data-highlighted={highlightedEmployeeId === record.employeeId || undefined}
+        >
+          <TableCell className="font-medium">{record.employeeNumber}</TableCell>
+          <TableCell>{record.employeeName}</TableCell>
+          <TableCell>{record.department}</TableCell>
+          <TableCell>{record.checkIn || '-'}</TableCell>
+          <TableCell>{record.checkOut || '-'}</TableCell>
+          <TableCell>
+            <Badge
+              variant="secondary"
+              className={cn('font-medium', statusConfig[record.status]?.class || '')}
+            >
+              {statusConfig[record.status]?.label || record.status}
+            </Badge>
+          </TableCell>
+          <TableCell className="text-right">
+            <div className="flex justify-end gap-2">
+              {!record.checkIn && (
+                <Button size="sm" onClick={() => handleCheckIn(record.employeeId)}>
+                  출근
+                </Button>
+              )}
+              {record.checkIn && !record.checkOut && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleCheckOut(record.employeeId)}
+                >
+                  퇴근
+                </Button>
+              )}
+            </div>
+          </TableCell>
+        </TableRow>
+      ))
+    );
+  }
+
+  return rows;
+}) : (
             <TableRow>
               <TableCell colSpan={COL_SPAN} className="text-center py-8 text-muted-foreground">
                 오늘의 근태 기록이 없습니다.

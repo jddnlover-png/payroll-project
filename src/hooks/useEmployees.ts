@@ -39,11 +39,12 @@ export function useEmployees() {
   const queryClient = useQueryClient();
 
   const {
-    data: employees = [],
-    isLoading,
+    data,
+    isPending,
+    isFetching,
     error,
   } = useQuery({
-    queryKey: ["employees", currentOrganization?.id],
+    queryKey: ["employees", currentOrganization?.id ?? "none"],
     queryFn: async () => {
       if (!currentOrganization?.id) return [];
 
@@ -57,7 +58,15 @@ export function useEmployees() {
       return data as unknown as Employee[];
     },
     enabled: !!currentOrganization?.id,
+    placeholderData: (previousData) => previousData ?? [],
+    staleTime: 1000 * 60 * 5,
+    gcTime: 1000 * 60 * 30,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
   });
+
+  const employees = data ?? [];
+  const activeEmployees = employees.filter((e) => e.is_active !== false);
 
   const addEmployee = useMutation({
     mutationFn: async (employee: Omit<EmployeeInsert, "organization_id">) => {
@@ -65,10 +74,7 @@ export function useEmployees() {
 
       const { data, error } = await supabase
         .from("employees")
-        .insert({
-          ...employee,
-          organization_id: currentOrganization.id,
-        })
+        .insert({ ...employee, organization_id: currentOrganization.id })
         .select()
         .single();
 
@@ -76,9 +82,9 @@ export function useEmployees() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["employees", currentOrganization?.id] });
-      toast.success("직원이 등록되었습니다");
-    },
+  queryClient.invalidateQueries({ queryKey: ["employees"] });
+  toast.success("직원이 등록되었습니다");
+},
     onError: (error: any) => {
       console.error("Error adding employee:", error);
       if (error.message?.includes("unique")) {
@@ -91,15 +97,20 @@ export function useEmployees() {
 
   const updateEmployee = useMutation({
     mutationFn: async ({ id, ...updates }: { id: string } & EmployeeUpdate) => {
-      const { data, error } = await supabase.from("employees").update(updates).eq("id", id).select().single();
+      const { data, error } = await supabase
+        .from("employees")
+        .update(updates)
+        .eq("id", id)
+        .select()
+        .single();
 
       if (error) throw error;
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["employees", currentOrganization?.id] });
-      toast.success("직원 정보가 수정되었습니다");
-    },
+  queryClient.invalidateQueries({ queryKey: ["employees"] });
+  toast.success("직원 정보가 수정되었습니다");
+},
     onError: (error) => {
       console.error("Error updating employee:", error);
       toast.error("직원 정보 수정 중 오류가 발생했습니다");
@@ -109,28 +120,26 @@ export function useEmployees() {
   const deleteEmployee = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from("employees").delete().eq("id", id);
-
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["employees", currentOrganization?.id] });
-      toast.success("직원이 삭제되었습니다");
-    },
+  queryClient.invalidateQueries({ queryKey: ["employees"] });
+  toast.success("직원이 삭제되었습니다");
+},
     onError: (error) => {
       console.error("Error deleting employee:", error);
       toast.error("직원 삭제 중 오류가 발생했습니다");
     },
   });
 
-  const activeEmployees = employees.filter((e) => e.is_active);
-
   return {
-    employees,
-    activeEmployees,
-    isLoading,
-    error,
-    addEmployee,
-    updateEmployee,
-    deleteEmployee,
-  };
+  employees,
+  activeEmployees,
+  isLoading: !!currentOrganization?.id && isPending && employees.length === 0,
+  isFetching,
+  error,
+  addEmployee,
+  updateEmployee,
+  deleteEmployee,
+};
 }
