@@ -176,14 +176,14 @@ const Index = () => {
     );
   }
   return <DashboardTab />;
-      case "employees":
+                  case "employees":
         return <EmployeeTab activeTab={activeSubMenu || "list"} />;
-      case "payroll":
+            case "payroll":
         return <PayrollTab activeTab={activeSubMenu || "regular"} />;
       case "attendance":
-        return <AttendanceTab activeTab={activeSubMenu || "daily"} />;
-      case "reports":
-        return <ReportsTab section={activeSubMenu || "charts"} />;
+  return <AttendanceTab activeTab={activeSubMenu || "daily"} />;
+            case "reports":
+  return <ReportsTab section={activeSubMenu || "salary-payment"} />;
       case "settings":
   if (organizationLoading || !currentOrganization) {
     return (
@@ -192,12 +192,7 @@ const Index = () => {
       </div>
     );
   }
-  return (
-    <SettingsTab
-      key={`${currentOrganization.id}-${activeSubMenu || "payroll-items"}`}
-      section={activeSubMenu || "payroll-items"}
-    />
-  );
+  return <SettingsTab section={activeSubMenu || "payroll-items"} />;
       default:
   return <DashboardTab />;
     }
@@ -278,7 +273,7 @@ const Index = () => {
 
       {/* Main Content */}
       <div className="flex-1 min-w-0 flex flex-col">
-        <header className="border-b px-4 py-3 flex items-center justify-between sticky top-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-10">
+                <header className="border-b px-4 py-3 flex items-center justify-between sticky top-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-10">
           <div className="flex items-center gap-3">
             {isMobile && (
               <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
@@ -300,17 +295,17 @@ const Index = () => {
               <h2 className="text-base font-semibold text-foreground">{getCurrentLabel()}</h2>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <OrganizationSwitcher />
-            <UserMenu />
-          </div>
+                    <div className="flex items-center gap-2">
+  <OrganizationSwitcher />
+  <UserMenu />
+</div>
         </header>
 
         <main className="flex-1 p-4 md:p-6 overflow-auto">{renderContent()}</main>
       </div>
 
-      {/* AI 챗봇 */}
-      <AdminAIChatbot />
+            {/* AI 챗봇 */}
+      {/* <AdminAIChatbot /> */}
     </div>
   );
 };

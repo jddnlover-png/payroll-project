@@ -10,8 +10,8 @@ interface ReportsTabProps {
 }
 
 export function ReportsTab({ section = "salary-payment" }: ReportsTabProps) {
-  return (
-    <div className="space-y-6 animate-fade-in">
+    return (
+    <div className="space-y-6">
       {section === "salary-payment" && <SalaryPaymentReport />}
       {section === "monthly-trend" && <MonthlyTrendReport />}
       {section === "annual-salary" && <AnnualSalaryReport />}

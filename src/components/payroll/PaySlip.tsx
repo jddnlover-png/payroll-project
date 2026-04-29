@@ -1,5 +1,4 @@
 import { useState } from "react";
-import DOMPurify from "dompurify";
 import html2pdf from "html2pdf.js";
 import { PayrollRecord, Employee } from "@/types/employee";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -14,6 +13,7 @@ import { useEmployeeStore } from "@/store/employeeStore";
 import { usePayrollSettingsStore } from "@/store/payrollSettingsStore";
 import { useOrganizationSettings } from "@/hooks/useOrganizationSettings";
 import { useProductionTaxExempt } from "@/hooks/useProductionTaxExempt";
+import { generatePayslipHtml } from "@/components/payroll/payslipHtml";
 import { ANNUAL_EXEMPT_LIMIT } from "@/utils/productionTaxExemption";
 
 const formatMinutesToTime = (minutes: number) => {
@@ -69,6 +69,20 @@ export function PaySlip({
 
   const fmtNum = (n: number) => new Intl.NumberFormat("ko-KR").format(n);
 
+  const actualLateMinutes =
+    (record as any).actualLateMinutes ??
+    (record as any).actual_late_minutes ??
+    (record as any).totalActualLateMinutes ??
+    0;
+
+  const actualEarlyLeaveMinutes =
+    (record as any).actualEarlyLeaveMinutes ??
+    (record as any).actual_early_leave_minutes ??
+    (record as any).totalActualEarlyLeaveMinutes ??
+    0;
+
+  const formatPlainMinutes = (minutes: number) => `${minutes}분`;
+
   // 적용 시급 계산
   const standardWorkHours = orgSettings.standard_work_hours || 8;
   const appliedHourlyRate = (() => {
@@ -122,6 +136,29 @@ export function PaySlip({
   const totalDeductions = sortedDeductionItems
     ? sortedDeductionItems.reduce((sum, item) => sum + item.amount, 0)
     : record.deductions;
+
+  // 표시용: 휴일 야간교대 시간은 paymentItems의 hol-shift-tier*에서 가져온다.
+  const holidayShiftItems = displayPaymentItems.filter((item: any) =>
+    String(item.itemId || "").startsWith("hol-shift-tier"),
+  );
+
+  const holidayNightShiftMinutes = holidayShiftItems.reduce(
+    (sum: number, item: any) => sum + ((item.shiftTierMinutes || 0) as number),
+    0,
+  );
+
+  const holidayNightShiftTier1Minutes =
+    (holidayShiftItems.find((item: any) => item.itemId === "hol-shift-tier1") as any)?.shiftTierMinutes || 0;
+  const holidayNightShiftTier2Minutes =
+    (holidayShiftItems.find((item: any) => item.itemId === "hol-shift-tier2") as any)?.shiftTierMinutes || 0;
+  const holidayNightShiftTier3Minutes =
+    (holidayShiftItems.find((item: any) => item.itemId === "hol-shift-tier3") as any)?.shiftTierMinutes || 0;
+  const holidayNightShiftTier4Minutes =
+    (holidayShiftItems.find((item: any) => item.itemId === "hol-shift-tier4") as any)?.shiftTierMinutes || 0;
+
+  const nonHolidayNightShiftMinutes = record.nightShiftMinutes || 0;
+  const displayTotalNightShiftMinutes = nonHolidayNightShiftMinutes + holidayNightShiftMinutes;
+  const displayHolidayWorkMinutes = Math.max(record.holidayWorkMinutes || 0, holidayNightShiftMinutes);
 
   // 계산방법 생성 함수
   const getPaymentFormula = (item: { itemId: string; name: string; amount: number }): string => {
@@ -248,256 +285,29 @@ export function PaySlip({
     return item.amount > 0 ? "월정액 공제" : "해당 없음";
   };
 
-  const generatePaymentItemsHtml = () => {
-    return displayPaymentItems
-      .filter((item) => item.amount !== 0 || item.itemId === "base-salary")
-      .map((item) => {
-        const isBase = item.itemId === "base-salary";
-        const sanitizedName = DOMPurify.sanitize(item.name);
-        return `
-          <tr>
-            <td>${sanitizedName}${isBase && employee?.payType === "monthly" ? ' <span style="font-size:8px;color:#888;">(주휴수당 포함)</span>' : ""}</td>
-            <td class="${isBase ? "" : "text-green"}">${isBase ? "" : "+"}${formatCurrency(item.amount)}</td>
-          </tr>
-        `;
-      })
-      .join("");
-  };
-
-  // 공제 항목 HTML 생성 (sanitized)
-  const generateDeductionItemsHtml = () => {
-    if (sortedDeductionItems && sortedDeductionItems.length > 0) {
-      return sortedDeductionItems
-        .map((item) => {
-          const sanitizedName = DOMPurify.sanitize(item.name);
-          const isRefund = item.amount < 0;
-          return `
-          <tr>
-            <td>${sanitizedName}</td>
-            <td class="${isRefund ? "text-green" : "text-red"}">${isRefund ? "+" : "-"}${formatCurrency(Math.abs(item.amount))}</td>
-          </tr>
-        `;
-        })
-        .join("");
-    }
-    return `
-      <tr>
-        <td>4대보험 및 기타공제</td>
-        <td class="text-red">-${formatCurrency(record.deductions)}</td>
-      </tr>
-    `;
-  };
-
-  const generatePrintHtml = () => {
-    const sanitizedCompanyName = DOMPurify.sanitize(companySettings.companyName || "회사명");
-    const sanitizedEmployeeName = DOMPurify.sanitize(record.employeeName);
-    const sanitizedMonth = DOMPurify.sanitize(record.month);
-    const sanitizedEmployeeNumber = DOMPurify.sanitize(record.employeeNumber);
-    const sanitizedDepartment = DOMPurify.sanitize(record.department);
-    const sanitizedPosition = DOMPurify.sanitize(employee.position || "-");
-    const jobCategoryLabel = employee.jobCategory === "production" ? "생산직" : "사무직";
-
-    // 생년월일: 주민등록번호 앞 6자리에서 추출
-    const birthDate = (() => {
-      const rn = employee.residentNumber;
-      if (!rn) return "-";
-      const digits = rn.replace(/[^0-9]/g, "");
-      if (digits.length < 6) return "-";
-      const yy = digits.substring(0, 2);
-      const mm = digits.substring(2, 4);
-      const dd = digits.substring(4, 6);
-      const centuryDigit = digits.length >= 7 ? digits[6] : "";
-      const century = centuryDigit === "3" || centuryDigit === "4" ? "20" : "19";
-      return `${century}${yy}.${mm}.${dd}`;
-    })();
-
-    return `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>급여명세서 - ${sanitizedEmployeeName}</title>
-          <style>
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-            @page { size: A4; margin: 8mm; }
-            body { 
-  font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; 
-  padding: 6px; max-width: 100%; margin: 0 auto; 
-  background: #fff; color: #333; line-height: 1.2; font-size: 10px;
-}
-.header { text-align: center; margin-bottom: 5px; padding-bottom: 4px; border-bottom: 2px solid #2563eb; }
-.company-name { font-size: 10px; color: #666; margin-bottom: 1px; }
-.title { font-size: 15px; font-weight: bold; color: #1e40af; margin-bottom: 1px; }
-.month { font-size: 10px; color: #666; background: #f1f5f9; display: inline-block; padding: 1px 8px; border-radius: 8px; }
-.content-wrapper { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
-.section { margin-bottom: 3px; border: 1px solid #e2e8f0; border-radius: 4px; overflow: hidden; }
-.section-header { background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: white; padding: 3px 6px; font-weight: bold; font-size: 10px; }
-.section-header.payment { background: linear-gradient(135deg, #10b981, #059669); }
-.section-header.deduction { background: linear-gradient(135deg, #ef4444, #dc2626); }
-table { width: 100%; border-collapse: collapse; }
-td { padding: 2px 5px; border-bottom: 1px solid #f1f5f9; font-size: 9.5px; }
-td:first-child { color: #64748b; width: 50%; }
-td:last-child { text-align: right; font-weight: 600; color: #1e293b; }
-.calc-table td:last-child { text-align: left; font-weight: normal; color: #555; }
-.calc-table td.formula { text-align: left !important; color: #555 !important; font-size: 8.5px; white-space: normal !important; overflow: hidden; word-break: keep-all; line-height: 1.5; font-weight: normal !important; }
-tr:last-child td { border-bottom: none; }
-.text-green { color: #059669; }
-.text-red { color: #dc2626; }
-.total-row { background: #f8fafc; font-weight: bold; }
-.total-row td:first-child { color: #1e293b; }
-.net-salary { background: linear-gradient(135deg, #1e40af, #3b82f6); color: white; border-radius: 4px; padding: 6px; text-align: center; margin-top: 4px; }
-.net-salary-label { font-size: 10px; opacity: 0.9; margin-bottom: 1px; }
-.net-salary-amount { font-size: 16px; font-weight: bold; }
-.footer { text-align: center; color: #94a3b8; font-size: 8px; padding: 6px 4px 8px 4px; border-top: 1px solid #e2e8f0; margin-top: 4px; }
-.full-width { grid-column: 1 / -1; }
-.calc-section { border: 1px solid #e2e8f0; border-radius: 4px; overflow: hidden; margin-bottom: 3px; }
-.calc-section .section-header { background: linear-gradient(135deg, #6366f1, #4f46e5); }
-.calc-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-.calc-table td { padding: 3px 4px; font-size: 9px; border-bottom: 1px solid #f1f5f9; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.5; }
-.calc-table .cat-row td { text-align: center; font-weight: bold; font-size: 9px; }
-.calc-table .head-row { background: #fafafa; font-weight: bold; }
-.calc-table td.formula { text-align: left !important; color: #555; font-size: 7.5px; white-space: normal !important; overflow: hidden; word-break: keep-all; line-height: 1.3; }
-@media print {
-  body { padding: 0; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
-  .section, .calc-section { break-inside: avoid; page-break-inside: avoid; }
-}
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <div class="company-name">${sanitizedCompanyName}</div>
-            <div class="title">급 여 명 세 서</div>
-            <div class="month">${sanitizedMonth}</div>
-          </div>
-          <div class="content-wrapper">
-  <div class="section full-width" style="margin-bottom:3px;">
-  <div class="section-header">📋 직원 정보 / 근태 / 근로시간</div>
-  <table style="width:100%;table-layout:fixed;">
-    <colgroup>
-      <col style="width:10%;"/><col style="width:18%;"/>
-      <col style="width:10%;"/><col style="width:22%;"/>
-      <col style="width:13%;"/><col style="width:27%;"/>
-    </colgroup>
-    <tr>
-      <td style="border-right:1px solid #e2e8f0;white-space:nowrap;">성명</td>
-      <td style="border-right:1px solid #e2e8f0;overflow:hidden;text-overflow:ellipsis;">${sanitizedEmployeeName}</td>
-      <td style="border-right:1px solid #e2e8f0;white-space:nowrap;">사번/직종</td>
-      <td style="border-right:1px solid #e2e8f0;overflow:hidden;text-overflow:ellipsis;">${sanitizedEmployeeNumber} / ${jobCategoryLabel}</td>
-      <td style="border-right:1px solid #e2e8f0;white-space:nowrap;">출근일수</td>
-      <td style="white-space:nowrap;">${record.presentDays + record.lateDays}일 (지각 ${record.lateDays}일)</td>
-    </tr>
-    <tr>
-      <td style="border-right:1px solid #e2e8f0;white-space:nowrap;">입사일</td>
-      <td style="border-right:1px solid #e2e8f0;white-space:nowrap;">${DOMPurify.sanitize(employee.hireDate || "-")}</td>
-      <td style="border-right:1px solid #e2e8f0;white-space:nowrap;">고용/급여</td>
-      <td style="border-right:1px solid #e2e8f0;overflow:hidden;text-overflow:ellipsis;">${employee.employmentType === "regular" ? "정규직" : employee.employmentType === "contract" ? "계약직" : employee.employmentType === "daily" ? "일용직" : "프리랜서"} / ${employee.payType === "daily" ? "일급제" : employee.payType === "hourly" ? "시급제" : "월급제"}</td>
-      <td style="border-right:1px solid #e2e8f0;white-space:nowrap;">결근/휴가</td>
-      <td style="white-space:nowrap;">${record.absentDays}일 / ${record.leaveDays}일</td>
-    </tr>
-    <tr>
-      <td style="border-right:1px solid #e2e8f0;white-space:nowrap;">시급</td>
-      <td style="border-right:1px solid #e2e8f0;white-space:nowrap;">${appliedHourlyRateText}</td>
-      <td style="border-right:1px solid #e2e8f0;white-space:nowrap;">부서/직급</td>
-      <td style="border-right:1px solid #e2e8f0;overflow:hidden;text-overflow:ellipsis;">${sanitizedDepartment} / ${sanitizedPosition}</td>
-      <td style="border-right:1px solid #e2e8f0;white-space:nowrap;">총/정규</td>
-      <td style="white-space:nowrap;">${formatMinutesToTime(record.totalWorkMinutes || 0)} / ${formatMinutesToTime(record.regularWorkMinutes || 0)}</td>
-    </tr>
-    <tr>
-      <td style="border-right:1px solid #e2e8f0;white-space:nowrap;">급여계좌</td>
-      <td colspan="3" style="border-right:1px solid #e2e8f0;overflow:hidden;text-overflow:ellipsis;">${DOMPurify.sanitize(employee.bankName ? `${employee.bankName} ${employee.accountNumber || ""}` : "-")}</td>
-      <td style="border-right:1px solid #e2e8f0;white-space:nowrap;">연장/야간</td>
-      <td style="white-space:nowrap;">${formatMinutesToTime(record.overtimeMinutes || 0)} / ${formatMinutesToTime((record.nightWorkMinutes || 0) + (record.nightShiftMinutes || 0))}</td>
-    </tr>
-  </table>
-</div>
-            <div class="section">
-              <div class="section-header payment">💰 지급 내역</div>
-              <table>
-                ${generatePaymentItemsHtml()}
-                <tr class="total-row"><td>지급액 합계</td><td>${formatCurrency(totalPayments)}</td></tr>
-              </table>
-            </div>
-            <div class="section">
-  <div class="section-header deduction">📉 공제 내역</div>
-  <table>
-    ${generateDeductionItemsHtml()}
-    <tr class="total-row">
-      <td>공제액 합계</td>
-      <td class="${totalDeductions < 0 ? "text-green" : "text-red"}">${totalDeductions < 0 ? "+" : "-"}${formatCurrency(Math.abs(totalDeductions))}</td>
-    </tr>
-  </table>
-</div>
-            ${""}
-            <div class="calc-section full-width">
-  <div class="section-header">📊 임금 계산방법</div>
-  <table class="calc-table">
-    <colgroup>
-  <col style="width:10%;"/>
-  <col style="width:9%;"/>
-  <col style="width:31%;"/>
-  <col style="width:10%;"/>
-  <col style="width:9%;"/>
-  <col style="width:31%;"/>
-</colgroup>
-    <tr class="cat-row"><td colspan="3" style="background:#e6f4ea;color:#1a7f37;">지급항목</td><td colspan="3" style="background:#fce8e6;color:#c62828;">공제항목</td></tr>
-    <tr class="head-row"><td>항목</td><td style="text-align:right;">금액</td><td>계산방법</td><td>항목</td><td style="text-align:right;">금액</td><td>계산방법</td></tr>
-    ${(() => {
-      const payCalcItems = displayPaymentItems.filter((i) => i.amount !== 0 || i.itemId === "base-salary");
-      const dedCalcItems = sortedDeductionItems || [];
-      const maxLen = Math.max(payCalcItems.length, dedCalcItems.length);
-      let rows = "";
-      for (let i = 0; i < maxLen; i++) {
-        const p = payCalcItems[i];
-        const d = dedCalcItems[i];
-        rows += "<tr>";
-        rows += p
-          ? `<td>${DOMPurify.sanitize(p.name)}</td><td style="text-align:right;">${formatCurrency(p.amount)}</td><td class="formula">${DOMPurify.sanitize(getPaymentFormula(p))}</td>`
-          : "<td></td><td></td><td></td>";
-        rows += d
-          ? `<td>${DOMPurify.sanitize(d.name)}</td><td style="text-align:right;color:#c62828;">${formatCurrency(d.amount)}</td><td class="formula">${DOMPurify.sanitize(getDeductionFormula(d))}</td>`
-          : "<td></td><td></td><td></td>";
-        rows += "</tr>";
-      }
-      if (employee?.jobCategory === "production" && yearlyExempt) {
-        const thisMonthRecord = yearlyExempt.monthlyBreakdown.find((r) => r.month === recordMonth);
-        const thisMonthExempt = thisMonthRecord?.exemptAmount ?? 0;
-        const newAccumulated = accumulatedBeforeThisMonth + thisMonthExempt;
-        const remainingLimit = Math.max(0, ANNUAL_EXEMPT_LIMIT - newAccumulated);
-        const usageRate = Math.min(100, Math.round((newAccumulated / ANNUAL_EXEMPT_LIMIT) * 100));
-        rows += `<tr style="background:#fffbeb;">
-      <td colspan="6" style="padding:2px 6px;color:#92400e;font-size:8.5px;border-top:1px solid #fde68a;">
-        🏭 생산직비과세(소§17) | 이번달: ${thisMonthExempt > 0 ? new Intl.NumberFormat("ko-KR").format(thisMonthExempt) + "원" : "미적용"} | 연간누적: ${new Intl.NumberFormat("ko-KR").format(newAccumulated)} / ${new Intl.NumberFormat("ko-KR").format(ANNUAL_EXEMPT_LIMIT)}원 | 잔여: ${new Intl.NumberFormat("ko-KR").format(remainingLimit)}원 (${usageRate}% 소진)
-      </td>
-    </tr>`;
-      }
-      return rows;
-    })()}
-              </table>
-            </div>
-          </div>
-          <div class="net-salary">
-            <div class="net-salary-label">실지급액</div>
-            <div class="net-salary-amount">${formatCurrency(record.netSalary)}</div>
-          </div>
-          <div class="footer">
-            <p>본 명세서는 ${sanitizedMonth} 귀속 급여입니다. | ${sanitizedCompanyName} | 발급일: ${new Date().toLocaleDateString("ko-KR")}</p>
-            <p style="margin-top: 4px; font-weight: 500;">귀하의 노고에 감사드립니다.</p>
-          </div>
-        </body>
-      </html>
-    `;
-  };
+  const getPayslipHtml = () =>
+    generatePayslipHtml({
+      record,
+      employee,
+      companyName: companySettings.companyName || "회사명",
+      paymentItems,
+      deductionItems,
+      orgSettings,
+      yearlyExempt,
+      accumulatedBeforeThisMonth,
+    });
 
   const handlePrint = () => {
     const printWindow = window.open("", "_blank");
     if (!printWindow) return;
-    printWindow.document.write(generatePrintHtml());
+    printWindow.document.write(getPayslipHtml());
     printWindow.document.close();
     printWindow.print();
   };
 
   const handlePdfExport = () => {
     const container = document.createElement("div");
-    container.innerHTML = generatePrintHtml();
+    container.innerHTML = getPayslipHtml();
     const body = container.querySelector("body");
     const content = body ? body.innerHTML : container.innerHTML;
 
@@ -713,8 +523,12 @@ tr:last-child td { border-bottom: none; }
                 <span className="font-medium">{record.presentDays + record.lateDays}일</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">지각일수</span>
-                <span className="font-medium">{record.lateDays}일</span>
+                <span className="text-muted-foreground">지각시간</span>
+                <span className="font-medium">{formatPlainMinutes(actualLateMinutes)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">조퇴시간</span>
+                <span className="font-medium">{formatPlainMinutes(actualEarlyLeaveMinutes)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">결근일수</span>
@@ -751,12 +565,55 @@ tr:last-child td { border-bottom: none; }
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">야간교대근로시간</span>
-                <span className="font-medium">{formatMinutesToTime(record.nightShiftMinutes || 0)}</span>
+                <span className="font-medium">{formatMinutesToTime(displayTotalNightShiftMinutes)}</span>
               </div>
+
+              {holidayNightShiftMinutes > 0 && (
+                <>
+                  <div className="flex justify-between col-span-2 pl-3 text-xs">
+                    <span className="text-muted-foreground">└ 비휴일 야간교대</span>
+                    <span className="font-medium">{formatMinutesToTime(nonHolidayNightShiftMinutes)}</span>
+                  </div>
+                  <div className="flex justify-between col-span-2 pl-3 text-xs">
+                    <span className="text-muted-foreground">└ 휴일 야간교대</span>
+                    <span className="font-medium">{formatMinutesToTime(holidayNightShiftMinutes)}</span>
+                  </div>
+                </>
+              )}
+
               <div className="flex justify-between">
                 <span className="text-muted-foreground">휴일근로시간</span>
-                <span className="font-medium">{formatMinutesToTime(record.holidayWorkMinutes || 0)}</span>
+                <span className="font-medium">{formatMinutesToTime(displayHolidayWorkMinutes)}</span>
               </div>
+
+              {holidayNightShiftMinutes > 0 && (
+                <>
+                  {holidayNightShiftTier1Minutes > 0 && (
+                    <div className="flex justify-between col-span-2 pl-3 text-xs">
+                      <span className="text-muted-foreground">└ 휴일1단계</span>
+                      <span className="font-medium">{formatMinutesToTime(holidayNightShiftTier1Minutes)}</span>
+                    </div>
+                  )}
+                  {holidayNightShiftTier2Minutes > 0 && (
+                    <div className="flex justify-between col-span-2 pl-3 text-xs">
+                      <span className="text-muted-foreground">└ 휴일2단계</span>
+                      <span className="font-medium">{formatMinutesToTime(holidayNightShiftTier2Minutes)}</span>
+                    </div>
+                  )}
+                  {holidayNightShiftTier3Minutes > 0 && (
+                    <div className="flex justify-between col-span-2 pl-3 text-xs">
+                      <span className="text-muted-foreground">└ 휴일3단계</span>
+                      <span className="font-medium">{formatMinutesToTime(holidayNightShiftTier3Minutes)}</span>
+                    </div>
+                  )}
+                  {holidayNightShiftTier4Minutes > 0 && (
+                    <div className="flex justify-between col-span-2 pl-3 text-xs">
+                      <span className="text-muted-foreground">└ 휴일4단계</span>
+                      <span className="font-medium">{formatMinutesToTime(holidayNightShiftTier4Minutes)}</span>
+                    </div>
+                  )}
+                </>
+              )}
             </CardContent>
           </Card>
 

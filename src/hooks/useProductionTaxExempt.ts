@@ -112,11 +112,13 @@ export function useProductionTaxExempt(year: number) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["production_tax_exempt_settings", orgId, year] });
+      queryClient.invalidateQueries({ queryKey: ["production_tax_exempt_records", orgId, year] });
       toast.success("생산직 비과세 설정이 저장되었습니다");
     },
-    onError: () => {
-      toast.error("설정 저장 중 오류가 발생했습니다");
-    },
+    onError: (error) => {
+  console.error("production_tax_exempt_settings save error:", error);
+  toast.error("설정 저장 중 오류가 발생했습니다");
+},
   });
 
   // ── 월별 비과세 기록 저장 ──
@@ -133,6 +135,7 @@ export function useProductionTaxExempt(year: number) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["production_tax_exempt_records", orgId, year] });
+      queryClient.invalidateQueries({ queryKey: ["production_tax_exempt_settings", orgId, year] });
     },
   });
 

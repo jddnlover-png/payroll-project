@@ -1,4 +1,5 @@
 import { useCallback } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useOrganization } from "@/contexts/OrganizationContext";
 import { useEmployees } from "@/hooks/useEmployees";
 import { useOrganizationSettings } from "@/hooks/useOrganizationSettings";
@@ -15,6 +16,8 @@ import { calculateProductionExempt } from "@/utils/productionTaxExemption";
 import { calculateIncomeTax } from "@/lib/incomeTaxCalculation";
 
 export function usePayrollCalculation(year: number, month: number) {
+  const queryClient = useQueryClient();
+
   const { currentOrganization } = useOrganization();
   const { employees } = useEmployees();
   const { settings: orgSettings } = useOrganizationSettings();
@@ -36,6 +39,53 @@ export function usePayrollCalculation(year: number, month: number) {
       }
 
       try {
+        const getKstMinutes = (value: string | null) => {
+          if (!value) return null;
+          const d = new Date(value);
+          const kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
+          return kst.getUTCHours() * 60 + kst.getUTCMinutes();
+        };
+
+        const getActualAttendanceMinutes = (records: any[]) => {
+          let actualLateMinutes = 0;
+          let actualEarlyLeaveMinutes = 0;
+
+          records.forEach((att) => {
+            const ci = att.check_in;
+            const co = att.check_out;
+            if (!ci || !co) return;
+
+            const isNight = (att.work_type || "day") === "night";
+
+            const checkInMin = getKstMinutes(ci);
+            const checkOutMin = getKstMinutes(co);
+            if (checkInMin === null || checkOutMin === null) return;
+
+            const startTime = isNight ? orgSettings.shift_tier1_start : orgSettings.work_start_time;
+            const endTime = isNight ? orgSettings.shift_tier3_end : orgSettings.work_end_time;
+            const lateThreshold = isNight ? orgSettings.shift_late_threshold : orgSettings.late_threshold;
+
+            const [sh, sm] = startTime.split(":").map(Number);
+            const startMin = sh * 60 + sm;
+
+            const [eh, em] = endTime.split(":").map(Number);
+            const endMin = eh * 60 + em;
+
+            if (checkInMin > startMin + lateThreshold) {
+              actualLateMinutes += checkInMin - startMin;
+            }
+
+            if (!isNight && checkOutMin < endMin) {
+              actualEarlyLeaveMinutes += endMin - checkOutMin;
+            }
+          });
+
+          return {
+            actualLateMinutes,
+            actualEarlyLeaveMinutes,
+          };
+        };
+
         // 해당 월의 시작일과 종료일 계산
         const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
         const lastDay = new Date(year, month, 0).getDate();
@@ -92,6 +142,24 @@ export function usePayrollCalculation(year: number, month: number) {
           (emp) => emp.is_active && employeeIds.includes(emp.id) && emp.employment_type !== "daily",
         );
 
+        const targetEmployeeIds = targetEmployees.map((emp) => emp.id);
+
+        // 이번 급여계산에서 제외된 직원의 해당 월 생산직 비과세 records 삭제
+        // 급여계산 버튼이 해당 월의 최신 계산 상태를 의미하므로,
+        // 선택되지 않은 직원의 월별 비과세 기록도 함께 제거한다.
+        const { error: cleanupExemptError } = await supabase
+          .from("production_tax_exempt_records")
+          .delete()
+          .eq("organization_id", currentOrganization.id)
+          .eq("apply_year", year)
+          .eq("apply_month", month)
+          .not("employee_id", "in", `(${targetEmployeeIds.join(",")})`);
+
+        if (cleanupExemptError) {
+          console.error("production_tax_exempt_records cleanup error:", cleanupExemptError);
+          throw cleanupExemptError;
+        }
+
         // salary_details 엔진용 전체 근태 데이터 변환
         const allAttRaw: AttendanceRawRecord[] = (allAttendanceData || []).map((a: any) => ({
           id: a.id,
@@ -120,6 +188,8 @@ export function usePayrollCalculation(year: number, month: number) {
             const lateDays = empAttendance.filter((a) => a.status === "late").length;
             const absentDays = empAttendance.filter((a) => a.status === "absent").length;
             const workedDays = presentDays + lateDays;
+
+            const { actualLateMinutes, actualEarlyLeaveMinutes } = getActualAttendanceMinutes(empAttendance);
 
             // ========== 시급/일급제: 검증 완료된 salary_details 엔진 사용 ==========
             if (emp.pay_type !== "monthly") {
@@ -284,14 +354,16 @@ export function usePayrollCalculation(year: number, month: number) {
                 });
               }
 
-              // 공휴일 근로수당 추가
-              if (publicHolidayWorkPay > 0) {
+              // 공휴일 근로시간 메타 저장
+              // 금액이 0원이어도 명세서 근무시간 표시를 위해 시간은 반드시 저장
+              if (meta.publicHolidayWorkMinutes > 0 || publicHolidayWorkPay > 0) {
                 paymentItemsValues.push({
                   itemId: "public-holiday-work-pay",
                   name: "공휴일 근로수당",
                   amount: publicHolidayWorkPay,
                   type: "payment",
-                });
+                  publicHolidayWorkMinutes: meta.publicHolidayWorkMinutes,
+                } as any);
               }
 
               // 주휴수당 추가
@@ -346,19 +418,32 @@ export function usePayrollCalculation(year: number, month: number) {
                 exemptAmount = exemptResult.exemptAmount;
 
                 // upsert로 변경 (UNIQUE 제약 기반 안전한 덮어쓰기)
-                await supabase.from("production_tax_exempt_records").upsert(
-                  {
-                    organization_id: currentOrganization.id,
-                    employee_id: emp.id,
-                    apply_year: year,
-                    apply_month: month,
-                    monthly_salary: exemptResult.monthlySalary,
-                    is_eligible_month: exemptResult.isEligible,
-                    exempt_amount: exemptResult.exemptAmount,
-                    taxable_amount: exemptResult.taxableAmount,
-                  },
-                  { onConflict: "organization_id,employee_id,apply_year,apply_month" },
-                );
+                const { data: savedExemptRecord, error: exemptRecordError } = await supabase
+                  .from("production_tax_exempt_records")
+                  .upsert(
+                    {
+                      organization_id: currentOrganization.id,
+                      employee_id: emp.id,
+                      apply_year: year,
+                      apply_month: month,
+                      monthly_salary: exemptResult.monthlySalary,
+                      is_eligible_month: exemptResult.isEligible,
+                      exempt_amount: exemptResult.exemptAmount,
+                      taxable_amount: exemptResult.taxableAmount,
+                    },
+                    { onConflict: "organization_id,employee_id,apply_year,apply_month" },
+                  )
+                  .select()
+                  .single();
+
+                if (exemptRecordError) {
+                  console.error("production_tax_exempt_records upsert error:", exemptRecordError);
+                  throw exemptRecordError;
+                }
+
+                if (!savedExemptRecord) {
+                  throw new Error("production_tax_exempt_records 저장 결과가 없습니다.");
+                }
               }
 
               // ── 공제 기준 분리 (법적 기준) ──
@@ -422,6 +507,8 @@ export function usePayrollCalculation(year: number, month: number) {
               return {
                 organization_id: currentOrganization.id,
                 employee_id: emp.id,
+                actual_late_minutes: actualLateMinutes,
+                actual_early_leave_minutes: actualEarlyLeaveMinutes,
                 period_year: year,
                 period_month: month,
                 base_salary: baseSalary,
@@ -640,6 +727,8 @@ export function usePayrollCalculation(year: number, month: number) {
             return {
               organization_id: currentOrganization.id,
               employee_id: emp.id,
+              actual_late_minutes: actualLateMinutes,
+              actual_early_leave_minutes: actualEarlyLeaveMinutes,
               period_year: year,
               period_month: month,
               base_salary: baseSalary,
@@ -664,6 +753,14 @@ export function usePayrollCalculation(year: number, month: number) {
         // Supabase에 저장
         await createPayroll.mutateAsync(payrollRecords);
 
+        queryClient.invalidateQueries({
+          queryKey: ["production_tax_exempt_records", currentOrganization.id, year],
+        });
+
+        queryClient.invalidateQueries({
+          queryKey: ["payroll_records", currentOrganization.id, year, month],
+        });
+
         return payrollRecords;
       } catch (error) {
         console.error("Error calculating payroll:", error);
@@ -677,6 +774,7 @@ export function usePayrollCalculation(year: number, month: number) {
       year,
       month,
       createPayroll,
+      queryClient,
       getEmployeePaymentItems,
       getEmployeeDeductionItems,
       orgSettings,

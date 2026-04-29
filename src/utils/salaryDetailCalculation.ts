@@ -29,7 +29,17 @@ const FIXED_PUBLIC_HOLIDAYS: Array<[number, number]> = [
 // 음력 기반 공휴일 (매년 다르므로 2025~2027 하드코딩, 이후 확장)
 const LUNAR_HOLIDAYS: Record<number, string[]> = {
   2025: ["2025-01-28", "2025-01-29", "2025-01-30", "2025-05-05", "2025-10-05", "2025-10-06", "2025-10-07"],
-  2026: ["2026-02-16", "2026-02-17", "2026-02-18", "2026-05-24", "2026-09-24", "2026-09-25", "2026-09-26"],
+  2026: [
+    "2026-02-16",
+    "2026-02-17",
+    "2026-02-18",
+    "2026-03-02",
+    "2026-05-06",
+    "2026-05-24",
+    "2026-09-24",
+    "2026-09-25",
+    "2026-09-26",
+  ],
   2027: ["2027-02-06", "2027-02-07", "2027-02-08", "2027-05-13", "2027-10-14", "2027-10-15", "2027-10-16"],
 };
 
@@ -43,6 +53,11 @@ export interface AttendanceRawRecord {
   break_minutes: number | null;
   work_type: string | null;
   is_holiday: boolean | null;
+}
+
+function normalizeDateStr(dateStr: string): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 }
 
 export interface SalaryDetailResult {
@@ -106,15 +121,23 @@ function floor1(n: number): number {
 }
 
 /** 해당 날짜가 법정 공휴일인지 판별 */
-export function isPublicHoliday(dateStr: string): boolean {
-  const [y, m, d] = dateStr.split("-").map(Number);
+export function isPublicHoliday(dateStr: string, publicHolidayDates?: Set<string>): boolean {
+  const normalizedDate = normalizeDateStr(dateStr);
+
+  if (publicHolidayDates?.has(normalizedDate)) {
+    return true;
+  }
+
+  const [y, m, d] = normalizedDate.split("-").map(Number);
+
   // 고정 공휴일
   for (const [hm, hd] of FIXED_PUBLIC_HOLIDAYS) {
     if (m === hm && d === hd) return true;
   }
+
   // 음력 기반 공휴일
   const lunarDates = LUNAR_HOLIDAYS[y] || [];
-  return lunarDates.includes(dateStr);
+  return lunarDates.includes(normalizedDate);
 }
 
 /** 근로자의 날인지 판별 */
@@ -304,6 +327,7 @@ export function calculateSalaryDetail(
   settings: OrganizationSettings,
   yearMonth: string,
   prevCarryDays: number = 0,
+  publicHolidayDates?: Set<string>,
 ): SalaryDetailResult {
   const hourlyRate = getHourlyRate(employee, settings.standard_work_hours);
   const standardMinutes = (settings.standard_work_hours || 8) * 60;
@@ -409,7 +433,7 @@ export function calculateSalaryDetail(
     totalWorkMinutes += recognized;
 
     const isWeeklyHol = isWeeklyHoliday(dateStr, settings);
-    const isPubHoliday = isPublicHoliday(dateStr);
+    const isPubHoliday = att.is_holiday === true || isPublicHoliday(dateStr, publicHolidayDates);
     const isLabor = isLaborDay(dateStr);
     const isScheduled = isScheduledWorkday(dateStr, settings);
 
@@ -614,7 +638,7 @@ export function calculateSalaryDetail(
 
     for (let d = 1; d <= lastDay; d++) {
       const dateStr = `${yearStr}-${monthStr}-${String(d).padStart(2, "0")}`;
-      const isPubHol = isPublicHoliday(dateStr);
+      const isPubHol = isPublicHoliday(dateStr, publicHolidayDates);
       const isLabor = isLaborDay(dateStr);
       if (!isPubHol) continue;
 

@@ -9,8 +9,8 @@ interface AttendanceTabProps {
 export function AttendanceTab({ activeTab: controlledTab }: AttendanceTabProps) {
   const currentTab = controlledTab || 'daily';
 
-  return (
-    <div className="space-y-4 animate-fade-in">
+    return (
+    <div className="space-y-4">
       {currentTab === 'daily' && <DailyAttendance />}
       {currentTab === 'summary' && <AttendanceSummary />}
       {currentTab === 'upload' && <ExcelAttendanceUpload />}

@@ -34,7 +34,7 @@ export function StatCard({ title, value, variant, icon, active, onClick }: StatC
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm font-medium opacity-80">{title}</p>
-          <p className="text-3xl font-bold mt-1">{value}명 (raw:{String(value)})</p>
+          <p className="text-3xl font-bold mt-1">{value}명</p>
         </div>
         {icon && <div className="text-2xl opacity-60">{icon}</div>}
       </div>

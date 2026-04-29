@@ -695,7 +695,7 @@ export function EmployeeTab({ activeTab: controlledTab }: EmployeeTabProps) {
   };
 
   return (
-    <div className="space-y-4 animate-fade-in">
+    <div className="space-y-4">
       {(controlledTab || "list") === "list" && (
         <div className="flex gap-4">
           {/* 부서 트리 */}
@@ -1366,7 +1366,7 @@ export function EmployeeTab({ activeTab: controlledTab }: EmployeeTabProps) {
               ) : (
                 <Table>
                   <TableHeader>
-                    <TableRow>
+                    <TableRow key="empty-row">
                       <TableHead className="w-10">
                         <Checkbox
                           checked={
@@ -1393,16 +1393,16 @@ export function EmployeeTab({ activeTab: controlledTab }: EmployeeTabProps) {
                   </TableHeader>
                   <TableBody>
                     {filteredEmployees.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={12} className="text-center py-8 text-muted-foreground">
-                          {selectedDepartment
-                            ? `${selectedDepartment} 부서에 등록된 직원이 없습니다.`
-                            : "등록된 직원이 없습니다. 신규 직원을 등록해주세요."}
-                        </TableCell>
-                      </TableRow>
-                    ) : (
+  <TableRow key="empty-row">
+    <TableCell colSpan={12} className="text-center py-8 text-muted-foreground">
+      {selectedDepartment
+        ? `${selectedDepartment} 부서에 등록된 직원이 없습니다.`
+        : "등록된 직원이 없습니다. 신규 직원을 등록해주세요."}
+    </TableCell>
+  </TableRow>
+) : (
                       filteredEmployees.map((employee) => (
-                        <TableRow key={employee.id}>
+                        <TableRow key={`emp-row-${employee.id}-${employee.is_active}`}>
                           <TableCell>
                             <Checkbox
                               checked={selectedExportIds.includes(employee.id)}

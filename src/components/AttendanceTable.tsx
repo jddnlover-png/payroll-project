@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
-import { useAttendance } from '@/hooks/useAttendance';
+import type { AttendanceRecord } from '@/hooks/useAttendance';
 import { useLeaveRecords } from '@/hooks/useLeaveRecords';
 import { Button } from '@/components/ui/button';
+import { format } from 'date-fns';
 import {
   Table,
   TableBody,
@@ -30,11 +31,20 @@ const statusConfig: Record<string, { label: string; class: string }> = {
 
 interface AttendanceTableProps {
   highlightedEmployeeId?: string | null;
+  attendance?: any[];
+  isLoading?: boolean;
+  onCheckIn: (employeeId: string) => void;
+  onCheckOut: (employeeId: string) => void;
 }
 
-export function AttendanceTable({ highlightedEmployeeId }: AttendanceTableProps) {
-  const today = new Date().toISOString().split('T')[0];
-  const { attendance: dbAttendance, checkIn, checkOut } = useAttendance(today);
+export function AttendanceTable({
+  highlightedEmployeeId,
+  attendance = [],
+  isLoading = false,
+  onCheckIn,
+  onCheckOut,
+}: AttendanceTableProps) {
+  const today = format(new Date(), 'yyyy-MM-dd');
   const { leaveRecords } = useLeaveRecords();
   const [selectedDepartments, setSelectedDepartments] = useState<string[]>([]);
   const [collapsedDepts, setCollapsedDepts] = useState<Set<string>>(new Set());
@@ -58,7 +68,7 @@ export function AttendanceTable({ highlightedEmployeeId }: AttendanceTableProps)
   }, [leaveRecords, today]);
 
   const todayAttendance = useMemo(() => {
-    return dbAttendance.map(att => {
+    return attendance.map((att: any) => {
       const leaveRecord = leaveRecordsByEmployee.get(att.employee_id);
       let status: keyof typeof statusConfig = att.status as keyof typeof statusConfig;
       if (leaveRecord) {
@@ -75,7 +85,7 @@ export function AttendanceTable({ highlightedEmployeeId }: AttendanceTableProps)
         status,
       };
     });
-  }, [dbAttendance, leaveRecordsByEmployee]);
+  }, [attendance, leaveRecordsByEmployee]);
 
   const filtered = useMemo(() =>
     filterByDepartments(todayAttendance, selectedDepartments),
@@ -93,13 +103,13 @@ export function AttendanceTable({ highlightedEmployeeId }: AttendanceTableProps)
     });
   };
 
-  const handleCheckIn = (employeeId: string) => checkIn.mutate(employeeId);
-  const handleCheckOut = (employeeId: string) => checkOut.mutate(employeeId);
+  const handleCheckIn = (employeeId: string) => onCheckIn(employeeId);
+  const handleCheckOut = (employeeId: string) => onCheckOut(employeeId);
 
   const COL_SPAN = 7;
 
   return (
-    <div className="rounded-lg border bg-card animate-fade-in">
+    <div className="rounded-lg border bg-card">
       <div className="p-4 border-b space-y-3">
         <h2 className="text-lg font-semibold">오늘의 출퇴근 현황</h2>
         <DepartmentChipFilter
@@ -122,66 +132,66 @@ export function AttendanceTable({ highlightedEmployeeId }: AttendanceTableProps)
         </TableHeader>
         <TableBody>
           {grouped.length > 0 ? grouped.flatMap(group => {
-  const rows = [
-    <DepartmentGroupHeader
-      key={`header-${group.department}`}
-      department={group.department}
-      count={group.items.length}
-      isExpanded={!collapsedDepts.has(group.department)}
-      onToggle={() => toggleCollapse(group.department)}
-      colSpan={COL_SPAN}
-    />
-  ];
+            const rows = [
+              <DepartmentGroupHeader
+                key={`header-${group.department}`}
+                department={group.department}
+                count={group.items.length}
+                isExpanded={!collapsedDepts.has(group.department)}
+                onToggle={() => toggleCollapse(group.department)}
+                colSpan={COL_SPAN}
+              />
+            ];
 
-  if (!collapsedDepts.has(group.department)) {
-    rows.push(
-      ...group.items.map(record => (
-        <TableRow
-          key={`row-${record.id}`}
-          id={`dashboard-row-${record.employeeId}`}
-          data-highlighted={highlightedEmployeeId === record.employeeId || undefined}
-        >
-          <TableCell className="font-medium">{record.employeeNumber}</TableCell>
-          <TableCell>{record.employeeName}</TableCell>
-          <TableCell>{record.department}</TableCell>
-          <TableCell>{record.checkIn || '-'}</TableCell>
-          <TableCell>{record.checkOut || '-'}</TableCell>
-          <TableCell>
-            <Badge
-              variant="secondary"
-              className={cn('font-medium', statusConfig[record.status]?.class || '')}
-            >
-              {statusConfig[record.status]?.label || record.status}
-            </Badge>
-          </TableCell>
-          <TableCell className="text-right">
-            <div className="flex justify-end gap-2">
-              {!record.checkIn && (
-                <Button size="sm" onClick={() => handleCheckIn(record.employeeId)}>
-                  출근
-                </Button>
-              )}
-              {record.checkIn && !record.checkOut && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => handleCheckOut(record.employeeId)}
-                >
-                  퇴근
-                </Button>
-              )}
-            </div>
-          </TableCell>
-        </TableRow>
-      ))
-    );
-  }
+            if (!collapsedDepts.has(group.department)) {
+              rows.push(
+                ...group.items.map(record => (
+                  <TableRow
+                    key={`row-${record.id}`}
+                    id={`dashboard-row-${record.employeeId}`}
+                    data-highlighted={highlightedEmployeeId === record.employeeId || undefined}
+                  >
+                    <TableCell className="font-medium">{record.employeeNumber}</TableCell>
+                    <TableCell>{record.employeeName}</TableCell>
+                    <TableCell>{record.department}</TableCell>
+                    <TableCell>{record.checkIn || '-'}</TableCell>
+                    <TableCell>{record.checkOut || '-'}</TableCell>
+                    <TableCell>
+                      <Badge
+                        variant="secondary"
+                        className={cn('font-medium', statusConfig[record.status]?.class || '')}
+                      >
+                        {statusConfig[record.status]?.label || record.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        {!record.checkIn && (
+                          <Button size="sm" onClick={() => handleCheckIn(record.employeeId)}>
+                            출근
+                          </Button>
+                        )}
+                        {record.checkIn && !record.checkOut && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleCheckOut(record.employeeId)}
+                          >
+                            퇴근
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              );
+            }
 
-  return rows;
-}) : (
+            return rows;
+          }) : (
             <TableRow>
               <TableCell colSpan={COL_SPAN} className="text-center py-8 text-muted-foreground">
-                오늘의 근태 기록이 없습니다.
+                {isLoading ? '근태 불러오는 중...' : '오늘의 근태 기록이 없습니다.'}
               </TableCell>
             </TableRow>
           )}

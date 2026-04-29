@@ -93,12 +93,12 @@ function getRoundedCheckInTime(
 }
 
 export function useAttendance(date?: string) {
-  const { currentOrganization } = useOrganization();
+  const { currentOrganization, initialized, loading: organizationLoading } = useOrganization();
   const { settings } = useOrganizationSettings();
   const queryClient = useQueryClient();
   const targetDate = date || format(new Date(), 'yyyy-MM-dd');
 
-  const { data: attendance = [], isLoading, error } = useQuery({
+  const { data: attendance = [], isLoading, isFetching, error } = useQuery({
     queryKey: ['attendance', currentOrganization?.id, targetDate],
     queryFn: async () => {
       if (!currentOrganization?.id) return [];
@@ -116,7 +116,10 @@ export function useAttendance(date?: string) {
       if (error) throw error;
       return data as AttendanceRecord[];
     },
-    enabled: !!currentOrganization?.id,
+    enabled: initialized && !!currentOrganization?.id,
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   });
 
   const checkIn = useMutation({
@@ -188,9 +191,11 @@ export function useAttendance(date?: string) {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['attendance', currentOrganization?.id] });
-      toast.success('출근 처리되었습니다');
-    },
+  queryClient.invalidateQueries({
+    queryKey: ['attendance', currentOrganization?.id, targetDate],
+  });
+  toast.success('출근 처리되었습니다');
+},
     onError: (error) => {
       console.error('Error checking in:', error);
       toast.error('출근 처리 중 오류가 발생했습니다');
@@ -287,7 +292,9 @@ export function useAttendance(date?: string) {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['attendance', currentOrganization?.id] });
+      queryClient.invalidateQueries({
+  queryKey: ['attendance', currentOrganization?.id, targetDate],
+});
       toast.success('퇴근 처리되었습니다');
     },
     onError: (error: any) => {
@@ -317,7 +324,9 @@ export function useAttendance(date?: string) {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['attendance', currentOrganization?.id] });
+       queryClient.invalidateQueries({
+  queryKey: ['attendance', currentOrganization?.id, targetDate],
+});
       toast.success('근태 기록이 수정되었습니다');
     },
     onError: (error) => {
@@ -357,10 +366,12 @@ export function useAttendance(date?: string) {
       return data;
     },
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['attendance', currentOrganization?.id] });
-      const statusLabel = variables.status === 'absent' ? '결근' : variables.status === 'leave' ? '휴가' : '반차';
-      toast.success(`${variables.employeeIds.length}명이 ${statusLabel} 처리되었습니다`);
-    },
+  queryClient.invalidateQueries({
+    queryKey: ['attendance', currentOrganization?.id, targetDate],
+  });
+  const statusLabel = variables.status === 'absent' ? '결근' : variables.status === 'leave' ? '휴가' : '반차';
+  toast.success(`${variables.employeeIds.length}명이 ${statusLabel} 처리되었습니다`);
+},
     onError: (error: any) => {
       console.error('Error bulk updating status:', error);
       toast.error(error.message || '일괄 처리 중 오류가 발생했습니다');
@@ -381,7 +392,9 @@ export function useAttendance(date?: string) {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['attendance', currentOrganization?.id] });
+      queryClient.invalidateQueries({
+  queryKey: ['attendance', currentOrganization?.id, targetDate],
+});
       toast.success('근무조가 변경되었습니다');
     },
     onError: (error) => {
@@ -391,15 +404,15 @@ export function useAttendance(date?: string) {
   });
 
   return {
-    attendance,
-    isLoading,
-    error,
-    checkIn,
-    checkOut,
-    updateAttendance,
-    bulkUpdateStatus,
-    updateShiftType,
-  };
+  attendance,
+  isLoading: organizationLoading || !initialized || isLoading || isFetching,
+  error,
+  checkIn,
+  checkOut,
+  updateAttendance,
+  bulkUpdateStatus,
+  updateShiftType,
+};
 }
 
 export function useAttendanceRange(startDate: string, endDate: string) {

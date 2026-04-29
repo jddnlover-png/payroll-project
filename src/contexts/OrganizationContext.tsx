@@ -1,209 +1,184 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  ReactNode,
-} from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
+import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from './AuthContext';
 
-type Organization = {
+interface Organization {
   id: string;
-  name?: string | null;
-};
+  name: string;
+  business_number: string | null;
+  representative: string | null;
+  address: string | null;
+  phone: string | null;
+  email: string | null;
+}
 
-type OrganizationContextType = {
+interface OrganizationContextType {
   organizations: Organization[];
   currentOrganization: Organization | null;
-  currentRole: string | null;
+  userRole: 'admin' | 'member' | null;
   loading: boolean;
   initialized: boolean;
-  setCurrentOrganization: (org: Organization | null) => void;
+  setCurrentOrganization: (org: Organization) => void;
   refreshOrganizations: () => Promise<void>;
+  isAdmin: boolean;
+}
+
+const OrganizationContext = createContext<OrganizationContextType>({
+  organizations: [],
+  currentOrganization: null,
+  userRole: null,
+  loading: true,
+  initialized: false,
+  setCurrentOrganization: () => {},
+  refreshOrganizations: async () => {},
+  isAdmin: false,
+});
+
+export const useOrganization = () => {
+  const context = useContext(OrganizationContext);
+  if (!context) {
+    throw new Error('useOrganization must be used within an OrganizationProvider');
+  }
+  return context;
 };
 
-const OrganizationContext = createContext<OrganizationContextType | undefined>(undefined);
+const CURRENT_ORG_KEY = 'current_organization_id';
 
-export function OrganizationProvider({ children }: { children: ReactNode }) {
+export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
   const { user, loading: authLoading } = useAuth();
-
-  const mountedRef = useRef(true);
-  const fetchedUserIdRef = useRef<string | null>(null);
-
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [currentOrganization, setCurrentOrganizationState] = useState<Organization | null>(null);
-  const [currentRole, setCurrentRole] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<'admin' | 'member' | null>(null);
   const [loading, setLoading] = useState(true);
   const [initialized, setInitialized] = useState(false);
+  const [lastUserId, setLastUserId] = useState<string | null>(null);
 
-  const safeSetState = useCallback((fn: () => void) => {
-    if (!mountedRef.current) return;
-    fn();
-  }, []);
+  const fetchOrganizations = async (userId: string) => {
+    setLoading(true);
+    setInitialized(false);
 
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
+    try {
+      const { data: memberData, error: memberError } = await supabase
+        .from('organization_members')
+        .select('organization_id')
+        .eq('user_id', userId);
 
-  const resetState = useCallback(() => {
-    fetchedUserIdRef.current = null;
-    safeSetState(() => {
+      if (memberError) throw memberError;
+
+      if (!memberData || memberData.length === 0) {
+        setOrganizations([]);
+        setCurrentOrganizationState(null);
+        setUserRole(null);
+        setLoading(false);
+        setInitialized(true);
+        return;
+      }
+
+      const orgIds = memberData.map(m => m.organization_id);
+
+      const { data: orgsData, error: orgsError } = await supabase
+        .from('organizations')
+        .select('*')
+        .in('id', orgIds);
+
+      if (orgsError) throw orgsError;
+
+      setOrganizations(orgsData || []);
+
+      const savedOrgId = localStorage.getItem(CURRENT_ORG_KEY);
+      const savedOrg = orgsData?.find(o => o.id === savedOrgId);
+
+      if (savedOrg) {
+        setCurrentOrganizationState(savedOrg);
+        await fetchUserRole(savedOrg.id);
+      } else if (orgsData && orgsData.length > 0) {
+        setCurrentOrganizationState(orgsData[0]);
+        localStorage.setItem(CURRENT_ORG_KEY, orgsData[0].id);
+        await fetchUserRole(orgsData[0].id);
+      }
+    } catch (error) {
+      console.error('Error fetching organizations:', error);
       setOrganizations([]);
       setCurrentOrganizationState(null);
-      setCurrentRole(null);
+      setUserRole(null);
+    } finally {
       setLoading(false);
+      setInitialized(true);
+    }
+  };
+
+  const resetState = () => {
+    setOrganizations([]);
+    setCurrentOrganizationState(null);
+    setUserRole(null);
+    setLoading(false);
+    setInitialized(true);
+    setLastUserId(null);
+  };
+
+  const fetchUserRole = async (orgId: string) => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .eq('organization_id', orgId)
+        .maybeSingle();
+
+      if (error) throw error;
+      setUserRole((data?.role as 'admin' | 'member') || 'member');
+    } catch (error) {
+      console.error('Error fetching user role:', error);
+      setUserRole('member');
+    }
+  };
+
+  const setCurrentOrganization = (org: Organization) => {
+    setCurrentOrganizationState(org);
+    localStorage.setItem(CURRENT_ORG_KEY, org.id);
+    fetchUserRole(org.id);
+  };
+
+  const refreshOrganizations = async () => {
+    if (user) {
+      await fetchOrganizations(user.id);
+    }
+  };
+
+  useEffect(() => {
+    if (authLoading) {
+      setLoading(true);
       setInitialized(false);
-    });
-  }, [safeSetState]);
+      return;
+    }
 
-  const fetchOrganizations = useCallback(async () => {
-    if (authLoading) return;
-
-    if (!user?.id) {
-      fetchedUserIdRef.current = null;
+    if (!user) {
       resetState();
       return;
     }
 
-    if (fetchedUserIdRef.current === user.id) {
-      return;
+    if (user.id !== lastUserId) {
+      setLastUserId(user.id);
+      fetchOrganizations(user.id);
     }
+  }, [user, authLoading, lastUserId]);
 
-    fetchedUserIdRef.current = user.id;
-    safeSetState(() => setLoading(true));
-
-    try {
-      const { data: memberships, error: membershipsError } = await supabase
-        .from("organization_members")
-        .select("organization_id, is_owner")
-        .eq("user_id", user.id);
-
-      if (membershipsError) throw membershipsError;
-
-      if (!memberships || memberships.length === 0) {
-        safeSetState(() => {
-          setOrganizations([]);
-          setCurrentOrganizationState(null);
-          setCurrentRole(null);
-          setLoading(false);
-          setInitialized(true);
-        });
-        return;
-      }
-
-      const organizationIds = memberships.map((m) => m.organization_id);
-
-      const { data: orgs, error: orgsError } = await supabase
-        .from("organizations")
-        .select("id, name")
-        .in("id", organizationIds);
-
-      if (orgsError) throw orgsError;
-
-      const normalizedOrgs: Organization[] = (orgs ?? []).map((org) => ({
-        id: org.id,
-        name: org.name,
-      }));
-
-      const nextCurrent = normalizedOrgs[0] ?? null;
-      let nextRole: string | null = null;
-
-      if (nextCurrent) {
-        const { data: roleRow, error: roleError } = await supabase
-          .from("user_roles")
-          .select("role")
-          .eq("user_id", user.id)
-          .eq("organization_id", nextCurrent.id)
-          .maybeSingle();
-
-        if (roleError) throw roleError;
-        nextRole = roleRow?.role ?? null;
-      }
-
-      safeSetState(() => {
-        setOrganizations(normalizedOrgs);
-        setCurrentOrganizationState(nextCurrent);
-        setCurrentRole(nextRole);
-        setLoading(false);
-        setInitialized(true);
-      });
-    } catch (error) {
-      console.error("OrganizationContext error:", error);
-      safeSetState(() => {
-        setOrganizations([]);
-        setCurrentOrganizationState(null);
-        setCurrentRole(null);
-        setLoading(false);
-        setInitialized(true);
-      });
-    }
-  }, [user?.id, authLoading, resetState, safeSetState]);
-
-  useEffect(() => {
-    void fetchOrganizations();
-  }, [fetchOrganizations]);
-
-  const setCurrentOrganization = useCallback(
-    (org: Organization | null) => {
-      safeSetState(() => setCurrentOrganizationState(org));
-
-      if (!user?.id || !org?.id) {
-        safeSetState(() => setCurrentRole(null));
-        return;
-      }
-
-      void (async () => {
-        try {
-          const { data, error } = await supabase
-            .from("user_roles")
-            .select("role")
-            .eq("user_id", user.id)
-            .eq("organization_id", org.id)
-            .maybeSingle();
-
-          if (error) throw error;
-          safeSetState(() => setCurrentRole(data?.role ?? null));
-        } catch (error) {
-          console.error("OrganizationContext setCurrentOrganization role error:", error);
-          safeSetState(() => setCurrentRole(null));
-        }
-      })();
-    },
-    [safeSetState, user?.id]
+  return (
+    <OrganizationContext.Provider
+      value={{
+        organizations,
+        currentOrganization,
+        userRole,
+        loading,
+        initialized,
+        setCurrentOrganization,
+        refreshOrganizations,
+        isAdmin: userRole === 'admin',
+      }}
+    >
+      {children}
+    </OrganizationContext.Provider>
   );
-
-  const refreshOrganizations = useCallback(async () => {
-    fetchedUserIdRef.current = null;
-    await fetchOrganizations();
-  }, [fetchOrganizations]);
-
-  const value = useMemo<OrganizationContextType>(
-    () => ({
-      organizations,
-      currentOrganization,
-      currentRole,
-      loading,
-      initialized,
-      setCurrentOrganization,
-      refreshOrganizations,
-    }),
-    [organizations, currentOrganization, currentRole, loading, initialized, setCurrentOrganization, refreshOrganizations]
-  );
-
-  return <OrganizationContext.Provider value={value}>{children}</OrganizationContext.Provider>;
-}
-
-export function useOrganization() {
-  const context = useContext(OrganizationContext);
-  if (!context) {
-    throw new Error("useOrganization must be used within an OrganizationProvider");
-  }
-  return context;
-}
+};

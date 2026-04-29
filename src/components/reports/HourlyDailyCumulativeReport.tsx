@@ -276,7 +276,7 @@ export function HourlyDailyCumulativeReport() {
 
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-bold">시급/일급 급여 누적 현황</h2>
         <div className="flex items-center gap-2">

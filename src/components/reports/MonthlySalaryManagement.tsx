@@ -130,7 +130,7 @@ export function MonthlySalaryManagement() {
   const months = Array.from({ length: 12 }, (_, i) => i + 1);
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-bold">월급제 정산 관리</h2>
         <div className="flex items-center gap-2">

@@ -32,8 +32,8 @@ export function SettingsTab({ section = "payroll-items" }: SettingsTabProps = {}
 
   const hourlyEmployees = (employees ?? []).filter((emp) => emp.payType === "hourly");
 
-  return (
-    <div className="space-y-6 animate-fade-in max-w-4xl">
+    return (
+    <div className="space-y-6 max-w-4xl">
       {section === "payroll-items" && <PayrollItemsSettings />}
 
       {section === "employee-payroll" && <EmployeePayrollSettings />}

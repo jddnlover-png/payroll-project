@@ -282,7 +282,7 @@ export function LeaveManagement() {
   );
 
   return (
-    <div className="space-y-4 animate-fade-in">
+    <div className="space-y-4">
       {isLoading && (
         <div className="flex items-center justify-center py-8">
           <Loader2 className="w-6 h-6 animate-spin text-primary" />

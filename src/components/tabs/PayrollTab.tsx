@@ -1,3 +1,7 @@
+// 아래 코드는 src/components/payroll/PayrollTab.tsx 전체 교체본입니다.
+// 기존 일괄 출력/PDF 전용 HTML과 batchPrintStyles를 제거하고,
+// PaySlip.tsx와 동일한 generatePayslipHtml() 양식을 일괄 출력/PDF에서도 사용하도록 정리했습니다.
+
 import { useState, useMemo, useEffect } from "react";
 import { ConstructionSiteManager } from "@/components/construction/ConstructionSiteManager";
 import ExcelJS from "exceljs";
@@ -45,20 +49,19 @@ import {
   ShieldCheck,
   FileSpreadsheet,
   ChevronDown,
-  MoreHorizontal,
   Search,
   FileDown,
   MessageSquare,
+  ShieldAlert,
 } from "lucide-react";
-import { FilterSidebar, filterByDepartmentTree } from "@/components/filters/FilterSidebar";
-import { DepartmentGroupHeader } from "@/components/filters/DepartmentGroupHeader";
+import { FilterSidebar } from "@/components/filters/FilterSidebar";
 import { supabase } from "@/integrations/supabase/client";
 import { useOrganization } from "@/contexts/OrganizationContext";
 import { useWeeklyHolidayCarry } from "@/hooks/useWeeklyHolidayCarry";
 import { toast } from "sonner";
-import DOMPurify from "dompurify";
 import { PayrollLedger } from "@/components/payroll/PayrollLedger";
 import { PaySlip } from "@/components/payroll/PaySlip";
+import { generatePayslipHtml } from "@/components/payroll/payslipHtml";
 import { PayrollItemEditor } from "@/components/payroll/PayrollItemEditor";
 import { PayrollHistory } from "@/components/payroll/PayrollHistory";
 import { EmployeeCombobox } from "@/components/employee/EmployeeCombobox";
@@ -67,10 +70,9 @@ import { PayrollItemValue, Employee } from "@/types/employee";
 import { exportPayrollLedger, exportPayslips } from "@/components/payroll/PayrollExcelExport";
 import { useOrganizationSettings } from "@/hooks/useOrganizationSettings";
 import { useProductionTaxExempt } from "@/hooks/useProductionTaxExempt";
-import { ANNUAL_EXEMPT_LIMIT, MONTHLY_SALARY_LIMIT, PRIOR_YEAR_INCOME_LIMIT } from "@/utils/productionTaxExemption";
+import { ANNUAL_EXEMPT_LIMIT, PRIOR_YEAR_INCOME_LIMIT } from "@/utils/productionTaxExemption";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { ShieldAlert } from "lucide-react";
 
 const formatCurrency = (amount: number) =>
   new Intl.NumberFormat("ko-KR", { style: "currency", currency: "KRW" }).format(amount);
@@ -95,15 +97,9 @@ export function PayrollTab({ activeTab = "regular" }: PayrollTabProps) {
 
 function RegularPayrollContent() {
   const { currentOrganization } = useOrganization();
-  const {
-    employees: storeEmployees,
-    payroll: storePayroll,
-    updatePayroll: updateStorePayroll,
-    calculatePayrollFromAttendance,
-  } = useEmployeeStore();
-  const { employees: dbEmployees, isLoading: isEmployeesLoading } = useEmployees();
+  const { employees: storeEmployees, payroll: storePayroll, calculatePayrollFromAttendance } = useEmployeeStore();
+  const { employees: dbEmployees } = useEmployees();
 
-  // ✅ 날짜/월 상태 — usePayroll보다 반드시 먼저 선언
   const today = new Date();
   const currentYear = today.getFullYear();
   const currentMonth = today.getMonth() + 1;
@@ -132,10 +128,8 @@ function RegularPayrollContent() {
     }
   };
 
-  // Use DB payroll hook
   const {
     payroll: dbPayroll,
-    isLoading: isPayrollLoading,
     updatePayroll: updateDbPayroll,
     markAsPaid,
     markAsConfirmedPaid,
@@ -143,7 +137,7 @@ function RegularPayrollContent() {
     unconfirmPayroll,
   } = usePayroll(selectedYear, selectedMonthNum);
   const { calculatePayroll } = usePayrollCalculation(selectedYear, selectedMonthNum);
-  const { calculateAll: calculateSalaryDetails } = useSalaryDetails(selectedYear, selectedMonthNum);
+  const { salaryDetails, calculateAll: calculateSalaryDetails } = useSalaryDetails(selectedYear, selectedMonthNum);
   const { saveCarryDays, deleteCarryDaysBatch, getEffectiveCarryDaysBatch } = useWeeklyHolidayCarry();
 
   const [payrollDialogOpen, setPayrollDialogOpen] = useState(false);
@@ -168,9 +162,13 @@ function RegularPayrollContent() {
   const [selectedJobCategory, setSelectedJobCategory] = useState<string | null>(null);
   const { paymentItems, deductionItems: settingsDeductionItems } = usePayrollSettingsStore();
   const { settings: orgSettings } = useOrganizationSettings();
-  // 생산직 비과세 설정 모달
   const [productionExemptOpen, setProductionExemptOpen] = useState(false);
-  const { settings: exemptSettings, upsertSetting, getYearlyExempt } = useProductionTaxExempt(selectedYear);
+  const {
+    settings: exemptSettings,
+    upsertSetting,
+    getYearlyExempt,
+    getAccumulatedExempt,
+  } = useProductionTaxExempt(selectedYear);
   const [dailyPayrollSummaries, setDailyPayrollSummaries] = useState<
     {
       employeeId: string;
@@ -184,7 +182,6 @@ function RegularPayrollContent() {
     }[]
   >([]);
 
-  // 부서 트리 데이터
   const [dbDeptTree, setDbDeptTree] = useState<
     { id: string; name: string; parent_id: string | null; sort_order: number }[]
   >([]);
@@ -205,7 +202,6 @@ function RegularPayrollContent() {
     fetchDepartments();
   }, [currentOrganization]);
 
-  // 일용직 확정 급여 요약 데이터 가져오기
   useEffect(() => {
     if (!currentOrganization) return;
     const fetchDailySummaries = async () => {
@@ -227,7 +223,6 @@ function RegularPayrollContent() {
         return;
       }
 
-      // 직원별 그룹화
       const byEmp = new Map<
         string,
         { totalWage: number; totalDeductions: number; netPay: number; workDays: number; emp: any }
@@ -263,7 +258,6 @@ function RegularPayrollContent() {
     fetchDailySummaries();
   }, [currentOrganization, selectedMonth]);
 
-  // Build dept tree for filtering
   const deptTree = useMemo(() => {
     const map = new Map<string | null, typeof dbDeptTree>();
     dbDeptTree.forEach((d) => {
@@ -292,7 +286,6 @@ function RegularPayrollContent() {
     return result;
   }, [dbDeptTree]);
 
-  // DB에서 가져온 직원 데이터를 Employee 타입으로 변환
   const convertedDbEmployees: Employee[] = useMemo(() => {
     return dbEmployees.map((emp) => ({
       id: emp.id,
@@ -316,7 +309,6 @@ function RegularPayrollContent() {
     }));
   }, [dbEmployees]);
 
-  // DB 직원이 있으면 DB 사용, 없으면 스토어 사용 (fallback)
   const convertedEmployees: Employee[] = useMemo(() => {
     if (convertedDbEmployees.length > 0) {
       return convertedDbEmployees;
@@ -324,7 +316,6 @@ function RegularPayrollContent() {
     return storeEmployees;
   }, [convertedDbEmployees, storeEmployees]);
 
-  // Transform DB payroll data to match existing payrollData format
   const dbPayrollData = useMemo(() => {
     return dbPayroll.map((record) => ({
       id: record.id,
@@ -344,33 +335,64 @@ function RegularPayrollContent() {
       lateDays: 0,
       absentDays: 0,
       leaveDays: 0,
+      actualLateMinutes: (record as any).actualLateMinutes ?? (record as any).actual_late_minutes ?? 0,
+      actualEarlyLeaveMinutes:
+        (record as any).actualEarlyLeaveMinutes ?? (record as any).actual_early_leave_minutes ?? 0,
       totalWorkMinutes: (record as any).total_work_minutes || 0,
       regularWorkMinutes: (record as any).regular_work_minutes || 0,
       overtimeMinutes: (record as any).overtime_minutes || 0,
       nightWorkMinutes: (record as any).night_work_minutes || 0,
       nightShiftMinutes: (record as any).night_shift_minutes || 0,
       holidayWorkMinutes: (() => {
-        const holItem = (record.payment_items as any[])?.find((i: any) => i.itemId === "holiday-work-allowance");
-        if (holItem)
-          return (
-            (holItem.holidayWork8hMinutes || 0) +
-            (holItem.holidayWorkOver8hMinutes || 0) +
-            (holItem.holidayNightMinutes || 0)
-          );
-        return 0;
+        const items = (record.payment_items as any[]) || [];
+
+        const paymentItemMinutes = items.reduce((sum, item) => {
+          if (item.itemId === "holiday-work-allowance") {
+            return (
+              sum +
+              (item.holidayWork8hMinutes || 0) +
+              (item.holidayWorkOver8hMinutes || 0) +
+              (item.holidayNightMinutes || 0)
+            );
+          }
+
+          if (item.itemId === "public-holiday-work-pay") {
+            return sum + (item.publicHolidayWorkMinutes || item.minutes || 0);
+          }
+
+          if (item.itemId?.startsWith("hol-shift-tier")) {
+            return sum + (item.shiftTierMinutes || 0);
+          }
+
+          return sum;
+        }, 0);
+
+        if (paymentItemMinutes > 0) return paymentItemMinutes;
+
+        const detail = salaryDetails.find((d) => d.employee_id === record.employee_id);
+        const meta = (detail as any)?.meta || {};
+
+        return (
+          (meta.holidayWork8hMinutes || 0) +
+          (meta.holidayWorkOver8hMinutes || 0) +
+          (meta.holidayNightMinutes || 0) +
+          (meta.publicHolidayWorkMinutes || 0) +
+          (meta.holShiftTier1Minutes || 0) +
+          (meta.holShiftTier2Minutes || 0) +
+          (meta.holShiftTier3Minutes || 0) +
+          (meta.holShiftTier4Minutes || 0)
+        );
       })(),
       calculatedAt: record.created_at,
       paymentItems: record.payment_items || [],
       deductionItems: record.deduction_items || [],
     }));
-  }, [dbPayroll, selectedMonth]);
+  }, [dbPayroll, selectedMonth, salaryDetails]);
 
-  // 스토어에서 해당 월의 급여 데이터
   const storePayrollData = useMemo(() => {
     return storePayroll.filter((p) => p.month === selectedMonth);
   }, [storePayroll, selectedMonth]);
 
-  // DB 데이터 우선, 없으면 스토어 데이터 사용
   const payrollData = useMemo(() => {
     if (dbPayrollData.length > 0) {
       return dbPayrollData;
@@ -380,11 +402,9 @@ function RegularPayrollContent() {
 
   const hasCalculatedData = payrollData.length > 0;
 
-  // 부서 및 고용형태 필터링된 급여 데이터
   const filteredPayrollData = useMemo(() => {
     let filtered = payrollData;
 
-    // 부서 필터
     if (selectedDepartment) {
       if (selectedDepartment === "미분류") {
         filtered = filtered.filter((r) => !r.department || !dbDepartments.includes(r.department));
@@ -398,7 +418,6 @@ function RegularPayrollContent() {
       }
     }
 
-    // 고용형태 필터
     if (selectedEmploymentType) {
       filtered = filtered.filter((r) => {
         const emp = convertedEmployees.find((e) => e.id === r.employeeId);
@@ -406,7 +425,6 @@ function RegularPayrollContent() {
       });
     }
 
-    // 급여유형 필터
     if (selectedPayType) {
       filtered = filtered.filter((r) => {
         const emp = convertedEmployees.find((e) => e.id === r.employeeId);
@@ -414,7 +432,6 @@ function RegularPayrollContent() {
       });
     }
 
-    // 직종 필터
     if (selectedJobCategory) {
       filtered = filtered.filter((r) => {
         const dbEmp = dbEmployees.find((e) => e.id === r.employeeId);
@@ -445,7 +462,6 @@ function RegularPayrollContent() {
     setPayrollDialogOpen(true);
   };
 
-  // 급여 테이블 체크박스
   const handleSelectRecord = (recordId: string, checked: boolean) => {
     if (checked) {
       setSelectedRecordIds((prev) => [...prev, recordId]);
@@ -464,7 +480,6 @@ function RegularPayrollContent() {
 
   const getSelectedRecords = () => payrollData.filter((r) => selectedRecordIds.includes(r.id));
 
-  // 선택/일괄 이메일 발송
   const handleBatchEmail = async (records: typeof payrollData) => {
     const recordsWithEmail = records.filter((record) => {
       const emp = convertedEmployees.find((e) => e.id === record.employeeId);
@@ -529,7 +544,6 @@ function RegularPayrollContent() {
     else toast.warning(`${successCount}명 발송 성공, ${failCount}명 발송 실패`);
   };
 
-  // SMS 발송
   const handleBatchSms = async (records: typeof payrollData) => {
     const recordsWithPhone = records.filter((record) => {
       const emp = convertedEmployees.find((e) => e.id === record.employeeId);
@@ -591,348 +605,28 @@ function RegularPayrollContent() {
     else toast.warning(`${successCount}명 발송 성공, ${failCount}명 발송 실패`);
   };
 
-  // 일괄 출력/PDF 공통 HTML 생성
   const generateFullPaySlipHtml = (record: (typeof payrollData)[0]) => {
     const emp = convertedEmployees.find((e) => e.id === record.employeeId);
-    const sanitizedName = DOMPurify.sanitize(record.employeeName);
-    const sanitizedNumber = DOMPurify.sanitize(record.employeeNumber);
-    const sanitizedDept = DOMPurify.sanitize(record.department);
-    const sanitizedPosition = DOMPurify.sanitize(emp?.position || "-");
-    const bankInfo = DOMPurify.sanitize(emp?.bankName ? `${emp.bankName} ${emp.accountNumber || ""}` : "-");
-    const jobCategoryLabel = emp?.jobCategory === "production" ? "생산직" : "사무직";
-    const empTypeLabel =
-      emp?.employmentType === "regular"
-        ? "정규직"
-        : emp?.employmentType === "contract"
-          ? "계약직"
-          : emp?.employmentType === "daily"
-            ? "일용직"
-            : "프리랜서";
-    const payTypeLabel = emp?.payType === "daily" ? "일급제" : emp?.payType === "hourly" ? "시급제" : "월급제";
-    const fmtNum = (n: number) => new Intl.NumberFormat("ko-KR").format(n);
+    if (!emp) return "";
 
-    // 생년월일
-    const birthDate = (() => {
-      const rn = emp?.residentNumber;
-      if (!rn) return "-";
-      const digits = rn.replace(/[^0-9]/g, "");
-      if (digits.length < 6) return "-";
-      const yy = digits.substring(0, 2);
-      const mm = digits.substring(2, 4);
-      const dd = digits.substring(4, 6);
-      const centuryDigit = digits.length >= 7 ? digits[6] : "";
-      const century = centuryDigit === "3" || centuryDigit === "4" ? "20" : "19";
-      return `${century}${yy}.${mm}.${dd}`;
-    })();
+    const [yearText, monthText] = record.month.split("-");
+    const recordYear = Number(yearText || selectedYear);
+    const recordMonth = Number(monthText || selectedMonthNum);
+    const yearlyExempt = emp.jobCategory === "production" ? getYearlyExempt(emp.id) : null;
+    const accumulatedBeforeThisMonth = emp.jobCategory === "production" ? getAccumulatedExempt(emp.id, recordMonth) : 0;
 
-    // 적용 시급
-    const standardWorkHours = orgSettings.standard_work_hours || 8;
-    const appliedHourlyRate = (() => {
-      if (emp?.payType === "monthly") return 0;
-      if (emp?.payType === "hourly" && emp.hourlyRate) return emp.hourlyRate;
-      if (emp?.payType === "daily" && emp.dailyRate) return Math.round(emp.dailyRate / standardWorkHours);
-      return 0;
-    })();
-    const appliedHourlyRateText =
-      emp?.payType === "monthly" ? "해당 없음" : appliedHourlyRate > 0 ? `${fmtNum(appliedHourlyRate)}원` : "해당 없음";
-
-    const overtimeRate = orgSettings.overtime_multiplier || 1.5;
-    const nightRate = orgSettings.night_shift_multiplier || 2.0;
-    const overtimeHours = (record.overtimeMinutes || 0) / 60;
-    const nightHours = ((record.nightWorkMinutes || 0) + (record.nightShiftMinutes || 0)) / 60;
-
-    // 저장된 지급 항목 직접 사용
-    const displayPayItems: { itemId: string; name: string; amount: number }[] =
-      record.paymentItems && (record.paymentItems as any[]).length > 0
-        ? (record.paymentItems as any[])
-        : paymentItems
-            .filter((item) => item.isActive)
-            .map((item) => {
-              let amount = 0;
-              if (item.id === "base-salary") amount = record.baseSalary;
-              else if (item.id === "overtime") amount = record.overtime;
-              else if (item.id === "bonus") amount = record.bonus;
-              return { itemId: item.id, name: item.name, amount };
-            });
-
-    const totalPaymentsCalc = displayPayItems.reduce((sum, item) => sum + (item.amount || 0), 0);
-    const DEDUCTION_ORDER = [
-      "income-tax",
-      "local-income-tax",
-      "national-pension",
-      "health-insurance",
-      "employment-insurance",
-      "long-term-care",
-    ];
-    const sortDeds = (items: any[]) =>
-      [...items].sort((a: any, b: any) => {
-        const ai = DEDUCTION_ORDER.indexOf(a.itemId);
-        const bi = DEDUCTION_ORDER.indexOf(b.itemId);
-        return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
-      });
-    const dedItems =
-      record.deductionItems && (record.deductionItems as any[]).length > 0
-        ? sortDeds(record.deductionItems as any[])
-        : [];
-    const totalDeductionsCalc =
-      dedItems.length > 0 ? dedItems.reduce((sum: number, item: any) => sum + item.amount, 0) : record.deductions;
-
-    // 지급항목 HTML
-    const paymentHtml = displayPayItems
-      .filter((item) => item.amount !== 0 || item.itemId === "base-salary")
-      .map((item) => {
-        const isBase = item.itemId === "base-salary";
-        return `<tr><td>${DOMPurify.sanitize(item.name)}${isBase && emp?.payType === "monthly" ? ' <span style="font-size:8px;color:#888;">(주휴수당 포함)</span>' : ""}</td><td class="${isBase ? "" : "text-green"}">${isBase ? "" : "+"}${formatCurrency(item.amount)}</td></tr>`;
-      })
-      .join("");
-
-    // 공제항목 HTML
-    const deductionHtml =
-      dedItems.length > 0
-        ? dedItems
-            .map((item: any) => {
-              const isRefund = item.amount < 0;
-              return `<tr><td>${DOMPurify.sanitize(item.name)}</td><td class="${isRefund ? "text-green" : "text-red"}">${isRefund ? "+" : "-"}${formatCurrency(Math.abs(item.amount))}</td></tr>`;
-            })
-            .join("")
-        : `<tr><td>4대보험 및 기타공제</td><td class="text-red">-${formatCurrency(record.deductions)}</td></tr>`;
-
-    // 계산방법 함수
-    const getPayFormula = (item: { itemId: string; name: string; amount: number }): string => {
-      if (emp?.payType === "monthly") return "월정액 지급";
-      if (item.itemId === "base-salary") {
-        if (emp?.payType === "daily")
-          return emp.dailyRate ? `${fmtNum(emp.dailyRate)}원 × ${record.presentDays + record.lateDays}일` : "해당 없음";
-        if (emp?.payType === "hourly")
-          return emp.hourlyRate
-            ? `${fmtNum(emp.hourlyRate)}원 × ${((record.totalWorkMinutes || 0) / 60).toFixed(1)}시간`
-            : "해당 없음";
-      } else if (item.itemId === "overtime") {
-        if (appliedHourlyRate > 0 && overtimeHours > 0)
-          return `${fmtNum(appliedHourlyRate)}원 × ${overtimeRate} × ${overtimeHours.toFixed(1)}시간`;
-        return "해당 없음";
-      } else if (
-        item.itemId === "night-shift-allowance" ||
-        (item.name.includes("야간") && !item.itemId?.startsWith("night-shift-tier"))
-      ) {
-        if (appliedHourlyRate > 0 && nightHours > 0)
-          return `${fmtNum(appliedHourlyRate)}원 × ${nightRate}배 × ${nightHours.toFixed(1)}시간`;
-        return "해당 없음";
-      } else if (item.itemId?.startsWith("night-shift-tier") || item.itemId?.startsWith("hol-shift-tier")) {
-        const tierMinutes = (item as any).shiftTierMinutes || 0;
-        const tierMultiplier = (item as any).shiftTierMultiplier || 1.5;
-        const alphaRate = tierMultiplier - 1.0;
-        if (appliedHourlyRate > 0 && tierMinutes > 0)
-          return `${fmtNum(appliedHourlyRate)}원 × ${alphaRate.toFixed(1)} × ${(tierMinutes / 60).toFixed(1)}시간`;
-        return "해당 없음";
-      } else if (item.itemId === "holiday-work-allowance" || item.name.includes("휴일근로")) {
-        if (appliedHourlyRate > 0 && item.amount > 0) {
-          const hol8h = (item as any).holidayWork8hMinutes || 0;
-          const holOver8h = (item as any).holidayWorkOver8hMinutes || 0;
-          const holNight = (item as any).holidayNightMinutes || 0;
-          const holidayAlpha8h = orgSettings.holiday_alpha_8h || 0.5;
-          const lines: string[] = [];
-          if (hol8h > 0) {
-            const h = (hol8h / 60).toFixed(1);
-            lines.push(`8h이내: ${fmtNum(appliedHourlyRate)}원 × ${1.0 + holidayAlpha8h}배 × ${h}시간`);
-          }
-          const holOver8hNonNight = Math.max(0, holOver8h - holNight);
-          if (holOver8hNonNight > 0) {
-            const h = (holOver8hNonNight / 60).toFixed(1);
-            lines.push(
-              `8h초과: ${fmtNum(appliedHourlyRate)}원 × ${1.0 + (orgSettings.holiday_alpha_ot || 1.0)}배 × ${h}시간`,
-            );
-          }
-          if (holNight > 0) {
-            const compositeRate = 1.0 + (orgSettings.holiday_alpha_ot || 1.0) + 0.5;
-            const h = (holNight / 60).toFixed(1);
-            lines.push(`야간포함: ${fmtNum(appliedHourlyRate)}원 × ${compositeRate}배 × ${h}시간`);
-          }
-          return lines.length > 0 ? lines.join(" / ") : "해당 없음";
-        }
-        return "해당 없음";
-      } else if (item.itemId === "weekly-holiday-allowance" || item.name.includes("주휴")) {
-        if (appliedHourlyRate > 0 && item.amount > 0) {
-          const hours = item.amount / appliedHourlyRate;
-          return `${fmtNum(appliedHourlyRate)}원 × ${hours.toFixed(1)}시간`;
-        }
-        return "해당 없음";
-      } else if (item.itemId === "public-holiday-pay" || item.name.includes("공휴일 유급")) {
-        if (appliedHourlyRate > 0 && item.amount > 0) {
-          const hours = item.amount / appliedHourlyRate;
-          return `${fmtNum(appliedHourlyRate)}원 × ${hours.toFixed(1)}시간`;
-        }
-        return "해당 없음";
-      } else if (item.itemId === "public-holiday-work-pay" || item.name.includes("공휴일 근로")) {
-        if (appliedHourlyRate > 0 && item.amount > 0) {
-          const hours = item.amount / (appliedHourlyRate * 0.5);
-          return `${fmtNum(appliedHourlyRate)}원 × 0.5 × ${hours.toFixed(1)}시간`;
-        }
-        return "해당 없음";
-      } else {
-        const si = paymentItems.find((pi) => pi.id === item.itemId);
-        if (si?.calculationType === "percentage" && si.defaultValue) return `기본급 × ${si.defaultValue}%`;
-        return "월정액 지급";
-      }
-      return "해당 없음";
-    };
-
-    const getDedFormula = (item: { itemId: string; name: string; amount: number }): string => {
-      const si = settingsDeductionItems.find((di) => di.id === item.itemId);
-      if (item.itemId === "national-pension") return `${fmtNum(totalPaymentsCalc)}원 × ${si?.defaultValue ?? 4.5}%`;
-      if (item.itemId === "health-insurance") return `${fmtNum(totalPaymentsCalc)}원 × ${si?.defaultValue ?? 3.545}%`;
-      if (item.itemId === "employment-insurance") return `${fmtNum(totalPaymentsCalc)}원 × ${si?.defaultValue ?? 0.9}%`;
-      if (item.itemId === "long-term-care") return `건강보험료 × ${si?.defaultValue ?? 12.81}%`;
-      if (item.itemId === "income-tax") return "간이세액표 적용";
-      if (item.itemId === "local-income-tax" || item.name.includes("지방소득세")) return "소득세 × 10%";
-      if (si?.calculationType === "percentage" && si.defaultValue)
-        return `${fmtNum(totalPaymentsCalc)}원 × ${si.defaultValue}%`;
-      return item.amount > 0 ? "월정액 공제" : "해당 없음";
-    };
-
-    // 임금 계산방법 테이블
-    const payCalcItems = displayPayItems.filter((i) => i.amount !== 0 || i.itemId === "base-salary");
-    const dedCalcItems = dedItems;
-    const maxLen = Math.max(payCalcItems.length, dedCalcItems.length);
-    let calcRows = "";
-    for (let i = 0; i < maxLen; i++) {
-      const p = payCalcItems[i];
-      const d = dedCalcItems[i];
-      calcRows += "<tr>";
-      calcRows += p
-        ? `<td>${DOMPurify.sanitize(p.name)}</td><td style="text-align:right;">${formatCurrency(p.amount)}</td><td class="formula">${DOMPurify.sanitize(getPayFormula(p))}</td>`
-        : "<td></td><td></td><td></td>";
-      calcRows += d
-        ? `<td>${DOMPurify.sanitize(d.name)}</td><td style="text-align:right;color:#c62828;">${formatCurrency(d.amount)}</td><td class="formula">${DOMPurify.sanitize(getDedFormula(d))}</td>`
-        : "<td></td><td></td><td></td>";
-      calcRows += "</tr>";
-    }
-
-    const formatMinToTime = (minutes: number) => {
-      const h = Math.floor(minutes / 60);
-      const m = minutes % 60;
-      return `${String(h).padStart(2, "0")}시간 ${String(m).padStart(2, "0")}분`;
-    };
-
-    return `
-      <div class="payslip-page">
-        <div class="header">
-          <div class="company-name">${DOMPurify.sanitize(useEmployeeStore.getState().companySettings.companyName || "회사명")}</div>
-          <div class="title">급 여 명 세 서</div>
-          <div class="month">${DOMPurify.sanitize(record.month)}</div>
-        </div>
-        <div class="content-wrapper">
-          <div class="section">
-            <div class="section-header">📋 직원 정보</div>
-            <table>
-              <tr><td>성명</td><td>${sanitizedName}</td></tr>
-              <tr><td>생년월일</td><td>${birthDate}</td></tr>
-              <tr><td>사원번호</td><td>${sanitizedNumber}</td></tr>
-              <tr><td>부서 / 직급</td><td>${sanitizedDept} / ${sanitizedPosition}</td></tr>
-              <tr><td>직종</td><td>${jobCategoryLabel}</td></tr>
-              <tr><td>입사일</td><td>${DOMPurify.sanitize(emp?.hireDate || "-")}</td></tr>
-              <tr><td>고용형태</td><td>${empTypeLabel}</td></tr>
-              <tr><td>급여유형</td><td>${payTypeLabel}</td></tr>
-              ${emp?.payType === "hourly" && emp.hourlyRate ? `<tr><td>시급</td><td>${fmtNum(emp.hourlyRate)}원</td></tr>` : ""}
-              ${emp?.payType === "daily" && emp.dailyRate ? `<tr><td>일급</td><td>${fmtNum(emp.dailyRate)}원</td></tr>` : ""}
-              <tr><td>적용 시급</td><td>${appliedHourlyRateText}</td></tr>
-              <tr><td>급여계좌</td><td>${bankInfo}</td></tr>
-            </table>
-          </div>
-          <div style="display:flex;flex-direction:column;gap:6px;">
-            <div class="section" style="margin-bottom:0;">
-              <div class="section-header">📅 근태 현황</div>
-              <table>
-                <tr><td>출근일수</td><td>${record.presentDays + record.lateDays}일</td></tr>
-                <tr><td>지각</td><td>${record.lateDays}일</td></tr>
-                <tr><td>결근</td><td>${record.absentDays}일</td></tr>
-                <tr><td>휴가</td><td>${record.leaveDays}일</td></tr>
-              </table>
-            </div>
-            <div class="section" style="margin-bottom:0;">
-              <div class="section-header">⏱ 근로시간</div>
-              <table>
-                <tr><td>총근로</td><td>${formatMinToTime(record.totalWorkMinutes || 0)}</td></tr>
-                <tr><td>정규</td><td>${formatMinToTime(record.regularWorkMinutes || 0)}</td></tr>
-                <tr><td>연장</td><td>${formatMinToTime(record.overtimeMinutes || 0)}</td></tr>
-                <tr><td>야간</td><td>${formatMinToTime(record.nightWorkMinutes || 0)}</td></tr>
-                <tr><td>야간교대</td><td>${formatMinToTime(record.nightShiftMinutes || 0)}</td></tr>
-                <tr><td>휴일</td><td>${formatMinToTime(record.holidayWorkMinutes || 0)}</td></tr>
-              </table>
-            </div>
-          </div>
-          <div class="section">
-            <div class="section-header payment">💰 지급 내역</div>
-            <table>
-              ${paymentHtml}
-              <tr class="total-row"><td>지급액 합계</td><td>${formatCurrency(totalPaymentsCalc)}</td></tr>
-            </table>
-          </div>
-          <div class="section">
-            <div class="section-header deduction">📉 공제 내역</div>
-            <table>
-              ${deductionHtml}
-              <tr class="total-row"><td>공제액 합계</td><td class="${totalDeductionsCalc < 0 ? "text-green" : "text-red"}">${totalDeductionsCalc < 0 ? "+" : "-"}${formatCurrency(Math.abs(totalDeductionsCalc))}</td></tr>
-            </table>
-          </div>
-          <div class="calc-section full-width">
-            <div class="section-header">📊 임금 계산방법</div>
-            <table class="calc-table">
-              <tr class="cat-row"><td colspan="3" style="background:#e6f4ea;color:#1a7f37;">지급항목</td><td colspan="3" style="background:#fce8e6;color:#c62828;">공제항목</td></tr>
-              <tr class="head-row"><td>항목</td><td style="text-align:right;">금액</td><td>계산방법</td><td>항목</td><td style="text-align:right;">금액</td><td>계산방법</td></tr>
-              ${calcRows}
-            </table>
-          </div>
-        </div>
-        <div class="net-salary">
-          <div class="net-salary-label">실지급액</div>
-          <div class="net-salary-amount">${formatCurrency(record.netSalary)}</div>
-        </div>
-        <div class="footer">
-          <p>본 명세서는 ${DOMPurify.sanitize(record.month)} 귀속 급여입니다. | ${DOMPurify.sanitize(useEmployeeStore.getState().companySettings.companyName || "회사명")} | 발급일: ${new Date().toLocaleDateString("ko-KR")}</p>
-        </div>
-      </div>
-    `;
+    return generatePayslipHtml({
+      record,
+      employee: emp,
+      companyName: useEmployeeStore.getState().companySettings.companyName || "회사명",
+      paymentItems,
+      deductionItems: settingsDeductionItems,
+      orgSettings,
+      yearlyExempt,
+      accumulatedBeforeThisMonth,
+    });
   };
 
-  const batchPrintStyles = `
-    * { margin:0; padding:0; box-sizing:border-box; }
-    @page { size:A4; margin:8mm; }
-    body, div { font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif; color:#333; line-height:1.3; font-size:11px; }
-    .payslip-page { padding:10px; page-break-after:always; }
-    .payslip-page:last-child { page-break-after:auto; }
-    .header { text-align:center; margin-bottom:8px; padding-bottom:5px; border-bottom:2px solid #2563eb; }
-    .company-name { font-size:11px; color:#666; margin-bottom:2px; }
-    .title { font-size:17px; font-weight:bold; color:#1e40af; margin-bottom:2px; }
-    .month { font-size:11px; color:#666; background:#f1f5f9; display:inline-block; padding:2px 10px; border-radius:8px; }
-    .content-wrapper { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
-    .section { margin-bottom:4px; border:1px solid #e2e8f0; border-radius:4px; overflow:hidden; }
-    .section-header { background:linear-gradient(135deg,#3b82f6,#1d4ed8); color:white; padding:4px 8px; font-weight:bold; font-size:11px; }
-    .section-header.payment { background:linear-gradient(135deg,#10b981,#059669); }
-    .section-header.deduction { background:linear-gradient(135deg,#ef4444,#dc2626); }
-    table { width:100%; border-collapse:collapse; }
-    td { padding:3px 6px; border-bottom:1px solid #f1f5f9; font-size:10.5px; }
-    td:first-child { color:#64748b; width:50%; }
-    td:last-child { text-align:right; font-weight:600; color:#1e293b; }
-    tr:last-child td { border-bottom:none; }
-    .text-green { color:#059669; } .text-red { color:#dc2626; }
-    .total-row { background:#f8fafc; font-weight:bold; } .total-row td:first-child { color:#1e293b; }
-    .net-salary { background:linear-gradient(135deg,#1e40af,#3b82f6); color:white; border-radius:4px; padding:8px; text-align:center; margin-top:5px; }
-    .net-salary-label { font-size:11px; opacity:0.9; margin-bottom:2px; }
-    .net-salary-amount { font-size:18px; font-weight:bold; }
-    .footer { text-align:center; color:#94a3b8; font-size:9px; padding-top:5px; border-top:1px solid #e2e8f0; margin-top:5px; }
-    .full-width { grid-column:1 / -1; }
-    .calc-section { border:1px solid #e2e8f0; border-radius:4px; overflow:hidden; margin-bottom:4px; }
-    .calc-section .section-header { background:linear-gradient(135deg,#6366f1,#4f46e5); }
-    .calc-table { width:100%; border-collapse:collapse; }
-    .calc-table td { padding:2.5px 6px; font-size:10px; border-bottom:1px solid #f1f5f9; }
-    .calc-table .cat-row td { text-align:center; font-weight:bold; font-size:10px; }
-    .calc-table .head-row { background:#fafafa; font-weight:bold; }
-    .calc-table .formula { text-align:left !important; color:#555; font-size:9.5px; }
-    @media print { body { padding:0; print-color-adjust:exact; -webkit-print-color-adjust:exact; } .section, .calc-section { break-inside:avoid; } }
-  `;
-
-  // 선택/일괄 출력
   const handleBatchPrint = (records: typeof payrollData) => {
     if (records.length === 0) {
       toast.error("출력할 직원을 선택해주세요.");
@@ -943,14 +637,11 @@ function RegularPayrollContent() {
     const printWindow = window.open("", "_blank");
     if (!printWindow) return;
 
-    printWindow.document.write(
-      `<!DOCTYPE html><html><head><title>급여명세서 출력</title><style>${batchPrintStyles}</style></head><body>${allSlips}</body></html>`,
-    );
+    printWindow.document.write(allSlips);
     printWindow.document.close();
     printWindow.print();
   };
 
-  // PDF 일괄 다운로드
   const handleBatchPdfExport = (records: typeof payrollData) => {
     if (records.length === 0) {
       toast.error("PDF로 내보낼 직원을 선택해주세요.");
@@ -959,11 +650,11 @@ function RegularPayrollContent() {
 
     const allSlips = records.map((r) => generateFullPaySlipHtml(r)).join("");
     const wrapper = document.createElement("div");
-    wrapper.innerHTML = `<style>${batchPrintStyles}</style>${allSlips}`;
+    wrapper.innerHTML = allSlips;
 
     html2pdf()
       .set({
-        margin: 10,
+        margin: 6,
         filename: `급여명세서_${selectedMonth}.pdf`,
         image: { type: "jpeg", quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true },
@@ -1030,14 +721,6 @@ function RegularPayrollContent() {
     }
   };
 
-  const handlePaymentStatusChange = (id: string, status: "pending" | "paid") => {
-    if (status === "paid") {
-      markAsPaid.mutate([id]);
-    } else {
-      updateDbPayroll.mutate({ id, status, paid_at: null });
-    }
-  };
-
   const handleViewPaySlip = (index: number) => {
     setSelectedPayrollIndex(index);
     setPaySlipOpen(true);
@@ -1094,7 +777,6 @@ function RegularPayrollContent() {
     }, 0),
     deductions: payrollData.reduce((sum, r) => sum + r.deductions, 0),
     netSalary: payrollData.reduce((sum, r) => sum + r.netSalary, 0),
-    paidCount: payrollData.filter((r) => r.status === "paid").length,
     pendingCount: payrollData.filter((r) => r.status === "pending").length,
     confirmedCount: payrollData.filter((r) => r.status === "confirmed").length,
     confirmedPaidCount: payrollData.filter((r) => r.status === "confirmed_paid").length,
@@ -1105,7 +787,6 @@ function RegularPayrollContent() {
       <div className="flex justify-between items-center">
         <h2 className="text-lg font-semibold">급여 관리</h2>
         <div className="flex gap-2 flex-wrap">
-          {/* ✅ 년도 + 월 분리 드롭다운 */}
           <div className="flex gap-1 items-center">
             <Select value={String(selectedYearState)} onValueChange={handleYearChange}>
               <SelectTrigger className="w-24">
@@ -1155,7 +836,6 @@ function RegularPayrollContent() {
             생산직 비과세 설정
           </Button>
 
-          {/* 발송/출력 드롭다운 */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" disabled={!hasCalculatedData || isBatchSending}>
@@ -1201,7 +881,6 @@ function RegularPayrollContent() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* 엑셀 내보내기 드롭다운 */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -1302,7 +981,6 @@ function RegularPayrollContent() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* 확정 관리 드롭다운 */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" disabled={!hasCalculatedData}>
@@ -1556,7 +1234,7 @@ function RegularPayrollContent() {
                     <TableHead>직종</TableHead>
                     <TableHead>급여유형</TableHead>
                     <TableHead>부서</TableHead>
-                    <TableHead className="text-center">출근/지각/결근</TableHead>
+                    <TableHead className="text-center">출근일/지각/결근</TableHead>
                     <TableHead className="text-center">총 근무시간</TableHead>
                     <TableHead className="text-right">기본급</TableHead>
                     <TableHead className="text-right">지급내역</TableHead>
@@ -1644,9 +1322,9 @@ function RegularPayrollContent() {
                           <TableCell>{record.department}</TableCell>
                           <TableCell className="text-center">
                             <div className="flex justify-center gap-1">
-                              <Badge variant="secondary" className="status-green text-xs">
-                                {record.presentDays}
-                              </Badge>
+                              <Badge variant="secondary" className="status-green text-xs" title="출근일수">
+  {record.presentDays}
+</Badge>
                               <Badge
                                 variant="secondary"
                                 className={record.lateDays > 0 ? "status-yellow text-xs" : "text-xs"}
@@ -1774,7 +1452,6 @@ function RegularPayrollContent() {
         </div>
       )}
 
-      {/* 급여계산 직원 선택 다이얼로그 */}
       <Dialog open={payrollDialogOpen} onOpenChange={setPayrollDialogOpen}>
         <DialogContent className="max-w-md max-h-[80vh]">
           <DialogHeader>
@@ -1876,7 +1553,6 @@ function RegularPayrollContent() {
         </DialogContent>
       </Dialog>
 
-      {/* 생산직 비과세 설정 다이얼로그 */}
       <Dialog open={productionExemptOpen} onOpenChange={setProductionExemptOpen}>
         <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
