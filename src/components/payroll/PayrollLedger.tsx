@@ -8,9 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Printer, Mail, Loader2, FileDown } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
+import { Printer, FileDown } from "lucide-react";
 import { useEmployeeStore } from "@/store/employeeStore";
 import { usePayrollSettingsStore } from "@/store/payrollSettingsStore";
 import { useOrganizationSettings } from "@/hooks/useOrganizationSettings";
@@ -52,14 +50,11 @@ export function PayrollLedger({
   dailyPayrollSummaries = [],
   employees: propEmployees,
 }: PayrollLedgerProps) {
-  const [isSendingAll, setIsSendingAll] = useState(false);
   const [includeDailyWorkers, setIncludeDailyWorkers] = useState(false);
-  const { currentOrganization } = useOrganization();
-  const [sendingProgress, setSendingProgress] = useState({ current: 0, total: 0 });
+const { currentOrganization } = useOrganization();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const storeEmployees = useEmployeeStore((state) => state.employees);
   const employees = propEmployees && propEmployees.length > 0 ? propEmployees : storeEmployees;
-  const companySettings = useEmployeeStore((state) => state.companySettings);
   const { paymentItems, deductionItems } = usePayrollSettingsStore();
   const { settings: orgSettings } = useOrganizationSettings();
 
@@ -457,11 +452,15 @@ export function PayrollLedger({
               <td class="section-header" colspan="8">근태 및 근로시간</td>
             </tr>
             <tr class="info-row">
-              <td class="label">출근일수</td><td>${record.presentDays + record.lateDays}일</td>
-              <td class="label">지각일수</td><td>${record.lateDays}일</td>
-              <td class="label">결근일수</td><td>${record.absentDays}일</td>
-              <td class="label">휴가일수</td><td>${record.leaveDays}일</td>
-            </tr>
+  <td class="label">출근일수</td><td>${record.presentDays + record.lateDays}일</td>
+  <td class="label">지각시간</td><td>${(record as any).actualLateMinutes ? `${(record as any).actualLateMinutes}분` : "0분"}</td>
+  <td class="label">조퇴시간</td><td>${(record as any).actualEarlyLeaveMinutes ? `${(record as any).actualEarlyLeaveMinutes}분` : "0분"}</td>
+  <td class="label">결근일수</td><td>${record.absentDays}일</td>
+</tr>
+<tr class="info-row">
+  <td class="label">휴가일수</td><td>${record.leaveDays}일</td>
+  <td colspan="6"></td>
+</tr>
             <tr class="info-row">
               <td class="label">총근로시간</td><td>${formatMinutesToHM(record.totalWorkMinutes || 0)}</td>
               <td class="label">정규근로</td><td>${formatMinutesToHM(record.regularWorkMinutes || 0)}</td>
@@ -628,72 +627,6 @@ export function PayrollLedger({
       .save();
   };
 
-  const handleSendEmails = async () => {
-    const targetRecords = getTargetRecords();
-
-    const recordsWithEmail = targetRecords.filter((record) => {
-      const employee = employees.find((emp) => emp.id === record.employeeId);
-      return employee && employee.email && employee.email.trim() !== "";
-    });
-
-    if (recordsWithEmail.length === 0) {
-      toast.error("이메일 주소가 등록된 직원이 없습니다.");
-      return;
-    }
-
-    setIsSendingAll(true);
-    setSendingProgress({ current: 0, total: recordsWithEmail.length });
-
-    let successCount = 0;
-    let failCount = 0;
-
-    for (let i = 0; i < recordsWithEmail.length; i++) {
-      const record = recordsWithEmail[i];
-      const employee = employees.find((emp) => emp.id === record.employeeId);
-      if (!employee?.email) continue;
-
-      try {
-        const { error } = await supabase.functions.invoke("send-payslip-email", {
-          body: {
-            organizationId: currentOrganization?.id,
-            employeeName: record.employeeName,
-            employeeEmail: employee.email,
-            month: record.month,
-            employeeNumber: record.employeeNumber,
-            department: record.department,
-            presentDays: record.presentDays,
-            lateDays: record.lateDays,
-            absentDays: record.absentDays,
-            leaveDays: record.leaveDays,
-            overtimeHours: record.overtimeHours,
-            baseSalary: record.baseSalary,
-            overtime: record.overtime,
-            bonus: record.bonus,
-            deductions: record.deductions,
-            netSalary: record.netSalary,
-            companyName: companySettings.companyName,
-            companyLogoUrl: companySettings.companyLogoUrl,
-          },
-        });
-
-        if (error) {
-          failCount++;
-        } else {
-          successCount++;
-        }
-      } catch {
-        failCount++;
-      }
-      setSendingProgress({ current: i + 1, total: recordsWithEmail.length });
-    }
-
-    setIsSendingAll(false);
-    setSendingProgress({ current: 0, total: 0 });
-
-    if (failCount === 0) toast.success(`${successCount}명의 직원에게 급여명세서가 발송되었습니다.`);
-    else if (successCount === 0) toast.error("모든 이메일 발송에 실패했습니다.");
-    else toast.warning(`${successCount}명 발송 성공, ${failCount}명 발송 실패`);
-  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -705,28 +638,15 @@ export function PayrollLedger({
               <p className="text-xs font-normal text-muted-foreground mt-0.5">근로기준법 제48조에 따른 임금대장</p>
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={handleSendEmails} disabled={isSendingAll}>
-                {isSendingAll ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    발송 중 ({sendingProgress.current}/{sendingProgress.total})
-                  </>
-                ) : (
-                  <>
-                    <Mail className="w-4 h-4 mr-2" />
-                    {selectedIds.length > 0 ? `선택 발송 (${selectedIds.length})` : "일괄 발송"}
-                  </>
-                )}
-              </Button>
-              <Button variant="outline" size="sm" onClick={handlePdfExport}>
-                <FileDown className="w-4 h-4 mr-2" />
-                PDF
-              </Button>
-              <Button variant="outline" size="sm" onClick={handlePrint}>
-                <Printer className="w-4 h-4 mr-2" />
-                {selectedIds.length > 0 ? `선택 출력 (${selectedIds.length})` : "일괄 출력"}
-              </Button>
-            </div>
+  <Button variant="outline" size="sm" onClick={handlePdfExport}>
+    <FileDown className="w-4 h-4 mr-2" />
+    PDF
+  </Button>
+  <Button variant="outline" size="sm" onClick={handlePrint}>
+    <Printer className="w-4 h-4 mr-2" />
+    {selectedIds.length > 0 ? `선택 출력 (${selectedIds.length})` : "일괄 출력"}
+  </Button>
+</div>
           </DialogTitle>
         </DialogHeader>
 
@@ -772,9 +692,9 @@ export function PayrollLedger({
                 <TableHead rowSpan={2} className="text-center px-1 py-0.5 text-[10px] align-middle">
                   부서
                 </TableHead>
-                <TableHead colSpan={3} className="text-center px-1 py-0.5 text-[10px] bg-muted/50 border-b">
-                  근태
-                </TableHead>
+                <TableHead colSpan={4} className="text-center px-1 py-0.5 text-[10px] bg-muted/50 border-b">
+  근태
+</TableHead>
                 <TableHead
                   colSpan={6}
                   className="text-center px-1 py-0.5 text-[10px] bg-blue-50 dark:bg-blue-950/30 border-b"
@@ -806,8 +726,9 @@ export function PayrollLedger({
               {/* 상세 헤더 행 */}
               <TableRow>
                 <TableHead className="text-center px-1 py-0.5 text-[10px] bg-muted/50">출근</TableHead>
-                <TableHead className="text-center px-1 py-0.5 text-[10px] bg-muted/50">지각</TableHead>
-                <TableHead className="text-center px-1 py-0.5 text-[10px] bg-muted/50">결근</TableHead>
+<TableHead className="text-center px-1 py-0.5 text-[10px] bg-muted/50">지각</TableHead>
+<TableHead className="text-center px-1 py-0.5 text-[10px] bg-muted/50">조퇴</TableHead>
+<TableHead className="text-center px-1 py-0.5 text-[10px] bg-muted/50">결근</TableHead>
                 <TableHead className="text-center px-1 py-0.5 text-[10px] bg-blue-50 dark:bg-blue-950/30 whitespace-nowrap">
                   총근로
                 </TableHead>
@@ -864,8 +785,13 @@ export function PayrollLedger({
                   <TableCell className="text-center px-1 py-1">{record.employeeName}</TableCell>
                   <TableCell className="text-center px-1 py-1">{record.department}</TableCell>
                   <TableCell className="text-center px-1 py-1">{record.presentDays + record.lateDays}</TableCell>
-                  <TableCell className="text-center px-1 py-1">{record.lateDays}</TableCell>
-                  <TableCell className="text-center px-1 py-1">{record.absentDays}</TableCell>
+<TableCell className="text-center px-1 py-1">
+  {(record as any).actualLateMinutes ? `${(record as any).actualLateMinutes}분` : "0분"}
+</TableCell>
+<TableCell className="text-center px-1 py-1">
+  {(record as any).actualEarlyLeaveMinutes ? `${(record as any).actualEarlyLeaveMinutes}분` : "0분"}
+</TableCell>
+<TableCell className="text-center px-1 py-1">{record.absentDays}</TableCell>
                   <TableCell className="text-center px-1 py-1 bg-blue-50/50 dark:bg-blue-950/20 whitespace-nowrap">
                     {formatMinutesToHM(record.totalWorkMinutes || 0)}
                   </TableCell>
@@ -922,9 +848,10 @@ export function PayrollLedger({
                     </TableCell>
                     <TableCell className="text-center px-1 py-1">{ds.department}</TableCell>
                     <TableCell className="text-center px-1 py-1">{ds.workDays}</TableCell>
-                    <TableCell className="text-center px-1 py-1">-</TableCell>
-                    <TableCell className="text-center px-1 py-1">-</TableCell>
-                    <TableCell className="text-center px-1 py-1">-</TableCell>
+<TableCell className="text-center px-1 py-1">-</TableCell>
+<TableCell className="text-center px-1 py-1">-</TableCell>
+<TableCell className="text-center px-1 py-1">-</TableCell>
+<TableCell className="text-center px-1 py-1">-</TableCell>
                     <TableCell className="text-center px-1 py-1">-</TableCell>
                     <TableCell className="text-center px-1 py-1">-</TableCell>
                     <TableCell className="text-center px-1 py-1">-</TableCell>
@@ -964,7 +891,7 @@ export function PayrollLedger({
 
               <TableRow className="bg-muted font-semibold">
                 <TableCell />
-                <TableCell colSpan={7} className="text-center">
+                <TableCell colSpan={8} className="text-center">
                   합계
                   {includeDailyWorkers && dailyPayrollSummaries.length > 0 && (
                     <span className="text-[10px] font-normal text-muted-foreground ml-1">(일용직 포함)</span>

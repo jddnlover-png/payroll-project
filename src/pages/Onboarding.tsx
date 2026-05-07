@@ -34,37 +34,56 @@ export default function Onboarding() {
   };
 
   const handleComplete = async (skipPhone = false) => {
-    setLoading(true);
-    try {
-      const { data: orgId, error } = await supabase.rpc('create_organization_with_owner', {
-        _name: orgName,
-        _business_number: businessNumber || null,
-        _representative: null,
-      });
+  if (!skipPhone && !phoneNumber.trim()) {
+    toast.error('설정 도움을 받으려면 전화번호를 입력해주세요');
+    return;
+  }
 
-      if (error) throw error;
+  setLoading(true);
+  try {
+    const { data: orgId, error } = await supabase.rpc('create_organization_with_owner', {
+  _name: orgName.trim(),
+  _business_number: businessNumber.trim() || null,
+  _representative: null,
+});
 
-      // Update additional fields
-      if (employeeSize || (!skipPhone && phoneNumber)) {
-        await supabase
-          .from('organizations')
-          .update({
-            employee_size: employeeSize || null,
-            phone_number: skipPhone ? null : phoneNumber || null,
-          })
-          .eq('id', orgId);
-      }
+    if (error) throw error;
+if (!orgId) throw new Error('업체 ID가 생성되지 않았습니다.');
 
-      toast.success('업체가 생성되었습니다!');
-      await refreshOrganizations();
-      navigate('/');
-    } catch (error: any) {
-      console.error('Error creating organization:', error);
-      toast.error('업체 생성 중 오류가 발생했습니다');
-    } finally {
-      setLoading(false);
+if (employeeSize || (!skipPhone && phoneNumber)) {
+  const { error: updateError } = await supabase
+    .from('organizations')
+    .update({
+      employee_size: employeeSize || null,
+      phone_number: skipPhone ? null : phoneNumber.trim() || null,
+    })
+    .eq('id', orgId);
+
+  if (updateError) throw updateError;
+}
+
+    if (!skipPhone) {
+      const { error: helpError } = await supabase.rpc('submit_setup_help_request', {
+  _organization_id: orgId,
+  _contact_mobile: phoneNumber.trim(),
+  _employee_size: employeeSize || null,
+  _company_name: orgName.trim(),
+  _business_number: businessNumber.trim() || null,
+});
+
+      if (helpError) throw helpError;
     }
-  };
+
+    toast.success(skipPhone ? '업체가 생성되었습니다!' : '업체가 생성되고 설정 도움 요청이 접수되었습니다!');
+    await refreshOrganizations();
+    navigate('/');
+  } catch (error: any) {
+  console.error('Error creating organization:', error);
+  toast.error(error?.message || '업체 생성 중 오류가 발생했습니다');
+} finally {
+    setLoading(false);
+  }
+};
 
   const slideVariants = {
     enter: (dir: number) => ({ x: dir > 0 ? 80 : -80, opacity: 0 }),
@@ -83,8 +102,8 @@ export default function Onboarding() {
           </div>
           <CardTitle className="text-2xl font-bold">시작하기</CardTitle>
           <CardDescription>
-            {step === 1 ? '회사 정보를 입력해주세요' : '급여 설정을 빠르게 도와드립니다'}
-          </CardDescription>
+  {step === 1 ? '회사 정보를 입력해주세요' : '초기 설정을 빠르게 도와드립니다'}
+</CardDescription>
 
           {/* Step indicator */}
           <div className="flex items-center justify-center gap-3 pt-2">
@@ -166,7 +185,7 @@ export default function Onboarding() {
                   <div className="text-center mb-2">
                     <Phone className="h-8 w-8 text-primary mx-auto mb-2" />
                     <p className="text-sm text-muted-foreground leading-relaxed">
-                      원하시면 담당자가 전화로 초기 설정을 도와드립니다.
+                      전화번호를 남겨주시면 담당자가 초기 설정을 도와드립니다.
                     </p>
                   </div>
 
@@ -177,11 +196,11 @@ export default function Onboarding() {
                         <SelectValue placeholder="직원 수 선택" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="1-5">1~5명</SelectItem>
-                        <SelectItem value="6-20">6~20명</SelectItem>
-                        <SelectItem value="21-50">21~50명</SelectItem>
-                        <SelectItem value="50+">50명 이상</SelectItem>
-                      </SelectContent>
+  <SelectItem value="under_10">10인 이하</SelectItem>
+  <SelectItem value="11_30">11~30인 이하</SelectItem>
+  <SelectItem value="31_60">31~60인 이하</SelectItem>
+  <SelectItem value="over_60">60인 이상</SelectItem>
+</SelectContent>
                     </Select>
                   </div>
 
@@ -222,7 +241,7 @@ export default function Onboarding() {
                     onClick={() => handleComplete(true)}
                     disabled={loading}
                   >
-                    나중에 입력
+                  나중에 도움 받기
                   </button>
                 </div>
               </motion.div>

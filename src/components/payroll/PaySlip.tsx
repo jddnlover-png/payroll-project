@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import html2pdf from "html2pdf.js";
 import { PayrollRecord, Employee } from "@/types/employee";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -8,6 +8,7 @@ import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { Printer, ChevronLeft, ChevronRight, Mail, Loader2, FileDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useOrganization } from "@/contexts/OrganizationContext";
 import { toast } from "sonner";
 import { useEmployeeStore } from "@/store/employeeStore";
 import { usePayrollSettingsStore } from "@/store/payrollSettingsStore";
@@ -47,9 +48,17 @@ export function PaySlip({
   hasNext,
 }: PaySlipProps) {
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
-  const [emailAddress, setEmailAddress] = useState(employee?.email || "");
-  const [isSending, setIsSending] = useState(false);
-  const companySettings = useEmployeeStore((state) => state.companySettings);
+const [emailAddress, setEmailAddress] = useState(employee?.email || "");
+const [isSending, setIsSending] = useState(false);
+
+useEffect(() => {
+  if (emailDialogOpen) {
+    setEmailAddress(employee?.email || "");
+  }
+}, [emailDialogOpen, employee?.email]);
+
+const { currentOrganization } = useOrganization();
+const companySettings = useEmployeeStore((state) => state.companySettings);
   const { paymentItems, deductionItems } = usePayrollSettingsStore();
   const { settings: orgSettings } = useOrganizationSettings();
 
@@ -289,7 +298,7 @@ export function PaySlip({
     generatePayslipHtml({
       record,
       employee,
-      companyName: companySettings.companyName || "회사명",
+      companyName: currentOrganization?.name || companySettings.companyName || "회사명",
       paymentItems,
       deductionItems,
       orgSettings,
@@ -344,27 +353,17 @@ export function PaySlip({
 
     setIsSending(true);
     try {
-      const { data, error } = await supabase.functions.invoke("send-payslip-email", {
-        body: {
-          employeeName: record.employeeName,
-          employeeEmail: emailAddress,
-          month: record.month,
-          employeeNumber: record.employeeNumber,
-          department: record.department,
-          presentDays: record.presentDays,
-          lateDays: record.lateDays,
-          absentDays: record.absentDays,
-          leaveDays: record.leaveDays,
-          overtimeHours: record.overtimeHours,
-          baseSalary: record.baseSalary,
-          overtime: record.overtime,
-          bonus: record.bonus,
-          deductions: record.deductions,
-          netSalary: record.netSalary,
-          companyName: companySettings.companyName,
-          companyLogoUrl: companySettings.companyLogoUrl,
-        },
-      });
+      const { data, error } = await supabase.functions.invoke("send-document-email", {
+  body: {
+    type: "payslip",
+    organizationId: currentOrganization?.id,
+    employeeName: record.employeeName,
+    employeeEmail: emailAddress,
+    companyName: currentOrganization?.name || companySettings.companyName || "급여관리시스템",
+    month: record.month,
+    html: getPayslipHtml(),
+  },
+});
 
       if (error) throw error;
 

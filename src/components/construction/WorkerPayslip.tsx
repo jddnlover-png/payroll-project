@@ -3,7 +3,9 @@
  * - 노무대장 데이터 재구성 방식 (별도 계산 엔진 없음)
  */
 
+import { useState } from "react";
 import { DailyAttendanceRecord } from "@/hooks/useDailyAttendance";
+import { supabase } from "@/integrations/supabase/client";
 
 interface WeeklyHolidayMap {
   get: (key: string) => number | undefined;
@@ -156,8 +158,97 @@ export function WorkerPayslip({
   const totalPension = rows.reduce((s, r) => s + Number((r as any).national_pension ?? 0), 0);
   const totalHealth = rows.reduce((s, r) => s + Number((r as any).health_insurance ?? 0), 0);
   const totalLongTerm = rows.reduce((s, r) => s + Number((r as any).long_term_care_insurance ?? 0), 0);
-  const totalDeductions = rows.reduce((s, r) => s + r.totalDeductions, 0);
+    const totalDeductions = rows.reduce((s, r) => s + r.totalDeductions, 0);
   const totalNetPay = totalGross - totalDeductions;
+
+  const [emailDialogOpen, setEmailDialogOpen] = useState(false);
+  const [emailAddress, setEmailAddress] = useState("");
+  const [isEmailSending, setIsEmailSending] = useState(false);
+
+  const handleSendEmail = async () => {
+    if (!emailAddress.trim()) {
+      alert("이메일 주소를 입력해주세요.");
+      return;
+    }
+
+    const content = document.getElementById("payslip-content");
+    if (!content) {
+      alert("임금명세서 본문을 찾을 수 없습니다.");
+      return;
+    }
+
+    setIsEmailSending(true);
+
+    try {
+      const orgResult = await supabase.auth.getUser();
+
+      if (!orgResult.data.user) {
+        alert("로그인이 필요합니다.");
+        return;
+      }
+
+      const { data: orgData } = await supabase
+        .from("organization_members")
+        .select("organization_id, organizations(name)")
+        .eq("user_id", orgResult.data.user.id)
+        .maybeSingle();
+
+      const companyName = (orgData?.organizations as any)?.name || "급여관리시스템";
+      const organizationId = orgData?.organization_id || "";
+
+      if (!organizationId) {
+        alert("조직 정보를 찾을 수 없습니다.");
+        return;
+      }
+
+      const html = `
+        <!DOCTYPE html>
+        <html lang="ko">
+          <head>
+            <meta charset="UTF-8" />
+            <style>
+              * { box-sizing: border-box; margin: 0; padding: 0; }
+              body { font-family: 'Malgun Gothic', sans-serif; font-size: 12px; padding: 20px; color: #111827; }
+              h1 { text-align: center; font-size: 20px; font-weight: bold; margin-bottom: 16px; }
+              table { width: 100%; border-collapse: collapse; margin-bottom: 12px; font-size: 11px; }
+              th, td { border: 1px solid #555; padding: 4px 6px; }
+              th { background-color: #e8e8e8; font-weight: bold; text-align: left; }
+              .text-right { text-align: right; }
+              .font-bold { font-weight: bold; }
+              .bg-gray-50 { background-color: #f9fafb; }
+              .bg-gray-100 { background-color: #f3f4f6; }
+              .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+            </style>
+          </head>
+          <body>
+            ${content.innerHTML}
+          </body>
+        </html>
+      `;
+
+      const { error } = await supabase.functions.invoke("send-document-email", {
+        body: {
+          organizationId,
+          employeeName: workerName,
+          employeeEmail: emailAddress.trim(),
+          month: `${year}년 ${month}월`,
+          companyName,
+          html,
+        },
+      });
+
+      if (error) {
+        alert("이메일 발송에 실패했습니다: " + error.message);
+      } else {
+        alert(`${workerName}님께 임금명세서 이메일이 발송되었습니다.`);
+        setEmailDialogOpen(false);
+      }
+    } catch (e: any) {
+      alert("이메일 발송 오류: " + e.message);
+    } finally {
+      setIsEmailSending(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center overflow-y-auto py-8">
@@ -165,6 +256,12 @@ export function WorkerPayslip({
         {/* 버튼 영역 (인쇄 시 숨김) */}
         {/* 버튼 영역 (인쇄 시 숨김) */}
         <div className="flex justify-end gap-2 p-4 print:hidden">
+                    <button
+            onClick={() => setEmailDialogOpen(true)}
+            className="px-4 py-2 bg-slate-700 text-white rounded text-sm hover:bg-slate-800"
+          >
+            이메일 발송
+          </button>
           {/* 문자 발송 */}
           {phone && (
             <button
@@ -705,6 +802,54 @@ export function WorkerPayslip({
             </div>
           </div>
         </div>
+        
+           {/* 이메일 발송 다이얼로그 */}
+        {emailDialogOpen && (
+          <div className="fixed inset-0 bg-black/40 z-[60] flex items-center justify-center">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-sm p-5">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-lg font-semibold">임금명세서 이메일 발송</h2>
+                <button onClick={() => setEmailDialogOpen(false)} className="text-gray-500 hover:text-gray-800">
+                  ×
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="text-sm font-medium">받는 사람</label>
+                  <input
+                    type="email"
+                    value={emailAddress}
+                    onChange={(e) => setEmailAddress(e.target.value)}
+                    placeholder="이메일 주소 입력"
+                    className="mt-1 w-full border rounded px-3 py-2 text-sm"
+                  />
+                </div>
+
+                <p className="text-sm text-gray-500">
+                  {workerName}님의 {year}년 {month}월 임금명세서를 발송합니다.
+                </p>
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <button
+                    onClick={() => setEmailDialogOpen(false)}
+                    className="px-4 py-2 border rounded text-sm"
+                    disabled={isEmailSending}
+                  >
+                    취소
+                  </button>
+                  <button
+                    onClick={handleSendEmail}
+                    disabled={isEmailSending}
+                    className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:opacity-60"
+                  >
+                    {isEmailSending ? "발송 중..." : "발송"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

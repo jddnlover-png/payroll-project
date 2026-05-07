@@ -19,7 +19,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Printer, FileText, AlertTriangle, DollarSign, ChevronLeft, ChevronRight } from "lucide-react";
+import { Printer, FileText, AlertTriangle, DollarSign, ChevronLeft, ChevronRight, MessageSquare } from "lucide-react";
 import { calculateAgeFromSsn } from "@/utils/ssnAgeCalculation";
 import { useDailyPayrollSettings } from "@/hooks/useDailyPayrollSettings";
 import { WorkerPayslip } from "./WorkerPayslip";
@@ -267,8 +267,11 @@ export function PayrollLaborTab() {
     setDetailCols((prev) => ({ ...prev, [key]: !prev[key] }));
   };
   const [showPayslip, setShowPayslip] = useState(false);
-  const [showLaborReport, setShowLaborReport] = useState(false); // ← 추가
-  const orgId = currentOrganization?.id;
+const [showLaborReport, setShowLaborReport] = useState(false);
+const [selectedSmsKeys, setSelectedSmsKeys] = useState<string[]>([]);
+const [isSendingSms, setIsSendingSms] = useState(false);
+
+const orgId = currentOrganization?.id;
   const {
     upsert: upsertInsurance,
     getSetting,
@@ -290,9 +293,14 @@ export function PayrollLaborTab() {
   }, [selectedWorker]);
 
   // Reset worker when site or month changes
-  useEffect(() => {
-    setSelectedWorker(null);
-  }, [selectedSiteId, yearMonth]);
+useEffect(() => {
+  setSelectedWorker(null);
+}, [selectedSiteId, yearMonth]);
+
+// 현장/월 변경 시 문자 선택값 초기화
+useEffect(() => {
+  setSelectedSmsKeys([]);
+}, [selectedSiteId, yearMonth]);
 
   // ── Worker list query ──
   const { data: workerList = [], refetch: refetchWorkerList } = useQuery({
@@ -777,11 +785,111 @@ export function PayrollLaborTab() {
   };
 
   // ── Print labor report (법정양식) ──
-  const handlePrint = () => {
-    window.print();
-  };
+const handlePrint = () => {
+  window.print();
+};
 
-  return (
+const handleBulkSmsSend = async () => {
+  if (!orgId || !currentOrganization) {
+    toast.error("조직 정보를 찾을 수 없습니다.");
+    return;
+  }
+
+  if (selectedSmsKeys.length === 0) {
+    toast.error("문자를 발송할 직원을 선택해주세요.");
+    return;
+  }
+
+  const selectedWorkers = workerSummary.filter((w) => {
+    const key = w.records[0]?._workerKey ?? `NAME:${w.name}`;
+    return selectedSmsKeys.includes(key);
+  });
+
+  const sendTargets = selectedWorkers
+    .map((w) => {
+      const firstRecord = w.records[0] as any;
+      const phone = firstRecord?.phone ? String(firstRecord.phone).replace(/[^0-9]/g, "") : "";
+
+      return {
+        worker: w,
+        phone,
+        workerKey: firstRecord?._workerKey ?? `NAME:${w.name}`,
+      };
+    })
+    .filter((item) => item.phone);
+
+  const excludedCount = selectedWorkers.length - sendTargets.length;
+
+  if (sendTargets.length === 0) {
+    toast.error("선택한 직원 중 연락처가 있는 직원이 없습니다.");
+    return;
+  }
+
+  const isAllSelected = workerSummary.length > 0 && selectedSmsKeys.length === workerSummary.length;
+
+  const confirmMessage = isAllSelected
+    ? `현재 조회된 전체 ${sendTargets.length}명에게 임금명세서 문자를 발송할까요?${
+        excludedCount > 0 ? `\n연락처 없는 ${excludedCount}명은 제외됩니다.` : ""
+      }`
+    : `선택한 ${sendTargets.length}명에게 임금명세서 문자를 발송할까요?${
+        excludedCount > 0 ? `\n연락처 없는 ${excludedCount}명은 제외됩니다.` : ""
+      }`;
+
+  if (!window.confirm(confirmMessage)) return;
+
+  setIsSendingSms(true);
+
+  try {
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const target of sendTargets) {
+      const w = target.worker;
+
+      const totalPayments =
+        w.totalFinalPay +
+        w.totalWeeklyHolidayPay +
+        w.totalMealAllowance +
+        w.totalVehicleAllowance +
+        w.totalExtraNonTaxable;
+
+      const { error } = await supabase.functions.invoke("send-payslip-sms", {
+        body: {
+          organizationId: orgId,
+          employeeName: w.name,
+          employeePhone: target.phone,
+          employeeId: "daily-worker",
+          payrollRecordId: `daily-${year}-${String(month).padStart(2, "0")}-${target.workerKey}`,
+          month: `${year}년 ${month}월`,
+          baseSalary: w.totalFinalPay,
+          totalPayments,
+          deductions: w.totalDeductions,
+          netSalary: totalPayments - w.totalDeductions,
+          companyName: currentOrganization.name,
+          siteUrl: window.location.origin,
+        },
+      });
+
+      if (error) {
+        failCount += 1;
+      } else {
+        successCount += 1;
+      }
+    }
+
+    if (failCount > 0) {
+      toast.error(`문자 발송 완료: 성공 ${successCount}명 / 실패 ${failCount}명`);
+    } else {
+      toast.success(`임금명세서 문자가 ${successCount}명에게 발송되었습니다.`);
+    }
+  } catch (error: any) {
+    toast.error(`문자 발송 오류: ${error.message}`);
+  } finally {
+    setIsSendingSms(false);
+  }
+};
+
+return (
     <div className="space-y-4">
       {/* Controls */}
       <Card>
@@ -894,17 +1002,26 @@ export function PayrollLaborTab() {
               <Printer className="w-4 h-4 mr-1" /> 노무대장 출력
             </Button>
             <Button
-              variant="outline"
-              onClick={() => {
-                if (!selectedWorker) {
-                  toast.error("직원을 먼저 선택해주세요");
-                  return;
-                }
-                setShowPayslip(true);
-              }}
-            >
-              <FileText className="w-4 h-4 mr-1" /> 노무임금명세서 출력
-            </Button>
+  variant="outline"
+  onClick={() => {
+    if (!selectedWorker) {
+      toast.error("직원을 먼저 선택해주세요");
+      return;
+    }
+    setShowPayslip(true);
+  }}
+>
+  <FileText className="w-4 h-4 mr-1" /> 노무임금명세서 출력
+</Button>
+
+<Button
+  variant="outline"
+  onClick={handleBulkSmsSend}
+  disabled={isSendingSms || selectedSmsKeys.length === 0}
+>
+  <MessageSquare className="w-4 h-4 mr-1" />
+  {isSendingSms ? "문자 발송 중..." : `선택 직원 문자발송 (${selectedSmsKeys.length})`}
+</Button>
           </div>
 
           {/* ✅ 상세형 뷰설정 체크박스 — 하단 별도 영역 */}
@@ -1338,8 +1455,24 @@ export function PayrollLaborTab() {
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>성명</TableHead>
+                    <TableRow>
+  <TableHead className="w-[40px]">
+    <input
+      type="checkbox"
+      checked={workerSummary.length > 0 && selectedSmsKeys.length === workerSummary.length}
+      onChange={(e) => {
+        if (e.target.checked) {
+          setSelectedSmsKeys(
+            workerSummary.map((w) => w.records[0]?._workerKey ?? `NAME:${w.name}`)
+          );
+        } else {
+          setSelectedSmsKeys([]);
+        }
+      }}
+      className="w-4 h-4 cursor-pointer"
+    />
+  </TableHead>
+  <TableHead>성명</TableHead>
                     <TableHead>주민번호</TableHead>
                     <TableHead>연락처</TableHead>
                     <TableHead>직종</TableHead>
@@ -1357,9 +1490,26 @@ export function PayrollLaborTab() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {workerSummary.map((w) => (
-                    <TableRow key={w.name}>
-                      <TableCell className="font-medium">{w.name}</TableCell>
+                  {workerSummary.map((w) => {
+  const smsKey = w.records[0]?._workerKey ?? `NAME:${w.name}`;
+
+  return (
+    <TableRow key={w.name}>
+      <TableCell>
+        <input
+          type="checkbox"
+          checked={selectedSmsKeys.includes(smsKey)}
+          onChange={(e) => {
+            if (e.target.checked) {
+              setSelectedSmsKeys((prev) => [...prev, smsKey]);
+            } else {
+              setSelectedSmsKeys((prev) => prev.filter((key) => key !== smsKey));
+            }
+          }}
+          className="w-4 h-4 cursor-pointer"
+        />
+      </TableCell>
+      <TableCell className="font-medium">{w.name}</TableCell>
                       <TableCell className="text-muted-foreground text-xs">{w.ssnMasked}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {w.records[0] && (w.records[0] as any).phone
@@ -1506,10 +1656,11 @@ export function PayrollLaborTab() {
                             w.totalDeductions,
                         )}
                       </TableCell>
-                    </TableRow>
-                  ))}
+                     </TableRow>
+                  );
+                })}
                   <TableRow className="font-bold bg-muted">
-                    <TableCell colSpan={8}>합계</TableCell>
+                    <TableCell colSpan={9}>합계</TableCell>
                     <TableCell className="text-right text-muted-foreground text-sm">
                       {Math.round(
                         (workerSummary.reduce(

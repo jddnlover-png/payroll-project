@@ -504,27 +504,17 @@ function RegularPayrollContent() {
       if (!emp?.email) continue;
 
       try {
-        const { error } = await supabase.functions.invoke("send-payslip-email", {
-          body: {
-            employeeName: record.employeeName,
-            employeeEmail: emp.email,
-            month: record.month,
-            employeeNumber: record.employeeNumber,
-            department: record.department,
-            presentDays: record.presentDays,
-            lateDays: record.lateDays,
-            absentDays: record.absentDays,
-            leaveDays: record.leaveDays,
-            overtimeHours: record.overtimeHours,
-            baseSalary: record.baseSalary,
-            overtime: record.overtime,
-            bonus: record.bonus,
-            deductions: record.deductions,
-            netSalary: record.netSalary,
-            companyName: companySettings.companyName,
-            companyLogoUrl: companySettings.companyLogoUrl,
-          },
-        });
+        const { error } = await supabase.functions.invoke("send-document-email", {
+  body: {
+    type: "payslip",
+    organizationId: currentOrganization?.id,
+    employeeName: record.employeeName,
+    employeeEmail: emp.email,
+    companyName: companySettings.companyName || "급여관리시스템",
+    month: record.month,
+    html: generateFullPaySlipHtml(record),
+  },
+});
         if (error) {
           failCount++;
         } else {
@@ -583,7 +573,7 @@ function RegularPayrollContent() {
             deductions: record.deductions,
             netSalary: record.netSalary,
             companyName: companySettings.companyName,
-            siteUrl: window.location.origin,
+            siteUrl: "https://ai-crafted-web-spark.lovable.app",
           },
         });
         if (error) {

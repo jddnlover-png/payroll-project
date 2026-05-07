@@ -1,20 +1,44 @@
 import { ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { supabase } from '@/integrations/supabase/client';
 import { Loader2 } from 'lucide-react';
 
 interface ProtectedRouteProps {
   children: ReactNode;
   requireOrganization?: boolean;
+  redirectIfHasOrganization?: boolean;
 }
 
-export function ProtectedRoute({ children, requireOrganization = true }: ProtectedRouteProps) {
+export function ProtectedRoute({
+  children,
+  requireOrganization = true,
+  redirectIfHasOrganization = false,
+}: ProtectedRouteProps) {
   const { user, loading: authLoading } = useAuth();
-  const { organizations, loading: orgLoading, initialized } = useOrganization();
+  const { organizations, currentOrganization, loading: orgLoading, initialized } = useOrganization();
+
+const { data: trialStatus, isLoading: trialLoading } = useQuery({
+  queryKey: ['organization-trial-status', currentOrganization?.id],
+  queryFn: async () => {
+    if (!currentOrganization?.id) return null;
+
+    const { data, error } = await (supabase as any)
+      .rpc('get_organization_trial_status', {
+        _organization_id: currentOrganization.id,
+      })
+      .maybeSingle();
+
+    if (error) throw error;
+    return data as { is_expired: boolean } | null;
+  },
+  enabled: !!user && initialized && requireOrganization && !!currentOrganization?.id,
+});
 
   // 인증 또는 조직 로딩 중일 때 (initialized가 false면 아직 조회 전)
-  if (authLoading || orgLoading || !initialized) {
+  if (authLoading || orgLoading || !initialized || trialLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -31,11 +55,14 @@ export function ProtectedRoute({ children, requireOrganization = true }: Protect
   if (requireOrganization && organizations.length === 0) {
     return <Navigate to="/onboarding" replace />;
   }
+  if (requireOrganization && trialStatus?.is_expired) {
+  return <Navigate to="/expired" replace />;
+}
 
   // 조직이 필요 없는 페이지(온보딩)인데 이미 조직이 있는 사용자 → /로 리다이렉트
-  if (!requireOrganization && organizations.length > 0) {
-    return <Navigate to="/" replace />;
-  }
+  if (!requireOrganization && redirectIfHasOrganization && organizations.length > 0) {
+  return <Navigate to="/" replace />;
+}
 
   return <>{children}</>;
 }

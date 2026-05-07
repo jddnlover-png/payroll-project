@@ -18,9 +18,9 @@ export function OrganizationSwitcher() {
   if (organizations.length === 0) {
     return (
       <Button variant="outline" size="sm" onClick={() => navigate('/onboarding')}>
-        <Plus className="h-4 w-4 mr-2" />
-        업체 추가
-      </Button>
+  <Plus className="h-4 w-4 mr-2" />
+  사업장 추가
+</Button>
     );
   }
 
@@ -62,9 +62,15 @@ export function OrganizationSwitcher() {
         )}
       </Badge>
 
-      <Button variant="ghost" size="icon" onClick={() => navigate('/onboarding')}>
-        <Plus className="h-4 w-4" />
-      </Button>
+      <Button
+  variant="outline"
+  size="sm"
+  className="flex items-center gap-1"
+  onClick={() => navigate('/onboarding')}
+>
+  <Plus className="h-4 w-4" />
+  사업장 추가
+</Button>
     </div>
   );
 }

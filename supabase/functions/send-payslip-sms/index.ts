@@ -57,8 +57,14 @@ const generateSignature = async (apiKey: string, apiSecret: string): Promise<str
 
 serve(async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+  return new Response(null, {
+    status: 200,
+    headers: {
+      ...corsHeaders,
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+    },
+  });
+}
 
   try {
     if (!SOLAPI_API_KEY || !SOLAPI_API_SECRET) {
@@ -171,7 +177,7 @@ ${body.employeeName}님의 급여내역입니다.
 ▶ 총 공제액: ${formatCurrency(body.deductions)}원
 ▶ 실 수령액: ${formatCurrency(body.netSalary)}원
 
-📄 상세 명세서 확인:
+상세 명세서 확인
 ${payslipUrl}
 
 ※ 링크는 30일간 유효합니다.`;

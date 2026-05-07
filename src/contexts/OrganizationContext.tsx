@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './AuthContext';
+import { toast } from 'sonner';
 
 interface Organization {
   id: string;
@@ -51,7 +52,6 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
   const [userRole, setUserRole] = useState<'admin' | 'member' | null>(null);
   const [loading, setLoading] = useState(true);
   const [initialized, setInitialized] = useState(false);
-  const [lastUserId, setLastUserId] = useState<string | null>(null);
 
   const fetchOrganizations = async (userId: string) => {
     setLoading(true);
@@ -74,28 +74,72 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
         return;
       }
 
-      const orgIds = memberData.map(m => m.organization_id);
 
-      const { data: orgsData, error: orgsError } = await supabase
-        .from('organizations')
-        .select('*')
-        .in('id', orgIds);
+const orgIds = memberData.map(m => m.organization_id);
 
-      if (orgsError) throw orgsError;
+const { data: accessRows, error: accessError } = await supabase
+  .rpc('get_my_customer_access_status' as any);
 
-      setOrganizations(orgsData || []);
+if (accessError) throw accessError;
 
-      const savedOrgId = localStorage.getItem(CURRENT_ORG_KEY);
-      const savedOrg = orgsData?.find(o => o.id === savedOrgId);
+const blockedOrgIds = new Set(
+  ((accessRows ?? []) as {
+    organization_id: string;
+    customer_status: string;
+    is_blocked: boolean;
+  }[])
+    .filter((row) => row.is_blocked)
+    .map((row) => row.organization_id)
+);
 
-      if (savedOrg) {
-        setCurrentOrganizationState(savedOrg);
-        await fetchUserRole(savedOrg.id);
-      } else if (orgsData && orgsData.length > 0) {
-        setCurrentOrganizationState(orgsData[0]);
-        localStorage.setItem(CURRENT_ORG_KEY, orgsData[0].id);
-        await fetchUserRole(orgsData[0].id);
-      }
+const allowedOrgIds = orgIds.filter(
+  (orgId) => !blockedOrgIds.has(orgId)
+);
+
+if (allowedOrgIds.length === 0) {
+  setOrganizations([]);
+  setCurrentOrganizationState(null);
+  setUserRole(null);
+
+  localStorage.removeItem(CURRENT_ORG_KEY);
+
+  toast.error(
+    '서비스 이용이 정지되었거나 해지된 계정입니다. 관리자에게 문의하세요.'
+  );
+
+  await supabase.auth.signOut();
+
+  return;
+}
+
+const { data: orgsData, error: orgsError } = await supabase
+  .from('organizations')
+  .select('*')
+  .in('id', allowedOrgIds);
+
+if (orgsError) throw orgsError;
+
+const orgs = orgsData || [];
+setOrganizations(orgs);
+
+if (orgs.length === 0) {
+  setCurrentOrganizationState(null);
+  setUserRole(null);
+  localStorage.removeItem(CURRENT_ORG_KEY);
+  return;
+}
+
+const savedOrgId = localStorage.getItem(CURRENT_ORG_KEY);
+const savedOrg = orgs.find(o => o.id === savedOrgId);
+
+if (savedOrg) {
+  setCurrentOrganizationState(savedOrg);
+  await fetchUserRole(savedOrg.id);
+} else {
+  setCurrentOrganizationState(orgs[0]);
+  localStorage.setItem(CURRENT_ORG_KEY, orgs[0].id);
+  await fetchUserRole(orgs[0].id);
+}
     } catch (error) {
       console.error('Error fetching organizations:', error);
       setOrganizations([]);
@@ -108,13 +152,12 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const resetState = () => {
-    setOrganizations([]);
-    setCurrentOrganizationState(null);
-    setUserRole(null);
-    setLoading(false);
-    setInitialized(true);
-    setLastUserId(null);
-  };
+  setOrganizations([]);
+  setCurrentOrganizationState(null);
+  setUserRole(null);
+  setLoading(false);
+  setInitialized(true);
+};
 
   const fetchUserRole = async (orgId: string) => {
     if (!user) return;
@@ -148,22 +191,19 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
-    if (authLoading) {
-      setLoading(true);
-      setInitialized(false);
-      return;
-    }
+  if (authLoading) {
+    setLoading(true);
+    setInitialized(false);
+    return;
+  }
 
-    if (!user) {
-      resetState();
-      return;
-    }
+  if (!user) {
+    resetState();
+    return;
+  }
 
-    if (user.id !== lastUserId) {
-      setLastUserId(user.id);
-      fetchOrganizations(user.id);
-    }
-  }, [user, authLoading, lastUserId]);
+  fetchOrganizations(user.id);
+}, [user?.id, authLoading]);
 
   return (
     <OrganizationContext.Provider

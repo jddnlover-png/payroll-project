@@ -84,70 +84,11 @@ interface EmployeeStore {
 
 const today = new Date().toISOString().split('T')[0];
 
-const initialEmployees: Employee[] = [
-  {
-    id: '1',
-    employeeNumber: 'EMP001',
-    name: '김철수',
-    department: '영업팀',
-    position: '대리',
-    email: 'kim@company.com',
-    phone: '010-1234-5678',
-    hireDate: '2022-03-15',
-    baseSalary: 3500000,
-    payType: 'monthly',
-    employmentType: 'regular',
-    status: 'active',
-  },
-  {
-    id: '2',
-    employeeNumber: 'EMP002',
-    name: '이영희',
-    department: '개발팀',
-    position: '과장',
-    email: 'lee@company.com',
-    phone: '010-2345-6789',
-    hireDate: '2020-07-01',
-    baseSalary: 4500000,
-    payType: 'monthly',
-    employmentType: 'regular',
-    status: 'active',
-  },
-  {
-    id: '3',
-    employeeNumber: 'EMP003',
-    name: '박민수',
-    department: '인사팀',
-    position: '사원',
-    email: 'park@company.com',
-    phone: '010-3456-7890',
-    hireDate: '2023-01-10',
-    baseSalary: 0,
-    payType: 'hourly',
-    hourlyRate: 15000,
-    employmentType: 'daily',
-    status: 'active',
-  },
-];
+const initialEmployees: Employee[] = [];
 
-const initialAttendance: AttendanceRecord[] = initialEmployees.map((emp) => ({
-  id: `att-${emp.id}`,
-  employeeId: emp.id,
-  employeeNumber: emp.employeeNumber,
-  employeeName: emp.name,
-  department: emp.department,
-  date: today,
-  checkIn: null,
-  checkOut: null,
-  status: 'absent' as const,
-}));
+const initialAttendance: AttendanceRecord[] = [];
 
-const initialLeaveBalances: LeaveBalance[] = initialEmployees.map((emp) => ({
-  employeeId: emp.id,
-  totalLeave: 15,
-  usedLeave: 0,
-  remainingLeave: 15,
-}));
+const initialLeaveBalances: LeaveBalance[] = [];
 
 export const useEmployeeStore = create<EmployeeStore>((set, get) => ({
   employees: initialEmployees,

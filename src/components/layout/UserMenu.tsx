@@ -55,10 +55,12 @@ export function UserMenu() {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => navigate('/settings')}>
-          <Settings className="mr-2 h-4 w-4" />
-          설정
-        </DropdownMenuItem>
+        
+
+<DropdownMenuItem onClick={() => navigate('/settings')}>
+  <User className="mr-2 h-4 w-4" />
+  계정 정보
+</DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleSignOut} className="text-destructive">
           <LogOut className="mr-2 h-4 w-4" />

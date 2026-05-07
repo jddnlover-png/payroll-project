@@ -28,15 +28,17 @@ export default function PayslipView() {
 
     const fetchPayslip = async () => {
       try {
-        const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-        const response = await fetch(
-          `https://${projectId}.supabase.co/functions/v1/get-payslip?token=${encodeURIComponent(token)}`,
-          {
-            headers: {
-              'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-            },
-          }
-        );
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+const response = await fetch(
+  `${supabaseUrl}/functions/v1/get-payslip?token=${encodeURIComponent(token)}`,
+  {
+    headers: {
+      apikey: supabaseAnonKey,
+    },
+  }
+);
 
         if (!response.ok) {
           const errData = await response.json();

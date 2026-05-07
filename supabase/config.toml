@@ -1,1 +1,7 @@
 project_id = "rexhgspecmgvgbddgwle"
+
+[functions.send-payslip-sms]
+verify_jwt = false
+
+[functions.get-payslip]
+verify_jwt = false

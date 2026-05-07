@@ -31,19 +31,28 @@ export default function Auth() {
 
   // 인증 완료 시 메인 페이지로 이동 (ProtectedRoute가 조직 유무에 따라 리다이렉트 처리)
   useEffect(() => {
-    if (!authLoading && user && location.pathname === '/auth') {
-      navigate('/');
-    }
-  }, [user, authLoading, navigate, location.pathname]);
+  const hashParams = new URLSearchParams(window.location.hash.substring(1));
+  const type = hashParams.get('type');
+
+  if (type === 'recovery' || view === 'reset-password') {
+    return;
+  }
+
+  if (!authLoading && user && location.pathname === '/auth') {
+    navigate('/');
+  }
+}, [user, authLoading, navigate, location.pathname, view]);
 
   // Check for password reset token in URL
   useEffect(() => {
-    const hashParams = new URLSearchParams(window.location.hash.substring(1));
-    const type = hashParams.get('type');
-    if (type === 'recovery') {
-      setView('reset-password');
-    }
-  }, []);
+  const hashParams = new URLSearchParams(window.location.hash.substring(1));
+  const type = hashParams.get('type');
+
+  if (type === 'recovery') {
+    setView('reset-password');
+    setErrors({});
+  }
+}, []);
 
   const validateForm = (isSignUp: boolean) => {
     const newErrors: { email?: string; password?: string; fullName?: string } = {};

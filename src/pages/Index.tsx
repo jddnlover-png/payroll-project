@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useOrganization } from "@/contexts/OrganizationContext";
+import { useOrganizationFeatureFlags } from "@/hooks/useOrganizationFeatureFlags";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,7 @@ import { AttendanceTab } from "@/components/tabs/AttendanceTab";
 import { ReportsTab } from "@/components/tabs/ReportsTab";
 import { SettingsTab } from "@/components/tabs/SettingsTab";
 import { AdminAIChatbot } from "@/components/chat/AdminAIChatbot";
+import { TrialNoticeDialog } from "@/components/trial/TrialNoticeDialog";
 import {
   LayoutDashboard,
   Users,
@@ -122,6 +124,7 @@ const menuItems: MenuItem[] = [
 
 const Index = () => {
   const { currentOrganization, loading: organizationLoading } = useOrganization();
+  const { featureFlags } = useOrganizationFeatureFlags();
 
   const [activeMenu, setActiveMenu] = useState("dashboard");
   const [activeSubMenu, setActiveSubMenu] = useState<string | null>(null);
@@ -138,7 +141,7 @@ const Index = () => {
         setExpandedMenus((prev) => [...prev, item.id]);
         if (activeMenu !== item.id) {
           setActiveMenu(item.id);
-          setActiveSubMenu(item.subItems[0].id);
+          setActiveSubMenu(item.subItems?.[0]?.id ?? null);
         }
       }
     } else {
@@ -155,8 +158,29 @@ const Index = () => {
     if (isMobile) setSidebarOpen(false);
   };
 
-  const getCurrentLabel = () => {
-    const menu = menuItems.find((m) => m.id === activeMenu);
+  const visibleMenuItems = menuItems
+  .filter((item) => {
+    if (item.id === "attendance") return featureFlags.attendance_enabled;
+    if (item.id === "reports") return featureFlags.reports_enabled;
+    if (item.id === "settings") return featureFlags.settings_enabled;
+    return true;
+  })
+  .map((item) => {
+    if (item.id !== "payroll" || !item.subItems) return item;
+
+    return {
+      ...item,
+      subItems: item.subItems.filter((sub) => {
+        if (sub.id === "regular") return featureFlags.regular_payroll_enabled;
+        if (sub.id === "construction") return featureFlags.construction_daily_enabled;
+        return true;
+      }),
+    };
+  })
+  .filter((item) => !item.subItems || item.subItems.length > 0);
+
+const getCurrentLabel = () => {
+  const menu = visibleMenuItems.find((m) => m.id === activeMenu);
     if (!menu) return "";
     if (activeSubMenu && menu.subItems) {
       const sub = menu.subItems.find((s) => s.id === activeSubMenu);
@@ -201,7 +225,7 @@ const Index = () => {
   const SidebarNav = () => (
     <ScrollArea className="h-[calc(100vh-4rem)]">
       <nav className="p-3 space-y-1">
-        {menuItems.map((item) => {
+        {visibleMenuItems.map((item) => {
           const isActive = activeMenu === item.id;
           const isExpanded = expandedMenus.includes(item.id);
           const Icon = item.icon;
@@ -304,8 +328,10 @@ const Index = () => {
         <main className="flex-1 p-4 md:p-6 overflow-auto">{renderContent()}</main>
       </div>
 
-            {/* AI 챗봇 */}
-      {/* <AdminAIChatbot /> */}
+                        <TrialNoticeDialog />
+
+      {/* AI 챗봇 */}
+      <AdminAIChatbot />
     </div>
   );
 };
