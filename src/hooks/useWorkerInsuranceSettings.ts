@@ -49,23 +49,34 @@ export function useWorkerInsuranceSettings(organizationId: string | undefined) {
   const upsert = useCallback(
     async (setting: WorkerInsuranceSetting) => {
       if (!organizationId) return;
-      const { error } = await supabase.from("worker_insurance_settings").upsert(
-        {
-          organization_id: organizationId,
-          worker_key: setting.worker_key,
-          worker_name: setting.worker_name,
-          apply_employment_insurance: setting.apply_employment_insurance,
-          apply_national_pension: setting.apply_national_pension,
-          apply_health_insurance: setting.apply_health_insurance,
-          pension_confirmed: setting.pension_confirmed,
-          health_confirmed: setting.health_confirmed,
-          pension_confirmed_months: setting.pension_confirmed_months,
-          health_confirmed_months: setting.health_confirmed_months,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "organization_id,worker_key" },
-      );
-      if (!error) {
+      const { data, error } = await supabase
+  .from("worker_insurance_settings")
+  .upsert(
+    {
+      organization_id: organizationId,
+      worker_key: setting.worker_key,
+      worker_name: setting.worker_name,
+      apply_employment_insurance: setting.apply_employment_insurance,
+      apply_national_pension: setting.apply_national_pension,
+      apply_health_insurance: setting.apply_health_insurance,
+      pension_confirmed: setting.pension_confirmed,
+      health_confirmed: setting.health_confirmed,
+      pension_confirmed_months: setting.pension_confirmed_months,
+      health_confirmed_months: setting.health_confirmed_months,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "organization_id,worker_key" },
+  )
+  .select();
+
+if (error) {
+  console.error("worker_insurance_settings upsert error:", error);
+  return error;
+}
+
+console.log("worker_insurance_settings upsert success:", data);
+
+if (!error) {
         setSettings((prev) => {
           const exists = prev.find((s) => s.worker_key === setting.worker_key);
           if (exists) {

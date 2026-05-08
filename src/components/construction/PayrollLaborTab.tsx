@@ -24,8 +24,10 @@ import { calculateAgeFromSsn } from "@/utils/ssnAgeCalculation";
 import { useDailyPayrollSettings } from "@/hooks/useDailyPayrollSettings";
 import { WorkerPayslip } from "./WorkerPayslip";
 import { LaborReportPrint } from "./LaborReportPrint";
+import { InsuranceReviewHistory } from "./InsuranceReviewHistory";
 import { toast } from "sonner";
 import { useWorkerInsuranceSettings } from "@/hooks/useWorkerInsuranceSettings";
+import { useWorkerInsuranceReviewLogs } from "@/hooks/useWorkerInsuranceReviewLogs";
 
 async function recalculateWorkerTax(
   organizationId: string,
@@ -268,16 +270,21 @@ export function PayrollLaborTab() {
   };
   const [showPayslip, setShowPayslip] = useState(false);
 const [showLaborReport, setShowLaborReport] = useState(false);
+const [showInsuranceHistory, setShowInsuranceHistory] = useState(false);
 const [selectedSmsKeys, setSelectedSmsKeys] = useState<string[]>([]);
 const [isSendingSms, setIsSendingSms] = useState(false);
 
 const orgId = currentOrganization?.id;
-  const {
-    upsert: upsertInsurance,
-    getSetting,
-    isPensionConfirmedForMonth,
-    isHealthConfirmedForMonth,
-  } = useWorkerInsuranceSettings(orgId);
+
+const { insertReviewLog } = useWorkerInsuranceReviewLogs();
+
+const {
+  upsert: upsertInsurance,
+  fetch: refetchInsuranceSettings,
+  getSetting,
+  isPensionConfirmedForMonth,
+  isHealthConfirmedForMonth,
+} = useWorkerInsuranceSettings(orgId);
   const [year, month] = yearMonth.split("-").map(Number);
   const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
   const lastDay = new Date(year, month, 0).getDate();
@@ -999,9 +1006,10 @@ return (
             </div>
 
             <Button variant="outline" onClick={() => setShowLaborReport(true)}>
-              <Printer className="w-4 h-4 mr-1" /> 노무대장 출력
-            </Button>
-            <Button
+  <Printer className="w-4 h-4 mr-1" /> 노무대장 출력
+</Button>
+
+<Button
   variant="outline"
   onClick={() => {
     if (!selectedWorker) {
@@ -1016,8 +1024,17 @@ return (
 
 <Button
   variant="outline"
+  onClick={() => setShowInsuranceHistory(true)}
+  className="border-amber-400 bg-amber-50 text-amber-800 hover:bg-amber-100 hover:text-amber-900"
+>
+  보험 검토 이력
+</Button>
+
+<Button
+  variant="outline"
   onClick={handleBulkSmsSend}
   disabled={isSendingSms || selectedSmsKeys.length === 0}
+  className="border-blue-400 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800"
 >
   <MessageSquare className="w-4 h-4 mr-1" />
   {isSendingSms ? "문자 발송 중..." : `선택 직원 문자발송 (${selectedSmsKeys.length})`}
@@ -1133,7 +1150,7 @@ return (
             const isPensionAlwaysShow = effectiveDays === 0 && hasPrevMonth;
 
             let pensionMsg: string | null = null;
-            if (!isPensionConfirmedForMonth(wKey, yearMonth) || isPensionAlwaysShow) {
+            if (!isPensionConfirmedForMonth(wKey, yearMonth)) {
               const ssnRaw = w.records[0]?.ssn_masked;
               const ageResult = ssnRaw ? calculateAgeFromSsn(ssnRaw) : null;
               if (ageResult?.isOver60) {
@@ -1170,7 +1187,7 @@ return (
 
             const isHealthAlwaysShow = effectiveDays === 0 && hasPrevMonth;
 
-            if (!isHealthConfirmedForMonth(wKey, yearMonth) || isHealthAlwaysShow) {
+            if (!isHealthConfirmedForMonth(wKey, yearMonth)) {
               if (effectiveDays >= 8) {
                 if (hasNextMonth) {
                   healthMsg = hasPrevMonth
@@ -1231,16 +1248,18 @@ return (
 
             if (!pensionMsg && !healthMsg && !conversionMsg) return null;
 
-            return {
-              name: w.name,
-              wKey,
-              current,
-              pensionMsg,
-              healthMsg,
-              conversionMsg,
-              isPensionAlwaysShow,
-              isHealthAlwaysShow,
-            };
+           return {
+  name: w.name,
+  wKey,
+  current,
+  pensionMsg,
+  healthMsg,
+  conversionMsg,
+  isPensionAlwaysShow,
+  isHealthAlwaysShow,
+  days: effectiveDays,
+  totalIncome,
+};
           })
           .filter(Boolean);
 
@@ -1277,9 +1296,20 @@ return (
               pension_confirmed_months: [],
               health_confirmed_months: [],
             };
-            if (isPensionConfirmedForMonth(w.wKey, yearMonth) && isHealthConfirmedForMonth(w.wKey, yearMonth))
-              return null;
-            return { ...w, current, isAbsent: true };
+            const pensionConfirmed = isPensionConfirmedForMonth(w.wKey, yearMonth);
+const healthConfirmed = isHealthConfirmedForMonth(w.wKey, yearMonth);
+
+if (pensionConfirmed && healthConfirmed) return null;
+
+return {
+  ...w,
+  current,
+  isAbsent: true,
+  pensionMsg: pensionConfirmed ? null : "⚠ 미출근 / 상실신고 또는 계속근로 여부 확인 필요",
+  healthMsg: healthConfirmed ? null : "⚠ 미출근 / 상실신고 또는 계속근로 여부 확인 필요",
+  days: 0,
+  totalIncome: null,
+};
           })
           .filter(Boolean);
 
@@ -1331,8 +1361,23 @@ return (
                                   pension_confirmed: true,
                                   pension_confirmed_months: newMonths,
                                 };
-                                await upsertInsurance(newSetting);
-                                refetchRecords();
+                                if (orgId) {
+  await insertReviewLog({
+    organization_id: orgId,
+    worker_key: alert.wKey,
+    worker_name: alert.name,
+    review_month: yearMonth,
+    insurance_type: "pension",
+    review_message: "건강보험: ⚠ 미출근 / 상실신고 또는 계속근로 여부 확인 필요",
+    work_days: alert.days ?? null,
+    total_income: alert.totalIncome ?? null,
+    status: "confirmed",
+  });
+}
+
+await upsertInsurance(newSetting);
+await refetchInsuranceSettings();
+refetchRecords();
                               }}
                               className="shrink-0 text-xs px-2 py-0.5 rounded border border-amber-400 hover:bg-amber-100"
                             >
@@ -1340,7 +1385,7 @@ return (
                             </button>
                           </div>
                         )}
-                        {!isHealthConfirmedForMonth(alert.wKey, yearMonth) && (
+                        {alert.healthMsg && (
                           <div className="flex items-center justify-between gap-2 pl-3 text-sm">
                             <span>건강보험: ⚠ 미출근 / 상실신고 또는 계속근로 여부 확인 필요</span>
                             <button
@@ -1350,12 +1395,28 @@ return (
                                   ? prevMonths
                                   : [...prevMonths, yearMonth];
                                 const newSetting = {
-                                  ...alert.current,
-                                  health_confirmed: true,
-                                  health_confirmed_months: newMonths,
-                                };
-                                await upsertInsurance(newSetting);
-                                refetchRecords();
+  ...alert.current,
+  health_confirmed: true,
+  health_confirmed_months: newMonths,
+};
+
+if (orgId) {
+  await insertReviewLog({
+    organization_id: orgId,
+    worker_key: alert.wKey,
+    worker_name: alert.name,
+    review_month: yearMonth,
+    insurance_type: "health",
+    review_message: "건강보험: ⚠ 미출근 / 상실신고 또는 계속근로 여부 확인 필요",
+    work_days: alert.days ?? null,
+    total_income: alert.totalIncome ?? null,
+    status: "confirmed",
+  });
+}
+
+await upsertInsurance(newSetting);
+await refetchInsuranceSettings();
+refetchRecords();
                               }}
                               className="shrink-0 text-xs px-2 py-0.5 rounded border border-amber-400 hover:bg-amber-100"
                             >
@@ -1392,12 +1453,28 @@ return (
                                   ? prevMonths
                                   : [...prevMonths, yearMonth];
                                 const newSetting = {
-                                  ...alert.current,
-                                  pension_confirmed: true,
-                                  pension_confirmed_months: newMonths,
-                                };
-                                await upsertInsurance(newSetting);
-                                refetchRecords();
+  ...alert.current,
+  pension_confirmed: true,
+  pension_confirmed_months: newMonths,
+};
+
+if (orgId) {
+  await insertReviewLog({
+    organization_id: orgId,
+    worker_key: alert.wKey,
+    worker_name: alert.name,
+    review_month: yearMonth,
+    insurance_type: "pension",
+    review_message: `국민연금: ${alert.pensionMsg}`,
+    work_days: alert.days ?? null,
+    total_income: alert.totalIncome ?? null,
+    status: "confirmed",
+  });
+}
+
+await upsertInsurance(newSetting);
+await refetchInsuranceSettings();
+refetchRecords();
                               }}
                               className="shrink-0 text-xs px-2 py-0.5 rounded border border-amber-400 hover:bg-amber-100"
                             >
@@ -1407,23 +1484,39 @@ return (
                         </div>
                       )}
                       {alert.healthMsg && (
-                        <div className="flex items-center justify-between gap-2 pl-3 text-sm">
-                          <span>건강보험: {alert.healthMsg}</span>
-                          {!alert.isHealthAlwaysShow && (
-                            <button
-                              onClick={async () => {
-                                const prevMonths = alert.current.health_confirmed_months ?? [];
-                                const newMonths = prevMonths.includes(yearMonth)
-                                  ? prevMonths
-                                  : [...prevMonths, yearMonth];
-                                const newSetting = {
-                                  ...alert.current,
-                                  health_confirmed: true,
-                                  health_confirmed_months: newMonths,
-                                };
-                                await upsertInsurance(newSetting);
-                                refetchRecords();
-                              }}
+  <div className="flex items-center justify-between gap-2 pl-3 text-sm">
+    <span>건강보험: {alert.healthMsg}</span>
+    {!alert.isHealthAlwaysShow && (
+      <button
+        onClick={async () => {
+          const prevMonths = alert.current.health_confirmed_months ?? [];
+          const newMonths = prevMonths.includes(yearMonth)
+            ? prevMonths
+            : [...prevMonths, yearMonth];
+          const newSetting = {
+            ...alert.current,
+            health_confirmed: true,
+            health_confirmed_months: newMonths,
+          };
+
+          if (orgId) {
+            await insertReviewLog({
+              organization_id: orgId,
+              worker_key: alert.wKey,
+              worker_name: alert.name,
+              review_month: yearMonth,
+              insurance_type: "health",
+              review_message: `건강보험: ${alert.healthMsg}`,
+              work_days: alert.days ?? null,
+              total_income: alert.totalIncome ?? null,
+              status: "confirmed",
+            });
+          }
+
+          await upsertInsurance(newSetting);
+await refetchInsuranceSettings();
+refetchRecords();
+        }}
                               className="shrink-0 text-xs px-2 py-0.5 rounded border border-amber-400 hover:bg-amber-100"
                             >
                               확인 ✓
@@ -2147,6 +2240,13 @@ return (
           onClose={() => setShowLaborReport(false)}
         />
       )}
+      {showInsuranceHistory && (
+  <InsuranceReviewHistory
+    open={showInsuranceHistory}
+    onClose={() => setShowInsuranceHistory(false)}
+    organizationId={orgId!}
+  />
+)}
       {showPayslip && selectedWorker && (
         <WorkerPayslip
           workerName={
