@@ -16,6 +16,7 @@ import Onboarding from "./pages/Onboarding";
 import PayslipView from "./pages/PayslipView";
 import AccountSettings from "./pages/AccountSettings";
 import Expired from "./pages/Expired";
+import UpdatePassword from "./pages/UpdatePassword";
 
 import Admin from "./pages/Admin";
 import AdminLogin from "./pages/AdminLogin";
@@ -29,6 +30,7 @@ function AppRoutes() {
       <Route path="/landing" element={<Landing />} />
       <Route path="/auth" element={<Auth />} />
       <Route path="/admin-login" element={<AdminLogin />} />
+      <Route path="/update-password" element={<UpdatePassword />} />
 
       {/* ✅ 핵심: Admin은 ProtectedRoute 제거 */}
             <Route path="/admin" element={<Admin />} />
