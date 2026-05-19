@@ -35,6 +35,12 @@ const { data: trialStatus, isLoading: trialLoading } = useQuery({
     return data as { is_expired: boolean } | null;
   },
   enabled: !!user && initialized && requireOrganization && !!currentOrganization?.id,
+
+  // ✅ 이미 로그인된 사용자도 정지되면 자동 차단되도록 주기 확인
+  refetchInterval: 5000,
+  refetchOnWindowFocus: true,
+  refetchOnMount: 'always',
+  staleTime: 0,
 });
 
   // 인증 또는 조직 로딩 중일 때 (initialized가 false면 아직 조회 전)
