@@ -28,25 +28,17 @@ serve(async (req: Request): Promise<Response> => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Get token record
+    // Get token record safely through RPC
     const { data: tokenData, error: tokenError } = await supabase
-      .from("payslip_tokens")
-      .select("*")
-      .eq("token", token)
+      .rpc("get_payslip_by_token", {
+        p_token: token,
+      })
       .single();
 
     if (tokenError || !tokenData) {
       return new Response(
         JSON.stringify({ error: "Invalid or expired link" }),
         { status: 404, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
-    }
-
-    // Check expiration
-    if (new Date(tokenData.expires_at) < new Date()) {
-      return new Response(
-        JSON.stringify({ error: "This link has expired" }),
-        { status: 410, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
 

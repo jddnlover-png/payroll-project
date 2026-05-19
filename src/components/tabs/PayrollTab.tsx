@@ -573,7 +573,7 @@ function RegularPayrollContent() {
             deductions: record.deductions,
             netSalary: record.netSalary,
             companyName: companySettings.companyName,
-            siteUrl: "https://ai-crafted-web-spark.lovable.app",
+            siteUrl: "https://payroll-project-rho.vercel.app",
           },
         });
         if (error) {
