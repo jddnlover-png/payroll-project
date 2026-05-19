@@ -200,8 +200,8 @@ export default function Auth() {
     setLoading(true);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth`,
-      });
+  redirectTo: `${window.location.origin}/update-password`,
+});
 
       if (error) {
         toast.error(`비밀번호 재설정 오류: ${error.message}`);
