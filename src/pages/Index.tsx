@@ -1,4 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { useOrganization } from "@/contexts/OrganizationContext";
 import { useOrganizationFeatureFlags } from "@/hooks/useOrganizationFeatureFlags";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -123,7 +126,34 @@ const menuItems: MenuItem[] = [
 ];
 
 const Index = () => {
+  const navigate = useNavigate();
   const { currentOrganization, loading: organizationLoading } = useOrganization();
+
+  const { data: trialStatus } = useQuery({
+    queryKey: ["index-organization-trial-status", currentOrganization?.id],
+    queryFn: async () => {
+      if (!currentOrganization?.id) return null;
+
+      const { data, error } = await (supabase as any)
+        .rpc("get_organization_trial_status", {
+          _organization_id: currentOrganization.id,
+        })
+        .maybeSingle();
+
+      if (error) throw error;
+      return data as { is_expired: boolean } | null;
+    },
+    enabled: !!currentOrganization?.id,
+    refetchInterval: 3000,
+    refetchOnWindowFocus: true,
+    staleTime: 0,
+  });
+
+  useEffect(() => {
+    if (trialStatus?.is_expired) {
+      navigate("/expired", { replace: true });
+    }
+  }, [trialStatus?.is_expired, navigate]);
   const { featureFlags } = useOrganizationFeatureFlags();
 
   const [activeMenu, setActiveMenu] = useState("dashboard");
