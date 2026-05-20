@@ -163,7 +163,7 @@ serve(async (req: Request): Promise<Response> => {
       daily_payroll_record_id: null,
       daily_worker_key: body.workerKey,
       organization_id: body.organizationId,
-      employee_id: body.employeeId,
+      employee_id: null,
       period_year: body.periodYear,
       period_month: body.periodMonth,
       site_id: body.siteId || "all",
