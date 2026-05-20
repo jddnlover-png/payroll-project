@@ -183,11 +183,8 @@ serve(async (req: Request): Promise<Response> => {
 
 ${body.employeeName}님의 임금명세서가 발행되었습니다.
 
-임금명세서 확인 링크
-
-${payslipUrl}
-
-(30일간 조회 가능)`;
+아래 주소를 눌러 확인하세요:
+${payslipUrl}`;
 } else {
       const { data: tokenData, error: tokenError } = await serviceClient
         .from("payslip_tokens")
@@ -211,11 +208,8 @@ const payslipUrl = `${siteUrl}/payslip?token=${tokenData.token}`;
 
 ${body.employeeName}님의 급여명세서가 발행되었습니다.
 
-급여명세서 확인 링크
-
-${payslipUrl}
-
-(30일간 조회 가능)`;
+아래 주소를 눌러 확인하세요:
+${payslipUrl}`;
     }
 
     console.log(`Sending SMS to ${phone} for employee ${body.employeeName}`);
