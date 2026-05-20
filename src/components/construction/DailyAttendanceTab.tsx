@@ -236,10 +236,14 @@ export function DailyAttendanceTab({
   }, [yearMonth, onYearMonthChange]);
 
   useEffect(() => {
-    if (siteIdProp && siteIdProp !== selectedSiteId) {
-      setSelectedSiteId(siteIdProp);
-    }
-  }, [siteIdProp, selectedSiteId]);
+  if (
+    siteIdProp &&
+    siteIdProp !== selectedSiteId &&
+    selectedSiteId === ""
+  ) {
+    setSelectedSiteId(siteIdProp);
+  }
+}, [siteIdProp]);
 
   useEffect(() => {
     if (yearMonthProp && yearMonthProp !== yearMonth) {
