@@ -402,6 +402,17 @@ function RegularPayrollContent() {
 
   const hasCalculatedData = payrollData.length > 0;
 
+const isFinalizedPayroll = (status?: string) =>
+  status === "confirmed" || status === "confirmed_paid";
+
+const finalizedEmployeeIds = useMemo(() => {
+  return new Set(
+    payrollData
+      .filter((record) => isFinalizedPayroll(record.status))
+      .map((record) => record.employeeId),
+  );
+}, [payrollData]);
+
   const filteredPayrollData = useMemo(() => {
     let filtered = payrollData;
 
@@ -454,13 +465,24 @@ function RegularPayrollContent() {
 
   const activeEmployees = convertedEmployees.filter((e) => e.status === "active" && e.employmentType !== "daily");
 
-  const filteredEmployees = activeEmployees.filter((emp) => payTypeFilter === "all" || emp.payType === payTypeFilter);
+const calculableEmployees = activeEmployees.filter((emp) => !finalizedEmployeeIds.has(emp.id));
+
+const filteredEmployees = calculableEmployees.filter(
+  (emp) => payTypeFilter === "all" || emp.payType === payTypeFilter,
+);
 
   const handleOpenPayrollDialog = () => {
-    setPayTypeFilter("all");
-    setSelectedEmployeeIds(activeEmployees.map((e) => e.id));
-    setPayrollDialogOpen(true);
-  };
+  const availableEmployees = activeEmployees.filter((emp) => !finalizedEmployeeIds.has(emp.id));
+
+  if (availableEmployees.length === 0) {
+    toast.error("이미 확정된 급여는 재계산할 수 없습니다.");
+    return;
+  }
+
+  setPayTypeFilter("all");
+  setSelectedEmployeeIds(availableEmployees.map((e) => e.id));
+  setPayrollDialogOpen(true);
+};
 
   const handleSelectRecord = (recordId: string, checked: boolean) => {
     if (checked) {
@@ -685,12 +707,19 @@ function RegularPayrollContent() {
   };
 
   const handleCalculatePayroll = async () => {
-    if (selectedEmployeeIds.length === 0) {
-      toast.error("급여 계산할 직원을 선택해주세요.");
-      return;
-    }
+  if (selectedEmployeeIds.length === 0) {
+    toast.error("급여 계산할 직원을 선택해주세요.");
+    return;
+  }
 
-    setIsCalculating(true);
+  const finalizedSelected = selectedEmployeeIds.filter((id) => finalizedEmployeeIds.has(id));
+
+  if (finalizedSelected.length > 0) {
+    toast.error("확정된 급여는 재계산할 수 없습니다.");
+    return;
+  }
+
+  setIsCalculating(true);
     try {
       if (dbEmployees.length > 0) {
         await Promise.all([
