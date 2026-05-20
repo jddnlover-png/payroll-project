@@ -590,9 +590,10 @@ const exportBillingToExcel = async () => {
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet("과금관리");
 
-  sheet.columns = [
-    { header: "회사명", key: "name", width: 24 },
-    { header: "청구 기준월", key: "billing_month", width: 14 },
+    sheet.columns = [
+  { header: "회사명", key: "name", width: 24 },
+  { header: "사업자번호", key: "business_number", width: 18 },
+  { header: "청구 기준월", key: "billing_month", width: 14 },
     { header: "정기급여 재직자", key: "active", width: 16 },
     { header: "일용직 고유 인원", key: "daily_worker_count", width: 18 },
     { header: "정기급여 요금", key: "regular_fee", width: 16 },
@@ -621,8 +622,9 @@ const exportBillingToExcel = async () => {
     const totalFee = regularFee === null ? null : regularFee + dailyFee;
 
     sheet.addRow({
-      name: org.name,
-      billing_month: billingMonth,
+  name: org.name,
+  business_number: org.business_number ?? "",
+  billing_month: billingMonth,
       active: regularEnabled ? counts.active : "-",
       daily_worker_count: dailyEnabled ? dailyWorkerCount : "-",
       regular_fee: dailyEnabled && regularFee !== null ? "포함" : formatFee(regularFee),
