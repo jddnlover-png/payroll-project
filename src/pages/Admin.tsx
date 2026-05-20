@@ -1084,7 +1084,8 @@ if (!isSuperAdmin || !adminLoginVerified) {
             <TableHeader>
               <TableRow>
                 <TableHead>회사명</TableHead>
-                <TableHead>청구 기준월</TableHead>
+<TableHead>사업자번호</TableHead>
+<TableHead>청구 기준월</TableHead>
                 <TableHead className="text-right">정기급여 재직자</TableHead>
                 <TableHead className="text-right">일용직 고유 인원</TableHead>
 <TableHead className="text-right">정기SMS</TableHead>
@@ -1100,7 +1101,7 @@ if (!isSuperAdmin || !adminLoginVerified) {
             <TableBody>
               {organizations.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={11} className="h-24 text-center text-muted-foreground">
+                  <TableCell colSpan={12} className="h-24 text-center text-muted-foreground">
                     고객사가 없습니다.
                   </TableCell>
                 </TableRow>
@@ -1130,7 +1131,8 @@ const totalFee = regularFee === null ? null : regularFee + dailyFee;
                   return (
                     <TableRow key={org.id}>
                       <TableCell className="font-medium">{org.name}</TableCell>
-                      <TableCell>{billingMonth}</TableCell>
+<TableCell>{org.business_number || "-"}</TableCell>
+<TableCell>{billingMonth}</TableCell>
                       <TableCell className="text-right">{regularEnabled ? counts.active : "-"}</TableCell>
                       <TableCell className="text-right">{dailyEnabled ? dailyWorkerCount : "-"}</TableCell>
 <TableCell className="text-right">{smsUsage.monthly}</TableCell>
