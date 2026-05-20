@@ -237,7 +237,29 @@ ${payslipUrl}`;
       throw new Error(`Solapi API call failed [${solapiResponse.status}]: ${JSON.stringify(solapiResult)}`);
     }
 
-    console.log("SMS sent successfully:", JSON.stringify(solapiResult));
+        console.log("SMS sent successfully:", JSON.stringify(solapiResult));
+
+    const sentAt = new Date();
+    const { error: usageLogError } = await serviceClient
+      .from("message_usage_logs")
+      .insert({
+        organization_id: body.organizationId,
+        channel: "sms",
+        document_type: body.payrollType === "daily" ? "daily_payslip" : "monthly_payslip",
+        target_name: body.employeeName,
+        target_phone: phone,
+        target_email: null,
+        status: "success",
+        provider: "solapi",
+        unit_count: 1,
+        billing_year: sentAt.getFullYear(),
+        billing_month: sentAt.getMonth() + 1,
+        sent_at: sentAt.toISOString(),
+      });
+
+    if (usageLogError) {
+      console.error("Usage log insert failed:", usageLogError);
+    }
 
     return new Response(JSON.stringify({ success: true, result: solapiResult }), {
       status: 200,
