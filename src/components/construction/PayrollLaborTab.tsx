@@ -865,7 +865,7 @@ const handleBulkSmsSend = async () => {
   organizationId: orgId,
   employeeName: w.name,
   employeePhone: target.phone,
-  employeeId: firstRecord?.employee_id || firstRecord?.id,
+  employeeId: target.workerKey,
   payrollRecordId: `daily-${year}-${String(month).padStart(2, "0")}-${target.workerKey}`,
   payrollType: "daily",
   workerKey: target.workerKey,
