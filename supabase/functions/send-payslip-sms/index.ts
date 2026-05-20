@@ -166,8 +166,8 @@ ${body.employeeName}님의 임금내역입니다.
         throw new Error("Failed to create payslip link");
       }
 
-      const siteUrl = body.siteUrl || "https://payroll-project-rho.vercel.app";
-      const payslipUrl = `${siteUrl}/payslip?token=${tokenData.token}`;
+      const siteUrl = "https://payroll-project-rho.vercel.app";
+const payslipUrl = `${siteUrl}/payslip?token=${tokenData.token}`;
 
       message = `[${companyName}] ${body.month} 급여명세서
 
