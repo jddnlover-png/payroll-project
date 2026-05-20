@@ -862,19 +862,24 @@ const handleBulkSmsSend = async () => {
 
       const { error } = await supabase.functions.invoke("send-payslip-sms", {
         body: {
-          organizationId: orgId,
-          employeeName: w.name,
-          employeePhone: target.phone,
-          employeeId: "daily-worker",
-          payrollRecordId: `daily-${year}-${String(month).padStart(2, "0")}-${target.workerKey}`,
-          month: `${year}년 ${month}월`,
-          baseSalary: w.totalFinalPay,
-          totalPayments,
-          deductions: w.totalDeductions,
-          netSalary: totalPayments - w.totalDeductions,
-          companyName: currentOrganization.name,
-          siteUrl: window.location.origin,
-        },
+  organizationId: orgId,
+  employeeName: w.name,
+  employeePhone: target.phone,
+  employeeId: firstRecord?.employee_id || firstRecord?.id,
+  payrollRecordId: `daily-${year}-${String(month).padStart(2, "0")}-${target.workerKey}`,
+  payrollType: "daily",
+  workerKey: target.workerKey,
+  periodYear: year,
+  periodMonth: month,
+  siteId: selectedSiteId,
+  month: `${year}년 ${month}월`,
+  baseSalary: w.totalFinalPay,
+  totalPayments,
+  deductions: w.totalDeductions,
+  netSalary: totalPayments - w.totalDeductions,
+  companyName: currentOrganization.name,
+  siteUrl: window.location.origin,
+},
       });
 
       if (error) {

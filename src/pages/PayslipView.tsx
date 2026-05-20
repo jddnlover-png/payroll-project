@@ -8,6 +8,7 @@ const formatCurrency = (amount: number) =>
   new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(amount);
 
 interface PayslipData {
+  payslipType?: "monthly" | "daily";
   payroll: any;
   organization: any;
 }
@@ -81,10 +82,134 @@ const response = await fetch(
       </div>
     );
   }
+const { payroll, organization, payslipType } = data;
 
-  const { payroll, organization } = data;
-  const employee = payroll.employee;
+if (payslipType === "daily") {
+  const rows = payroll.rows || [];
   const periodLabel = `${payroll.period_year}년 ${payroll.period_month}월`;
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-primary/5 to-background p-4 md:p-8">
+      <div className="max-w-lg mx-auto space-y-4">
+        <div className="text-center space-y-2">
+          <div className="flex items-center justify-center gap-2 text-muted-foreground">
+            <Building2 className="h-4 w-4" />
+            <span className="text-sm">{organization?.name || "회사"}</span>
+          </div>
+          <h1 className="text-2xl font-bold text-foreground">임금명세서</h1>
+          <p className="text-muted-foreground bg-muted inline-block px-4 py-1 rounded-full text-sm">
+            {periodLabel}
+          </p>
+        </div>
+
+        <Card className="bg-primary text-primary-foreground">
+          <CardContent className="pt-6 text-center">
+            <p className="text-sm opacity-80 mb-1">실 수령액</p>
+            <p className="text-3xl font-bold">{formatCurrency(payroll.net_pay || 0)}</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm">근로자 정보</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">성명</span>
+              <span className="font-medium">{payroll.worker_name}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">주민번호</span>
+              <span>{payroll.ssn_masked || "-"}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">근무일수</span>
+              <span>{payroll.work_days || 0}일</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">지급기간</span>
+              <span>
+                {payroll.start_date} ~ {payroll.end_date}
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm text-emerald-600">💰 지급 내역</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">지급총액</span>
+              <span className="font-medium">{formatCurrency(payroll.total_payments || 0)}</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm text-destructive">📋 공제 내역</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">공제합계</span>
+              <span className="font-medium text-destructive">
+                -{formatCurrency(payroll.total_deductions || 0)}
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm">근무 상세</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            {rows.map((row: any) => (
+              <div key={row.id} className="rounded-lg border p-3 space-y-1">
+                <div className="flex justify-between font-medium">
+                  <span>{row.work_date}</span>
+                  <span>{row.site?.site_name || "-"}</span>
+                </div>
+                <div className="flex justify-between text-muted-foreground">
+                  <span>직종</span>
+                  <span>{row.job_type || "-"}</span>
+                </div>
+                <div className="flex justify-between text-muted-foreground">
+                  <span>근무시간</span>
+                  <span>
+                    {row.start_time || "-"} ~ {row.end_time || "-"}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">지급액</span>
+                  <span>{formatCurrency(Number(row.calculated_pay || 0))}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">공제액</span>
+                  <span className="text-destructive">
+                    -{formatCurrency(Number(row.total_deductions || 0))}
+                  </span>
+                </div>
+                <div className="flex justify-between font-semibold">
+                  <span>실수령액</span>
+                  <span>{formatCurrency(Number(row.net_pay || 0))}</span>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        <p className="text-center text-xs text-muted-foreground pt-2">
+          본 임금명세서는 {organization?.name || "회사"}에서 발급되었습니다.
+        </p>
+      </div>
+    </div>
+  );
+}
+  const employee = payroll.employee;
+const periodLabel = `${payroll.period_year}년 ${payroll.period_month}월`;
 
   const paymentItems: { name: string; amount: number }[] = payroll.payment_items || [];
   const deductionItems: { name: string; amount: number }[] = payroll.deduction_items || [];

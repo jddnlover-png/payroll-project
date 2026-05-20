@@ -25,6 +25,11 @@ interface SmsRequest {
   netSalary: number;
   companyName?: string;
   siteUrl?: string;
+  payrollType?: "monthly" | "daily";
+workerKey?: string;
+periodYear?: number;
+periodMonth?: number;
+siteId?: string;
 }
 
 const formatCurrency = (amount: number) => new Intl.NumberFormat("ko-KR").format(amount);
@@ -142,15 +147,48 @@ serve(async (req: Request): Promise<Response> => {
     const companyName = body.companyName || "급여관리시스템";
     let message: string;
 
-    if (body.employeeId === "daily-worker") {
-      message = `[${companyName}] ${body.month} 임금명세서
+    if (body.payrollType === "daily") {
+  if (!body.workerKey || !body.periodYear || !body.periodMonth) {
+    return new Response(JSON.stringify({ error: "Missing daily payslip fields" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json", ...corsHeaders },
+    });
+  }
 
-${body.employeeName}님의 임금내역입니다.
+  const { data: tokenData, error: tokenError } = await serviceClient
+    .from("payslip_tokens")
+    .insert({
+      payslip_type: "daily",
+      payroll_record_id: null,
+      daily_payroll_record_id: null,
+      daily_worker_key: body.workerKey,
+      organization_id: body.organizationId,
+      employee_id: body.employeeId,
+      period_year: body.periodYear,
+      period_month: body.periodMonth,
+      site_id: body.siteId || "all",
+    })
+    .select("token")
+    .single();
 
-▶ 지급총액: ${formatCurrency(body.totalPayments)}원
-▶ 공제합계: ${formatCurrency(body.deductions)}원
-▶ 실수령액: ${formatCurrency(body.netSalary)}원`;
-    } else {
+  if (tokenError || !tokenData) {
+    console.error("Daily token creation failed:", tokenError);
+    throw new Error("Failed to create daily payslip link");
+  }
+
+  const siteUrl = "https://payroll-project-rho.vercel.app";
+  const payslipUrl = `${siteUrl}/payslip?token=${tokenData.token}`;
+
+  message = `[${companyName}] ${body.month} 임금명세서
+
+${body.employeeName}님의 임금명세서가 발행되었습니다.
+
+임금명세서 확인 링크
+
+${payslipUrl}
+
+(30일간 조회 가능)`;
+} else {
       const { data: tokenData, error: tokenError } = await serviceClient
         .from("payslip_tokens")
         .insert({
