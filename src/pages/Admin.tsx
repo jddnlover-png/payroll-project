@@ -1087,7 +1087,10 @@ if (!isSuperAdmin || !adminLoginVerified) {
                 <TableHead>청구 기준월</TableHead>
                 <TableHead className="text-right">정기급여 재직자</TableHead>
                 <TableHead className="text-right">일용직 고유 인원</TableHead>
-                <TableHead className="text-right">정기급여 요금</TableHead>
+<TableHead className="text-right">정기SMS</TableHead>
+<TableHead className="text-right">일용SMS</TableHead>
+<TableHead className="text-right">총SMS</TableHead>
+<TableHead className="text-right">정기급여 요금</TableHead>
                 <TableHead className="text-right">일용직 요금</TableHead>
                 <TableHead className="text-right">예상 청구금액</TableHead>
                 <TableHead>상태</TableHead>
@@ -1097,7 +1100,7 @@ if (!isSuperAdmin || !adminLoginVerified) {
             <TableBody>
               {organizations.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
+                  <TableCell colSpan={11} className="h-24 text-center text-muted-foreground">
                     고객사가 없습니다.
                   </TableCell>
                 </TableRow>
@@ -1110,8 +1113,9 @@ if (!isSuperAdmin || !adminLoginVerified) {
                   const dailyEnabled = flags?.construction_daily_enabled ?? false;
 
                   const dailyWorkerCount = dailyWorkerCountMap[org.id] ?? 0;
+const smsUsage = smsUsageMap[org.id] ?? { monthly: 0, daily: 0, total: 0 };
 
-                  const regularFee = dailyEnabled
+const regularFee = dailyEnabled
   ? counts.active > 60
     ? null
     : 0
@@ -1129,9 +1133,10 @@ const totalFee = regularFee === null ? null : regularFee + dailyFee;
                       <TableCell>{billingMonth}</TableCell>
                       <TableCell className="text-right">{regularEnabled ? counts.active : "-"}</TableCell>
                       <TableCell className="text-right">{dailyEnabled ? dailyWorkerCount : "-"}</TableCell>
-                      <TableCell className="text-right">
-  {dailyEnabled && regularFee !== null ? "포함" : formatFee(regularFee)}
-</TableCell>
+<TableCell className="text-right">{smsUsage.monthly}</TableCell>
+<TableCell className="text-right">{smsUsage.daily}</TableCell>
+<TableCell className="text-right font-medium">{smsUsage.total}</TableCell>
+<TableCell className="text-right">{dailyEnabled && regularFee !== null ? "포함" : formatFee(regularFee)}</TableCell>
                       <TableCell className="text-right">{formatFee(dailyFee)}</TableCell>
                       <TableCell className="text-right font-semibold">{formatFee(totalFee)}</TableCell>
                       <TableCell>
