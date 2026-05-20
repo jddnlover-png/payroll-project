@@ -66,6 +66,14 @@ interface BillingSnapshotRow {
   is_confirmed: boolean;
 }
 
+interface MessageUsageLogRow {
+  organization_id: string;
+  channel: string;
+  document_type: string | null;
+  billing_year: number;
+  billing_month: number;
+}
+
 interface EditFormState {
   contact_name: string;
   contact_mobile: string;
@@ -346,6 +354,34 @@ const { data: billingSnapshots = [] } = useQuery({
   enabled: isSuperAdmin && !!billingMonth,
 });
 
+const { data: messageUsageLogs = [] } = useQuery({
+  queryKey: ["admin-message-usage", billingMonth],
+  queryFn: async () => {
+    if (!billingMonth) return [];
+
+    const [year, month] = billingMonth.split("-").map(Number);
+    const orgIds = organizations.map((org) => org.id);
+
+    if (orgIds.length === 0) {
+      return [];
+    }
+
+    const { data, error } = await supabase
+      .from("message_usage_logs" as any)
+      .select("organization_id, channel, document_type, billing_year, billing_month")
+      .eq("channel", "sms")
+      .eq("status", "success")
+      .eq("billing_year", year)
+      .eq("billing_month", month)
+      .in("organization_id", orgIds);
+
+    if (error) throw error;
+
+    return (data ?? []) as unknown as MessageUsageLogRow[];
+  },
+  enabled: isSuperAdmin && !!billingMonth && organizations.length > 0,
+});
+
 const confirmedSnapshotMap = useMemo(() => {
   return billingSnapshots.reduce<Record<string, boolean>>((acc, row) => {
     acc[row.organization_id] = row.is_confirmed;
@@ -356,6 +392,40 @@ const confirmedSnapshotMap = useMemo(() => {
 const isBillingMonthConfirmed = useMemo(() => {
   return billingSnapshots.some((row) => row.is_confirmed);
 }, [billingSnapshots]);
+
+const smsUsageMap = useMemo(() => {
+  return messageUsageLogs.reduce<
+    Record<
+      string,
+      {
+        monthly: number;
+        daily: number;
+        total: number;
+      }
+    >
+  >((acc, row) => {
+    if (!acc[row.organization_id]) {
+      acc[row.organization_id] = {
+        monthly: 0,
+        daily: 0,
+        total: 0,
+      };
+    }
+
+    if (row.document_type === "monthly_payslip") {
+      acc[row.organization_id].monthly += 1;
+    }
+
+    if (row.document_type === "daily_payslip") {
+      acc[row.organization_id].daily += 1;
+    }
+
+    acc[row.organization_id].total += 1;
+
+    return acc;
+  }, {});
+}, [messageUsageLogs]);
+
   const getCounts = (organizationId: string) => {
     const rows = employees.filter((emp) => emp.organization_id === organizationId);
     const total = rows.length;
