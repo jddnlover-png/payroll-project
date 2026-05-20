@@ -262,64 +262,7 @@ export function WorkerPayslip({
           >
             이메일 발송
           </button>
-          {/* 문자 발송 */}
-          {phone && (
-            <button
-              onClick={async () => {
-                try {
-                  const { supabase } = await import("@/integrations/supabase/client");
-
-                  const orgResult = await supabase.auth.getUser();
-                  if (!orgResult.data.user) {
-                    alert("로그인이 필요합니다.");
-                    return;
-                  }
-
-                  const { data: orgData } = await supabase
-                    .from("organization_members")
-                    .select("organization_id, organizations(name)")
-                    .eq("user_id", orgResult.data.user.id)
-                    .maybeSingle();
-
-                  const companyName = (orgData?.organizations as any)?.name || "";
-                  const organizationId = orgData?.organization_id || "";
-
-                  if (!organizationId) {
-                    alert("조직 정보를 찾을 수 없습니다.");
-                    return;
-                  }
-
-                  const { error } = await supabase.functions.invoke("send-payslip-sms", {
-                    body: {
-                      organizationId,
-                      employeeName: workerName,
-                      employeePhone: phone ?? "",
-                      employeeId: "daily-worker",
-                      payrollRecordId: `daily-${year}-${String(month).padStart(2, "0")}-${workerName}`,
-                      month: `${year}년 ${month}월`,
-                      baseSalary: totalRegularPay,
-                      totalPayments: totalGross,
-                      deductions: totalDeductions,
-                      netSalary: totalNetPay,
-                      companyName,
-                      siteUrl: window.location.origin,
-                    },
-                  });
-
-                  if (error) {
-                    alert("문자 발송에 실패했습니다: " + error.message);
-                  } else {
-                    alert(`${workerName}님께 임금명세서 문자가 발송되었습니다.`);
-                  }
-                } catch (e: any) {
-                  alert("문자 발송 오류: " + e.message);
-                }
-              }}
-              className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
-            >
-              문자 발송
-            </button>
-          )}
+          
           {/* 엑셀 저장 */}
           <button
             onClick={async () => {
