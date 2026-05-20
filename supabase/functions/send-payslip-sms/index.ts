@@ -172,11 +172,12 @@ const payslipUrl = `${siteUrl}/payslip?token=${tokenData.token}`;
       message = `[${companyName}] ${body.month} 급여명세서
 
 ${body.employeeName}님의 급여명세서가 발행되었습니다.
-아래 링크에서 상세 내역을 확인해 주세요.
+
+급여명세서 확인 링크
 
 ${payslipUrl}
 
-※ 링크는 30일간 유효합니다.`;
+(30일간 조회 가능)`;
     }
 
     console.log(`Sending SMS to ${phone} for employee ${body.employeeName}`);
