@@ -171,13 +171,9 @@ const payslipUrl = `${siteUrl}/payslip?token=${tokenData.token}`;
 
       message = `[${companyName}] ${body.month} 급여명세서
 
-${body.employeeName}님의 급여내역입니다.
+${body.employeeName}님의 급여명세서가 발행되었습니다.
+아래 링크에서 상세 내역을 확인해 주세요.
 
-▶ 총 지급액: ${formatCurrency(body.totalPayments)}원
-▶ 총 공제액: ${formatCurrency(body.deductions)}원
-▶ 실 수령액: ${formatCurrency(body.netSalary)}원
-
-상세 명세서 확인
 ${payslipUrl}
 
 ※ 링크는 30일간 유효합니다.`;
