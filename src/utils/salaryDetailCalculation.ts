@@ -567,11 +567,6 @@ export function calculateSalaryDetail(
 
     const empAllAtt = allAttendance.filter((a) => a.employee_id === employee.id);
 
-const monthStartDate = `${yearStr}-${monthStr}-01`;
-const prevMonthDate = new Date(calcYear, calcMonth - 2, 1);
-const prevMonthStr = `${prevMonthDate.getFullYear()}-${String(prevMonthDate.getMonth() + 1).padStart(2, "0")}`;
-const payrollStartMonth = String((settings as any).payroll_start_month || "").slice(0, 7) || null;
-
     // ① 전달 이월 처리
     if (prevCarryDays > 0 && weeks.length > 0) {
       const firstWeek = weeks[0];
@@ -599,37 +594,13 @@ const payrollStartMonth = String((settings as any).payroll_start_month || "").sl
     // ② 이번 달 각 주 판정
 for (const week of weeks) {
   const fullWeekDates = getWeekDates(week.dates[0]);
+  // 이 달에 속하는 소정근로일만 카운트
   const monthDatesInWeek = week.dates;
   const scheduledInMonth = monthDatesInWeek.filter((d) => isScheduledWorkday(d, settings));
 
-  const hasPrevMonthDates = fullWeekDates.some((d) => d < monthStartDate);
-  const hasCurrentMonthDates = fullWeekDates.some((d) => d.slice(0, 7) === yearMonth);
-
-  const isFirstWeekAfterPayrollStartMonth =
-    payrollStartMonth === prevMonthStr && hasPrevMonthDates && hasCurrentMonthDates;
-
-  // 도입 첫 달의 다음 달 첫 주 보정
-  if (isFirstWeekAfterPayrollStartMonth) {
-    const effectiveWeekDates = fullWeekDates.filter((d) => d.slice(0, 7) === yearMonth);
-    const weekAtt = empAllAtt.filter((a) => effectiveWeekDates.includes(a.date));
-    const stats = calculateWeeklyStats(weekAtt, settings, effectiveWeekDates);
-
-    if (
-      stats.totalMinutes >= 15 * 60 &&
-      stats.scheduledDaysTotal > 0 &&
-      stats.scheduledDaysWorked >= stats.scheduledDaysTotal
-    ) {
-      weeklyHolidayQualified = true;
-      const dailyBaseHours = calcDailyBaseHours(weekAtt, settings);
-      qualifiedWeeklyHolidayPay += floor1(dailyBaseHours * hourlyRate);
-      eligibleWeeks++;
-    }
-
-    continue;
-  }
-
   // 소정근로일 수가 설정 기준 미만 = 미완성 주 → 이월
   if (scheduledInMonth.length < workDays) {
+    // 실제 출근한 날수만 저장 (결근 제외)
     const workedInWeek = scheduledInMonth.filter((d) => {
       const att = empAllAtt.find((a) => a.date === d);
       return att && (att.status === "present" || att.status === "late");
