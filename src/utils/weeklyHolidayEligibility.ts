@@ -87,6 +87,13 @@ export interface WeeklyHolidayEligibilityInput {
   weeklyWorkDayList: string[];
   weeklyHoliday: string;
   weeklyWorkHours: number;
+
+  /**
+   * 회사 도입 기준월.
+   * 예: 2026-03이면 2026년 4월 첫 주 계산 시
+   * 3월 마지막 주 소정근로일을 결근으로 보지 않도록 보정한다.
+   */
+  payrollStartMonth?: string | null;
 }
 
 export interface WeeklyHolidayEligibilityResult {
@@ -126,7 +133,27 @@ export function calculateWeeklyHolidayEligibility(
   const week_start = formatDate(weekStartDate);
   const week_end = formatDate(weekEndDate);
 
-  const prescribed_dates = getPrescribedDates(weekStartDate, input.weeklyWorkDayList || []);
+  const raw_prescribed_dates = getPrescribedDates(weekStartDate, input.weeklyWorkDayList || []);
+
+const targetMonth = String(input.targetDate).slice(0, 7);
+const payrollStartMonth = input.payrollStartMonth || null;
+
+/**
+ * 첫 달/도입월 보정:
+ * 월 초 첫 주가 이전 달 날짜를 포함하는 경우,
+ * payrollStartMonth가 이전 달 이하로 설정되어 있으면
+ * 이전 달 날짜는 결근으로 보지 않는다.
+ *
+ * 예:
+ * - 계산월: 2026-04
+ * - 첫 주: 2026-03-30 ~ 2026-04-05
+ * - payrollStartMonth: 2026-03
+ * → 2026-03-30, 2026-03-31은 결근 체크에서 제외
+ */
+const prescribed_dates =
+  payrollStartMonth && payrollStartMonth < targetMonth
+    ? raw_prescribed_dates.filter((date) => date.slice(0, 7) === targetMonth)
+    : raw_prescribed_dates;
 
   const workerWeekRecords = input.records.filter((r) => {
     if (r.organization_id !== input.organizationId) return false;
