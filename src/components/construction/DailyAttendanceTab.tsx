@@ -655,15 +655,16 @@ export function DailyAttendanceTab({
             .eq("work_type", "hourly");
 
           const originalWeeklyResult = calculateWeeklyHolidayEligibility({
-            organizationId: currentOrganization.id,
-            workerKey: originalWorkerKey,
-            workerName: originalRecord.worker_name,
-            targetDate: originalRecord.work_date,
-            records: (allOrgRecordsForOriginal || []) as any,
-            weeklyWorkDayList: dailyPayrollSettings.weekly_work_day_list || [],
-            weeklyHoliday: dailyPayrollSettings.weekly_holiday || "sun",
-            weeklyWorkHours: dailyPayrollSettings.weekly_work_hours || 40,
-          });
+  organizationId: currentOrganization.id,
+  workerKey: originalWorkerKey,
+  workerName: originalRecord.worker_name,
+  targetDate: originalRecord.work_date,
+  records: (allOrgRecordsForOriginal || []) as any,
+  weeklyWorkDayList: dailyPayrollSettings.weekly_work_day_list || [],
+  weeklyHoliday: dailyPayrollSettings.weekly_holiday || "sun",
+  weeklyWorkHours: dailyPayrollSettings.weekly_work_hours || 40,
+  payrollStartMonth: orgSettings.payroll_start_month,
+});
 
           weeklyResultsMap.set(
             `${originalWeeklyResult.organization_id}|${originalWeeklyResult.worker_key}|${originalWeeklyResult.week_start}`,
@@ -679,15 +680,16 @@ export function DailyAttendanceTab({
             .eq("work_type", "hourly");
 
           const currentWeeklyResult = calculateWeeklyHolidayEligibility({
-            organizationId: currentOrganization.id,
-            workerKey: currentWorkerKey,
-            workerName: form.workerName.trim(),
-            targetDate: selectedDate,
-            records: (allOrgRecordsForCurrent || []) as any,
-            weeklyWorkDayList: dailyPayrollSettings.weekly_work_day_list || [],
-            weeklyHoliday: dailyPayrollSettings.weekly_holiday || "sun",
-            weeklyWorkHours: dailyPayrollSettings.weekly_work_hours || 40,
-          });
+  organizationId: currentOrganization.id,
+  workerKey: currentWorkerKey,
+  workerName: form.workerName.trim(),
+  targetDate: selectedDate,
+  records: (allOrgRecordsForCurrent || []) as any,
+  weeklyWorkDayList: dailyPayrollSettings.weekly_work_day_list || [],
+  weeklyHoliday: dailyPayrollSettings.weekly_holiday || "sun",
+  weeklyWorkHours: dailyPayrollSettings.weekly_work_hours || 40,
+  payrollStartMonth: orgSettings.payroll_start_month,
+});
 
           weeklyResultsMap.set(
             `${currentWeeklyResult.organization_id}|${currentWeeklyResult.worker_key}|${currentWeeklyResult.week_start}`,
@@ -711,15 +713,16 @@ export function DailyAttendanceTab({
           const recordsForWeeklyCalc = [...(allOrgRecords || []), record as any];
 
           const weeklyHolidayResult = calculateWeeklyHolidayEligibility({
-            organizationId: currentOrganization.id,
-            workerKey: currentWorkerKey,
-            workerName: form.workerName.trim(),
-            targetDate: selectedDate,
-            records: recordsForWeeklyCalc as any,
-            weeklyWorkDayList: dailyPayrollSettings.weekly_work_day_list || [],
-            weeklyHoliday: dailyPayrollSettings.weekly_holiday || "sun",
-            weeklyWorkHours: dailyPayrollSettings.weekly_work_hours || 40,
-          });
+  organizationId: currentOrganization.id,
+  workerKey: currentWorkerKey,
+  workerName: form.workerName.trim(),
+  targetDate: selectedDate,
+  records: recordsForWeeklyCalc as any,
+  weeklyWorkDayList: dailyPayrollSettings.weekly_work_day_list || [],
+  weeklyHoliday: dailyPayrollSettings.weekly_holiday || "sun",
+  weeklyWorkHours: dailyPayrollSettings.weekly_work_hours || 40,
+  payrollStartMonth: orgSettings.payroll_start_month,
+});
 
           await upsertWeeklyHolidayPayRecord(weeklyHolidayResult);
         }
@@ -745,6 +748,7 @@ export function DailyAttendanceTab({
     insertRecord,
     updateRecord,
     dailyPayrollSettings,
+orgSettings,
   ]);
 
   const ssnAgeWarning = useMemo(() => {
@@ -1563,15 +1567,16 @@ export function DailyAttendanceTab({
                       .eq("work_type", "hourly");
 
                     const weeklyHolidayResult = calculateWeeklyHolidayEligibility({
-                      organizationId: currentOrganization!.id,
-                      workerKey: deletingWorkerKey,
-                      workerName: deletingRecord.worker_name,
-                      targetDate: deletingRecord.work_date,
-                      records: (allOrgRecordsForDelete || []) as any,
-                      weeklyWorkDayList: dailyPayrollSettings.weekly_work_day_list || [],
-                      weeklyHoliday: dailyPayrollSettings.weekly_holiday || "sun",
-                      weeklyWorkHours: dailyPayrollSettings.weekly_work_hours || 40,
-                    });
+  organizationId: currentOrganization!.id,
+  workerKey: deletingWorkerKey,
+  workerName: deletingRecord.worker_name,
+  targetDate: deletingRecord.work_date,
+  records: (allOrgRecordsForDelete || []) as any,
+  weeklyWorkDayList: dailyPayrollSettings.weekly_work_day_list || [],
+  weeklyHoliday: dailyPayrollSettings.weekly_holiday || "sun",
+  weeklyWorkHours: dailyPayrollSettings.weekly_work_hours || 40,
+  payrollStartMonth: orgSettings.payroll_start_month,
+});
 
                     await upsertWeeklyHolidayPayRecord(weeklyHolidayResult);
                   }
