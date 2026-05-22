@@ -229,15 +229,28 @@ function calcHolidayPayAmount(
       return Math.floor(avgBaseDailyWage);
     }
 
-    // 우선순위 2: fallback - 기존 hourly 계산식
+        // 우선순위 2: fallback - 실제 근무기록 기준 1일 평균 소정근로시간 사용
+    const hourlyRate = weekRecords[0].daily_wage;
+
+    const validWorkHours = weekRecords
+      .map(r => Number(r.work_hours ?? 0))
+      .filter(v => v > 0);
+
+    if (validWorkHours.length > 0) {
+      const avgDailyWorkHours =
+        validWorkHours.reduce((sum, v) => sum + v, 0) / validWorkHours.length;
+
+      return Math.floor(hourlyRate * Math.min(avgDailyWorkHours, 8));
+    }
+
+    // 근무시간 기록이 없을 때만 기존 설정값 기준으로 fallback
     const actualDays = Math.max(
       1,
       weeklyWorkDayList?.length || weeklyWorkDays || 1
     );
-    if (actualDays === 0) return 0;
-    const hourlyRate = weekRecords[0].daily_wage;
+
     const dailyPrescribedHours = weeklyWorkHours / actualDays;
-    return Math.floor(hourlyRate * dailyPrescribedHours);
+    return Math.floor(hourlyRate * Math.min(dailyPrescribedHours, 8));
   }
 
   return 0;
