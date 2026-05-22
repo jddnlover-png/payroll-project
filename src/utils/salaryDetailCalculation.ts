@@ -253,17 +253,10 @@ function getWeekDates(dateStr: string): string[] {
 /** 주 단위 근무유형별 1일 기준시간 산정 (주휴수당용) */
 function calcDailyBaseHours(weekAtt: AttendanceRawRecord[], settings: OrganizationSettings): number {
   const weekAttWithCheckIn = weekAtt.filter((a) => a.check_in && a.check_out);
-  const hasNightShift = weekAttWithCheckIn.some((a) => {
-    if (a.work_type === "night") return true;
-    if (!a.check_in) return false;
-    const checkInDate = new Date(a.check_in);
-    const checkInHour = checkInDate.getHours() + checkInDate.getMinutes() / 60;
-    return checkInHour >= 14;
-  });
 
-  if (hasNightShift) {
-    let totalRecognized = 0;
-    let totalOvertime = 0;
+  if (weekAttWithCheckIn.length > 0) {
+    let totalScheduledMinutes = 0;
+
     for (const wa of weekAttWithCheckIn) {
       const waIsNight =
         wa.work_type === "night" ||
@@ -274,15 +267,19 @@ function calcDailyBaseHours(weekAtt: AttendanceRawRecord[], settings: Organizati
         })();
 
       if (waIsNight) {
-        // 야간교대: calculate4TierNightShift 사용 (퇴근 보정 포함)
         const checkIn = new Date(wa.check_in!);
         const checkOut = new Date(wa.check_out!);
         const t4 = calculate4TierNightShift(checkIn, checkOut, settings);
-        const nightRecognized = t4.tier1Minutes + t4.tier2Minutes + t4.tier3Minutes + t4.tier4Minutes;
-        // 정규분: 1단계 + 2단계 (연장은 3단계+4단계)
+
+        const nightRecognized =
+          t4.tier1Minutes +
+          t4.tier2Minutes +
+          t4.tier3Minutes +
+          t4.tier4Minutes;
+
         const nightOvertime = t4.tier3Minutes + t4.tier4Minutes;
-        totalRecognized += nightRecognized;
-        totalOvertime += nightOvertime;
+
+        totalScheduledMinutes += nightRecognized - nightOvertime;
       } else {
         const bd = calculateSingleAttendance(
           wa.check_in!,
@@ -292,61 +289,18 @@ function calcDailyBaseHours(weekAtt: AttendanceRawRecord[], settings: Organizati
           false,
           settings,
         );
-        totalRecognized += bd.recognizedMinutes;
-        totalOvertime += bd.overtimeWorkMinutes;
+
+        totalScheduledMinutes += bd.recognizedMinutes - bd.overtimeWorkMinutes;
       }
     }
-    const scheduledMinutes = totalRecognized - totalOvertime;
-    const daysWorked = weekAttWithCheckIn.length || 1;
-    return Math.min(scheduledMinutes / 60 / daysWorked, 8);
-  } else {
-  const settingValues = settings as OrganizationSettings & {
-    work_start_time?: string | null;
-    work_end_time?: string | null;
-    break_minutes?: number | null;
-    weekly_work_day_list?: string[] | null;
-    weekly_work_days?: number | null;
-  };
 
-  const parseTimeToMinutes = (time?: string | null): number | null => {
-    if (!time) return null;
-
-    const [hourText, minuteText] = time.split(":");
-    const hour = Number(hourText);
-    const minute = Number(minuteText);
-
-    if (Number.isNaN(hour) || Number.isNaN(minute)) return null;
-
-    return hour * 60 + minute;
-  };
-
-  const startMinutes = parseTimeToMinutes(settingValues.work_start_time);
-  const endMinutes = parseTimeToMinutes(settingValues.work_end_time);
-  const breakMinutes = Number(settingValues.break_minutes ?? 0);
-
-  if (startMinutes !== null && endMinutes !== null) {
-    let dailyMinutes = endMinutes - startMinutes;
-
-    if (dailyMinutes <= 0) {
-      dailyMinutes += 24 * 60;
-    }
-
-    dailyMinutes -= breakMinutes;
-
-    if (dailyMinutes > 0) {
-      return Math.min(dailyMinutes / 60, 8);
-    }
+    return Math.min(totalScheduledMinutes / 60 / weekAttWithCheckIn.length, 8);
   }
 
-  const weeklyWorkHours = Number(settingValues.weekly_work_hours || 40);
-  const scheduledWorkDays =
-    settingValues.weekly_work_day_list?.length ||
-    settingValues.weekly_work_days ||
-    settings.work_days ||
-    5;
+  const weeklyWorkHours = settings.weekly_work_hours || 40;
+  const scheduledWorkDays = settings.work_days || 5;
 
   return Math.min(weeklyWorkHours / scheduledWorkDays, 8);
-}
 }
 
 /**
