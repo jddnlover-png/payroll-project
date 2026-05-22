@@ -20,8 +20,18 @@ export function useWeeklyHolidayCarry() {
     if (!currentOrganization?.id) return 0;
 
     const prevMonth = month === 1 ? 12 : month - 1;
-    const prevYear = month === 1 ? year - 1 : year;
-    const prevMonthStr = `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
+const prevYear = month === 1 ? year - 1 : year;
+const prevMonthStr = `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
+
+console.log("[주휴 이월 단건 확인]", {
+  employeeId,
+  year,
+  month,
+  prevYear,
+  prevMonth,
+  prevMonthStr,
+  organizationId: currentOrganization.id,
+});
 
     // 1순위: 전달 급여 확정 시 자동 저장된 값
     const { data: autoCarry } = await supabase
@@ -58,6 +68,13 @@ const { data: orgSettings } = await supabase
   .maybeSingle();
 
 const companyStartMonth = (orgSettings as any)?.payroll_start_month as string | null;
+
+console.log("[주휴 이월 단건 회사 도입월 확인]", {
+  employeeId,
+  companyStartMonth,
+  prevMonthStr,
+  shouldReturnCarry: companyStartMonth === prevMonthStr,
+});
 
 // 예: 계산월 2026-04, 전달 2026-03, 도입월 2026-03이면 첫 주 보정 발생
 if (companyStartMonth && prevMonthStr === companyStartMonth) {
@@ -100,6 +117,16 @@ return 0;
 let remainingIds = employeeIds.filter(id => !result.has(id));
 const prevMonthStr = `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
 
+console.log("[주휴 이월 Batch 확인]", {
+  year,
+  month,
+  prevYear,
+  prevMonth,
+  prevMonthStr,
+  employeeIds,
+  organizationId: currentOrganization.id,
+});
+
 if (remainingIds.length > 0) {
   const { data: employees } = await supabase
     .from('employees')
@@ -129,13 +156,20 @@ if (remainingIds.length > 0) {
 
   const companyStartMonth = (orgSettings as any)?.payroll_start_month as string | null;
 
-  remainingIds.forEach(id => {
-    if (companyStartMonth && prevMonthStr === companyStartMonth) {
-      result.set(id, 1);
-    } else {
-      result.set(id, 0);
-    }
-  });
+console.log("[주휴 이월 Batch 회사 도입월 확인]", {
+  companyStartMonth,
+  prevMonthStr,
+  shouldReturnCarry: companyStartMonth === prevMonthStr,
+  remainingIds,
+});
+
+remainingIds.forEach(id => {
+  if (companyStartMonth && prevMonthStr === companyStartMonth) {
+    result.set(id, 1);
+  } else {
+    result.set(id, 0);
+  }
+});
 }
 
     // 나머지 0
