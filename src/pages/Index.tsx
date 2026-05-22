@@ -110,18 +110,18 @@ const menuItems: MenuItem[] = [
     label: "설정",
     icon: Settings,
     subItems: [
-      { id: "salary-work-standards", label: "급여/근무 기준", icon: UserCheck },
-      { id: "allowance", label: "초과근무 시간", icon: Coins },
-      { id: "night-shift", label: "야간 교대근무 설정", icon: Moon },
-      { id: "employee-payroll", label: "직원별 급여", icon: UserCog },
-      { id: "payroll-items", label: "급여 항목", icon: ListChecks },
-      { id: "work-hours", label: "근무 시간", icon: Timer },
-      { id: "payroll-calc", label: "급여계산", icon: Calculator },
-      { id: "dept-position", label: "부서/직급 관리", icon: Network },
-      { id: "leave-rules", label: "연차 규칙", icon: TreePalm },
-      { id: "automation", label: "자동화", icon: Zap },
-      { id: "company-info", label: "회사 정보", icon: Building2 },
-    ],
+  { id: "work-hours", label: "근무 시간", icon: Timer },
+  { id: "payroll-calc", label: "급여계산", icon: Calculator },
+  { id: "payroll-items", label: "급여 항목", icon: ListChecks },
+  { id: "employee-payroll", label: "직원별 급여", icon: UserCog },
+  { id: "salary-work-standards", label: "급여/근무 기준", icon: UserCheck },
+  { id: "allowance", label: "초과근무 시간", icon: Coins },
+  { id: "night-shift", label: "야간 교대근무 설정", icon: Moon },
+  { id: "leave-rules", label: "연차 규칙", icon: TreePalm },
+  { id: "dept-position", label: "부서/직급 관리", icon: Network },
+  { id: "automation", label: "자동화", icon: Zap },
+  { id: "company-info", label: "회사 정보", icon: Building2 },
+],
   },
 ];
 
@@ -246,7 +246,7 @@ const getCurrentLabel = () => {
       </div>
     );
   }
-  return <SettingsTab section={activeSubMenu || "payroll-items"} />;
+  return <SettingsTab section={activeSubMenu || "work-hours"} />;
       default:
   return <DashboardTab />;
     }
