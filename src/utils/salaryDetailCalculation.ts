@@ -568,28 +568,31 @@ export function calculateSalaryDetail(
     const empAllAtt = allAttendance.filter((a) => a.employee_id === employee.id);
 
     // ① 전달 이월 처리
-    if (prevCarryDays > 0 && weeks.length > 0) {
-      const firstWeek = weeks[0];
-      // 첫 주의 전체 날짜 (월요일~일요일)
-      const fullWeekDates = getWeekDates(firstWeek.dates[0]);
-      const weekAtt = empAllAtt.filter((a) => fullWeekDates.includes(a.date));
-      const stats = calculateWeeklyStats(weekAtt, settings, fullWeekDates);
+if (prevCarryDays > 0 && weeks.length > 0) {
+  const firstWeek = weeks[0];
 
-      // 전달 미완성 주 + 이번 달 첫 주가 합쳐서 완성 + 만근이면 지급
-      if (
-        stats.scheduledDaysTotal >= workDays &&
-        stats.scheduledDaysWorked >= stats.scheduledDaysTotal &&
-        stats.totalMinutes >= 15 * 60
-      ) {
-        // 주휴수당 기준시간 계산
-        const dailyBaseHours = calcDailyBaseHours(weekAtt, settings);
-        qualifiedWeeklyHolidayPay += floor1(dailyBaseHours * hourlyRate);
-        eligibleWeeks++;
-        weeklyHolidayQualified = true;
-      }
-      // 첫 주는 이월로 처리했으므로 아래 루프에서 제외
-      weeks.shift();
-    }
+  // firstWeek.dates는 이번 달에 속한 날짜만 들어있다.
+  // 예: 2026년 4월 첫 주 → ["2026-04-01", "2026-04-02", "2026-04-03", ...]
+  // 전달 이월값이 있으면 이전 달 날짜는 결근으로 보지 않고,
+  // 이번 달 첫 주 날짜만 기준으로 개근/15시간 여부를 판정한다.
+  const currentMonthWeekDates = firstWeek.dates;
+  const weekAtt = empAllAtt.filter((a) => currentMonthWeekDates.includes(a.date));
+  const stats = calculateWeeklyStats(weekAtt, settings, currentMonthWeekDates);
+
+  if (
+    stats.totalMinutes >= 15 * 60 &&
+    stats.scheduledDaysTotal > 0 &&
+    stats.scheduledDaysWorked >= stats.scheduledDaysTotal
+  ) {
+    const dailyBaseHours = calcDailyBaseHours(weekAtt, settings);
+    qualifiedWeeklyHolidayPay += floor1(dailyBaseHours * hourlyRate);
+    eligibleWeeks++;
+    weeklyHolidayQualified = true;
+  }
+
+  // 첫 주는 이월로 처리했으므로 아래 루프에서 제외
+  weeks.shift();
+}
 
     // ② 이번 달 각 주 판정
 for (const week of weeks) {
