@@ -43,17 +43,21 @@ export function SettingsTab({ section = "payroll-items" }: SettingsTabProps = {}
       {section === "company-info" && <CompanyInfoSettings />}
 
       {section === "work-hours" && (
-        <WorkHoursSettings
-          workStartTime={settings.work_start_time}
-          workEndTime={settings.work_end_time}
-          breakStartTime={settings.break_start_time}
-          breakEndTime={settings.break_end_time}
-          lateThreshold={settings.late_threshold}
-          checkoutThreshold={settings.checkout_threshold}
-          saving={saving}
-          onSave={saveSettings}
-        />
-      )}
+  <WorkHoursSettings
+    workStartTime={settings.work_start_time}
+    workEndTime={settings.work_end_time}
+    breakStartTime={settings.break_start_time}
+    breakEndTime={settings.break_end_time}
+    lateThreshold={settings.late_threshold}
+    checkoutThreshold={settings.checkout_threshold}
+    salaryCalcStartDay={settings.salary_calc_start_day}
+    salaryCalcEndDay={settings.salary_calc_end_day}
+    salaryPaymentMonth={settings.salary_payment_month}
+    salaryPaymentDay={settings.salary_payment_day}
+    saving={saving}
+    onSave={saveSettings}
+  />
+)}
 
       {section === "allowance" && (
         <AllowanceSettings

@@ -4,7 +4,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { Loader2 } from 'lucide-react';
+import { CalendarDays, CreditCard, Loader2 } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface WorkHoursSettingsProps {
   workStartTime: string;
@@ -13,26 +20,73 @@ interface WorkHoursSettingsProps {
   breakEndTime: string;
   lateThreshold: number;
   checkoutThreshold: number;
+  salaryCalcStartDay: string;
+  salaryCalcEndDay: string;
+  salaryPaymentMonth: string;
+  salaryPaymentDay: string;
   saving: boolean;
-  onSave: (data: { work_start_time: string; work_end_time: string; break_start_time: string; break_end_time: string; late_threshold: number; checkout_threshold: number }) => Promise<boolean>;
+  onSave: (data: {
+    work_start_time: string;
+    work_end_time: string;
+    break_start_time: string;
+    break_end_time: string;
+    late_threshold: number;
+    checkout_threshold: number;
+    salary_calc_start_day: string;
+    salary_calc_end_day: string;
+    salary_payment_month: string;
+    salary_payment_day: string;
+  }) => Promise<boolean>;
 }
 
-export function WorkHoursSettings({ workStartTime, workEndTime, breakStartTime, breakEndTime, lateThreshold, checkoutThreshold, saving, onSave }: WorkHoursSettingsProps) {
+export function WorkHoursSettings({
+  workStartTime,
+  workEndTime,
+  breakStartTime,
+  breakEndTime,
+  lateThreshold,
+  checkoutThreshold,
+  salaryCalcStartDay,
+  salaryCalcEndDay,
+  salaryPaymentMonth,
+  salaryPaymentDay,
+  saving,
+  onSave,
+}: WorkHoursSettingsProps) {
   const [startTime, setStartTime] = useState(workStartTime);
   const [endTime, setEndTime] = useState(workEndTime);
   const [brkStart, setBrkStart] = useState(breakStartTime);
   const [brkEnd, setBrkEnd] = useState(breakEndTime);
   const [threshold, setThreshold] = useState(lateThreshold);
-  const [coThreshold, setCoThreshold] = useState(checkoutThreshold);
+const [coThreshold, setCoThreshold] = useState(checkoutThreshold);
+const [calcStartDay, setCalcStartDay] = useState(salaryCalcStartDay);
+const [calcEndDay, setCalcEndDay] = useState(salaryCalcEndDay);
+const [paymentMonth, setPaymentMonth] = useState(salaryPaymentMonth);
+const [paymentDay, setPaymentDay] = useState(salaryPaymentDay);
 
   useEffect(() => {
-    setStartTime(workStartTime);
-    setEndTime(workEndTime);
-    setBrkStart(breakStartTime);
-    setBrkEnd(breakEndTime);
-    setThreshold(lateThreshold);
-    setCoThreshold(checkoutThreshold);
-  }, [workStartTime, workEndTime, breakStartTime, breakEndTime, lateThreshold, checkoutThreshold]);
+  setStartTime(workStartTime);
+  setEndTime(workEndTime);
+  setBrkStart(breakStartTime);
+  setBrkEnd(breakEndTime);
+  setThreshold(lateThreshold);
+  setCoThreshold(checkoutThreshold);
+  setCalcStartDay(salaryCalcStartDay);
+  setCalcEndDay(salaryCalcEndDay);
+  setPaymentMonth(salaryPaymentMonth);
+  setPaymentDay(salaryPaymentDay);
+}, [
+  workStartTime,
+  workEndTime,
+  breakStartTime,
+  breakEndTime,
+  lateThreshold,
+  checkoutThreshold,
+  salaryCalcStartDay,
+  salaryCalcEndDay,
+  salaryPaymentMonth,
+  salaryPaymentDay,
+]);
 
   // 휴게시간 계산 (분)
   const calcBreakMinutes = () => {
@@ -48,13 +102,17 @@ export function WorkHoursSettings({ workStartTime, workEndTime, breakStartTime, 
       return;
     }
     const success = await onSave({
-      work_start_time: startTime,
-      work_end_time: endTime,
-      break_start_time: brkStart,
-      break_end_time: brkEnd,
-      late_threshold: threshold,
-      checkout_threshold: coThreshold,
-    });
+  work_start_time: startTime,
+  work_end_time: endTime,
+  break_start_time: brkStart,
+  break_end_time: brkEnd,
+  late_threshold: threshold,
+  checkout_threshold: coThreshold,
+  salary_calc_start_day: calcStartDay,
+  salary_calc_end_day: calcEndDay,
+  salary_payment_month: paymentMonth,
+  salary_payment_day: paymentDay,
+});
     if (success) {
       toast.success('근무시간 설정이 저장되었습니다.');
     }
@@ -63,6 +121,7 @@ export function WorkHoursSettings({ workStartTime, workEndTime, breakStartTime, 
   const breakMinutes = calcBreakMinutes();
 
   return (
+  <div className="space-y-4">
     <Card>
       <CardHeader>
         <CardTitle className="text-base">근무 시간</CardTitle>
@@ -143,6 +202,90 @@ export function WorkHoursSettings({ workStartTime, workEndTime, breakStartTime, 
           </Button>
         </div>
       </CardContent>
-    </Card>
-  );
+      <Card>
+  <CardHeader>
+    <CardTitle className="text-base flex items-center gap-2">
+      <CalendarDays className="h-4 w-4 text-primary" />
+      급여 계산 기간
+    </CardTitle>
+    <CardDescription>급여 산정 시 사용할 계산 시작일과 종료일을 설정합니다.</CardDescription>
+  </CardHeader>
+  <CardContent className="grid grid-cols-2 gap-4">
+    <div className="space-y-2">
+      <Label>계산 시작일</Label>
+      <Select value={calcStartDay} onValueChange={setCalcStartDay}>
+        <SelectTrigger>
+          <SelectValue placeholder="계산 시작일" />
+        </SelectTrigger>
+        <SelectContent>
+          {Array.from({ length: 31 }, (_, i) => String(i + 1)).map((day) => (
+            <SelectItem key={day} value={day}>
+              {day}일
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+
+    <div className="space-y-2">
+      <Label>계산 종료일</Label>
+      <Select value={calcEndDay} onValueChange={setCalcEndDay}>
+        <SelectTrigger>
+          <SelectValue placeholder="계산 종료일" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="end">말일</SelectItem>
+          {Array.from({ length: 31 }, (_, i) => String(i + 1)).map((day) => (
+            <SelectItem key={day} value={day}>
+              {day}일
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  </CardContent>
+</Card>
+
+<Card>
+  <CardHeader>
+    <CardTitle className="text-base flex items-center gap-2">
+      <CreditCard className="h-4 w-4 text-primary" />
+      급여 지급 설정
+    </CardTitle>
+    <CardDescription>급여 지급 시점과 지급일을 설정합니다.</CardDescription>
+  </CardHeader>
+  <CardContent className="grid grid-cols-2 gap-4">
+    <div className="space-y-2">
+      <Label>지급 시점</Label>
+      <Select value={paymentMonth} onValueChange={setPaymentMonth}>
+        <SelectTrigger>
+          <SelectValue placeholder="지급 시점" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="current">당월 지급</SelectItem>
+          <SelectItem value="next">익월 지급</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+
+    <div className="space-y-2">
+      <Label>급여 지급일</Label>
+      <Select value={paymentDay} onValueChange={setPaymentDay}>
+        <SelectTrigger>
+          <SelectValue placeholder="급여 지급일" />
+        </SelectTrigger>
+        <SelectContent>
+          {Array.from({ length: 31 }, (_, i) => String(i + 1)).map((day) => (
+            <SelectItem key={day} value={day}>
+              {day}일
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  </CardContent>
+</Card>
+        </Card>
+  </div>
+);
 }

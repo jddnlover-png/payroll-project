@@ -247,102 +247,12 @@ export function SalaryWorkStandardsSettings({
 
   return (
     <div className="space-y-4">
-      <Tabs defaultValue="period" className="w-full">
-        <TabsList className="w-full grid grid-cols-4 mb-4">
-          <TabsTrigger value="period">급여 기간/지급</TabsTrigger>
-          <TabsTrigger value="work-hours">근무 시간/기준</TabsTrigger>
-          <TabsTrigger value="company-size">사업장 규모</TabsTrigger>
-          <TabsTrigger value="etc">기타 제도</TabsTrigger>
-        </TabsList>
-
-        {/* 탭1: 급여 기간/지급 */}
-        <TabsContent value="period" className="space-y-4 mt-0">
-          <Card className="rounded-xl">
-            <CardHeader className="pb-3">
-              <div className="flex items-center gap-2">
-                <CalendarDays className="h-5 w-5 text-primary" />
-                <CardTitle className="text-base">급여 계산 기간</CardTitle>
-              </div>
-              <CardDescription>급여 산정 시 사용할 계산 시작일과 종료일을 설정합니다.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label className="text-sm font-medium">계산 시작일</Label>
-                  <Select value={String(startDay)} onValueChange={(v) => setStartDay(Number(v))}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {days.map((d) => (
-                        <SelectItem key={d} value={String(d)}>
-                          {d}일
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-sm font-medium">계산 종료일</Label>
-                  <Select value={String(endDay)} onValueChange={(v) => setEndDay(Number(v))}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="31">말일</SelectItem>
-                      {days.slice(0, 30).map((d) => (
-                        <SelectItem key={d} value={String(d)}>
-                          {d}일
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="rounded-xl">
-            <CardHeader className="pb-3">
-              <div className="flex items-center gap-2">
-                <Briefcase className="h-5 w-5 text-primary" />
-                <CardTitle className="text-base">급여 지급 설정</CardTitle>
-              </div>
-              <CardDescription>급여 지급 시점과 지급일을 설정합니다.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label className="text-sm font-medium">지급 시점</Label>
-                  <Select value={paymentMonth} onValueChange={setPaymentMonth}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="current_month">당월 지급</SelectItem>
-                      <SelectItem value="next_month">익월 지급</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-sm font-medium">급여 지급일</Label>
-                  <Select value={String(paymentDay)} onValueChange={(v) => setPaymentDay(Number(v))}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {days.map((d) => (
-                        <SelectItem key={d} value={String(d)}>
-                          {d}일
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+      <Tabs defaultValue="work-hours" className="w-full">
+  <TabsList className="w-full grid grid-cols-3 mb-4">
+    <TabsTrigger value="work-hours">근무 시간/기준</TabsTrigger>
+    <TabsTrigger value="company-size">사업장 규모</TabsTrigger>
+    <TabsTrigger value="etc">기타 제도</TabsTrigger>
+  </TabsList>
 
         {/* 탭2: 근무 시간/기준 */}
         <TabsContent value="work-hours" className="mt-0">
