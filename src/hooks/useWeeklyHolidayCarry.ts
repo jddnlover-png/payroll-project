@@ -35,18 +35,37 @@ export function useWeeklyHolidayCarry() {
 
     if (autoCarry) return autoCarry.carry_days;
 
-    // 2순위: 회사 전체 도입 기준월 설정
-    const { data: orgSettings } = await supabase
-      .from('organization_settings')
-      .select('payroll_start_month')
-      .eq('organization_id', currentOrganization.id)
-      .maybeSingle();
+    // 2순위: 직원 수동 초기값
+const { data: employee } = await supabase
+  .from('employees')
+  .select('initial_carry_weeks, initial_carry_month')
+  .eq('id', employeeId)
+  .eq('organization_id', currentOrganization.id)
+  .maybeSingle();
 
-    const companyStartMonth = (orgSettings as any)?.payroll_start_month as string | null;
-    if (companyStartMonth && prevMonthStr <= companyStartMonth) return 0;
+const initialCarryMonth = (employee as any)?.initial_carry_month as string | null;
+const initialCarryWeeks = Number((employee as any)?.initial_carry_weeks ?? 0);
 
-    // 3순위: 없으면 0
-    return 0;
+if (initialCarryMonth === prevMonthStr && initialCarryWeeks > 0) {
+  return initialCarryWeeks;
+}
+
+// 3순위: 회사 전체 도입 기준월 설정
+const { data: orgSettings } = await supabase
+  .from('organization_settings')
+  .select('payroll_start_month')
+  .eq('organization_id', currentOrganization.id)
+  .maybeSingle();
+
+const companyStartMonth = (orgSettings as any)?.payroll_start_month as string | null;
+
+// 예: 계산월 2026-04, 전달 2026-03, 도입월 2026-03이면 첫 주 보정 발생
+if (companyStartMonth && prevMonthStr === companyStartMonth) {
+  return 1;
+}
+
+// 4순위: 없으면 0
+return 0;
   }, [currentOrganization?.id]);
 
   /**
@@ -77,25 +96,47 @@ export function useWeeklyHolidayCarry() {
       autoCarries.forEach(c => result.set(c.employee_id, c.carry_days));
     }
 
-    // 아직 값이 없는 직원들 → 회사 도입 기준월 확인
-    const remainingIds = employeeIds.filter(id => !result.has(id));
-    const prevMonthStr = `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
-    if (remainingIds.length > 0) {
-      const { data: orgSettings } = await supabase
-        .from('organization_settings')
-        .select('payroll_start_month')
-        .eq('organization_id', currentOrganization.id)
-        .maybeSingle();
+    // 아직 값이 없는 직원들 → 직원 수동 초기값 확인
+let remainingIds = employeeIds.filter(id => !result.has(id));
+const prevMonthStr = `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
 
-      const companyStartMonth = (orgSettings as any)?.payroll_start_month as string | null;
-      remainingIds.forEach(id => {
-        if (companyStartMonth && prevMonthStr <= companyStartMonth) {
-          result.set(id, 0);
-        } else {
-          result.set(id, 0);
-        }
-      });
+if (remainingIds.length > 0) {
+  const { data: employees } = await supabase
+    .from('employees')
+    .select('id, initial_carry_weeks, initial_carry_month')
+    .eq('organization_id', currentOrganization.id)
+    .in('id', remainingIds);
+
+  employees?.forEach((employee: any) => {
+    const initialCarryMonth = employee.initial_carry_month as string | null;
+    const initialCarryWeeks = Number(employee.initial_carry_weeks ?? 0);
+
+    if (initialCarryMonth === prevMonthStr && initialCarryWeeks > 0) {
+      result.set(employee.id, initialCarryWeeks);
     }
+  });
+}
+
+// 그래도 값이 없는 직원들 → 회사 도입 기준월 확인
+remainingIds = employeeIds.filter(id => !result.has(id));
+
+if (remainingIds.length > 0) {
+  const { data: orgSettings } = await supabase
+    .from('organization_settings')
+    .select('payroll_start_month')
+    .eq('organization_id', currentOrganization.id)
+    .maybeSingle();
+
+  const companyStartMonth = (orgSettings as any)?.payroll_start_month as string | null;
+
+  remainingIds.forEach(id => {
+    if (companyStartMonth && prevMonthStr === companyStartMonth) {
+      result.set(id, 1);
+    } else {
+      result.set(id, 0);
+    }
+  });
+}
 
     // 나머지 0
     employeeIds.forEach(id => {
