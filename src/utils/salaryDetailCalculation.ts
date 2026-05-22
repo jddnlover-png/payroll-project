@@ -300,9 +300,53 @@ function calcDailyBaseHours(weekAtt: AttendanceRawRecord[], settings: Organizati
     const daysWorked = weekAttWithCheckIn.length || 1;
     return Math.min(scheduledMinutes / 60 / daysWorked, 8);
   } else {
-    const weeklyWorkHours = settings.weekly_work_hours || 40;
-    return Math.min(weeklyWorkHours / 5, 8);
+  const settingValues = settings as OrganizationSettings & {
+    work_start_time?: string | null;
+    work_end_time?: string | null;
+    break_minutes?: number | null;
+    weekly_work_day_list?: string[] | null;
+    weekly_work_days?: number | null;
+  };
+
+  const parseTimeToMinutes = (time?: string | null): number | null => {
+    if (!time) return null;
+
+    const [hourText, minuteText] = time.split(":");
+    const hour = Number(hourText);
+    const minute = Number(minuteText);
+
+    if (Number.isNaN(hour) || Number.isNaN(minute)) return null;
+
+    return hour * 60 + minute;
+  };
+
+  const startMinutes = parseTimeToMinutes(settingValues.work_start_time);
+  const endMinutes = parseTimeToMinutes(settingValues.work_end_time);
+  const breakMinutes = Number(settingValues.break_minutes ?? 0);
+
+  if (startMinutes !== null && endMinutes !== null) {
+    let dailyMinutes = endMinutes - startMinutes;
+
+    if (dailyMinutes <= 0) {
+      dailyMinutes += 24 * 60;
+    }
+
+    dailyMinutes -= breakMinutes;
+
+    if (dailyMinutes > 0) {
+      return Math.min(dailyMinutes / 60, 8);
+    }
   }
+
+  const weeklyWorkHours = Number(settingValues.weekly_work_hours || 40);
+  const scheduledWorkDays =
+    settingValues.weekly_work_day_list?.length ||
+    settingValues.weekly_work_days ||
+    settings.work_days ||
+    5;
+
+  return Math.min(weeklyWorkHours / scheduledWorkDays, 8);
+}
 }
 
 /**
