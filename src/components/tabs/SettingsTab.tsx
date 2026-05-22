@@ -50,12 +50,12 @@ export function SettingsTab({ section = "payroll-items" }: SettingsTabProps = {}
     breakEndTime={settings.break_end_time}
     lateThreshold={settings.late_threshold}
     checkoutThreshold={settings.checkout_threshold}
-    salaryCalcStartDay={settings.salary_calc_start_day}
-    salaryCalcEndDay={settings.salary_calc_end_day}
-    salaryPaymentMonth={settings.salary_payment_month}
-    salaryPaymentDay={settings.salary_payment_day}
+    salaryCalcStartDay={String(settings.salary_calc_start_day ?? "1")}
+    salaryCalcEndDay={String(settings.salary_calc_end_day ?? "end")}
+    salaryPaymentMonth={String(settings.salary_payment_month ?? "next")}
+    salaryPaymentDay={String(settings.salary_payment_day ?? "10")}
     saving={saving}
-    onSave={saveSettings}
+    onSave={async (data) => saveSettings(data as any)}
   />
 )}
 
