@@ -22,6 +22,7 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { Upload, Download, FileSpreadsheet, Check, AlertCircle } from 'lucide-react';
 import ExcelJS from 'exceljs';
+import * as XLSX from 'xlsx';
 
 interface ExcelRow {
   사원번호: string;
@@ -514,14 +515,43 @@ export function ExcelAttendanceUpload() {
 
     try {
       const arrayBuffer = await file.arrayBuffer();
-      const workbook = new ExcelJS.Workbook();
-      await workbook.xlsx.load(arrayBuffer);
+const workbook = new ExcelJS.Workbook();
 
-      const worksheet = workbook.worksheets[0];
-      if (!worksheet) {
-        toast.error('엑셀 파일에서 시트를 찾을 수 없습니다.');
-        return;
-      }
+try {
+  await workbook.xlsx.load(arrayBuffer);
+} catch {
+  const sheetWorkbook = XLSX.read(arrayBuffer, {
+    type: 'array',
+    cellDates: true,
+  });
+
+  const convertedBuffer = XLSX.write(sheetWorkbook, {
+    bookType: 'xlsx',
+    type: 'array',
+  });
+
+  await workbook.xlsx.load(convertedBuffer);
+}
+
+if (workbook.worksheets.length === 0 && file.name.toLowerCase().endsWith('.xls')) {
+  const sheetWorkbook = XLSX.read(arrayBuffer, {
+    type: 'array',
+    cellDates: true,
+  });
+
+  const convertedBuffer = XLSX.write(sheetWorkbook, {
+    bookType: 'xlsx',
+    type: 'array',
+  });
+
+  await workbook.xlsx.load(convertedBuffer);
+}
+
+const worksheet = workbook.worksheets[0];
+if (!worksheet) {
+  toast.error('엑셀 파일에서 시트를 찾을 수 없습니다. 파일을 xlsx 형식으로 저장 후 다시 업로드해주세요.');
+  return;
+}
 
       let parsed: ParsedAttendance[] = [];
 
