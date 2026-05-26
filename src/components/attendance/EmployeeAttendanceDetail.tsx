@@ -1,6 +1,7 @@
-import { useMemo, useCallback } from 'react';
+import { useMemo, useCallback, useEffect, useState } from 'react';
 import { useAttendanceRange } from '@/hooks/useAttendance';
 import { useOrganizationSettings } from '@/hooks/useOrganizationSettings';
+import { supabase } from '@/integrations/supabase/client';
 import {
   Dialog,
   DialogContent,
@@ -30,6 +31,12 @@ interface EmployeeAttendanceDetailProps {
   endDate: string;
 }
 
+interface PublicHoliday {
+  holiday_date: string;
+  holiday_name: string;
+  is_holiday: boolean;
+}
+
 export function EmployeeAttendanceDetail({
   employee,
   open,
@@ -37,13 +44,39 @@ export function EmployeeAttendanceDetail({
   startDate,
   endDate,
 }: EmployeeAttendanceDetailProps) {
-  // DB에서 근태 데이터 조회
   const { data: dbAttendance = [] } = useAttendanceRange(startDate, endDate);
   const { settings } = useOrganizationSettings();
 
+  const [publicHolidays, setPublicHolidays] = useState<PublicHoliday[]>([]);
+
+  useEffect(() => {
+    const fetchPublicHolidays = async () => {
+      const { data, error } = await supabase
+        .from('public_holidays')
+        .select('holiday_date, holiday_name, is_holiday')
+        .gte('holiday_date', startDate)
+        .lte('holiday_date', endDate)
+        .eq('is_holiday', true);
+
+      if (error) {
+        console.error('공휴일 조회 실패:', error);
+        setPublicHolidays([]);
+        return;
+      }
+
+      setPublicHolidays(data || []);
+    };
+
+    fetchPublicHolidays();
+  }, [startDate, endDate]);
+
+  const publicHolidayMap = useMemo(() => {
+    return new Map(publicHolidays.map((h) => [h.holiday_date, h.holiday_name]));
+  }, [publicHolidays]);
+
   const employeeRecords = useMemo(() => {
     if (!employee) return [];
-    
+
     return dbAttendance
       .filter((att) => att.employee_id === employee.id)
       .map((att) => ({
@@ -58,6 +91,69 @@ export function EmployeeAttendanceDetail({
       .sort((a, b) => b.date.localeCompare(a.date));
   }, [employee, dbAttendance]);
 
+  const isScheduledWorkday = useCallback(
+    (dateStr: string) => {
+      const date = new Date(dateStr + 'T00:00:00');
+      const day = date.getDay();
+
+      const anySettings = settings as any;
+
+      const scheduledDays =
+        anySettings?.scheduled_work_days ||
+        anySettings?.work_days ||
+        anySettings?.workdays ||
+        [1, 2, 3, 4, 5];
+
+      if (Array.isArray(scheduledDays)) {
+        return scheduledDays.includes(day) || scheduledDays.includes(String(day));
+      }
+
+      return day >= 1 && day <= 5;
+    },
+    [settings],
+  );
+
+  const formatMinutes = (minutes: number) => {
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return `${hours}시간 ${mins}분`;
+  };
+
+  const getPaidHolidayMinutes = useCallback(() => {
+    return Math.round((settings.standard_work_hours || 8) * 60);
+  }, [settings.standard_work_hours]);
+
+  const isPaidPublicHolidayRecord = useCallback(
+    (record: { date: string; checkIn: string | null; checkOut: string | null }) => {
+      const hasActualWork = !!(record.checkIn && record.checkOut);
+      const holidayName = publicHolidayMap.get(record.date);
+
+      return (
+        settings.apply_public_holiday &&
+        !hasActualWork &&
+        !!holidayName &&
+        isScheduledWorkday(record.date)
+      );
+    },
+    [settings.apply_public_holiday, publicHolidayMap, isScheduledWorkday],
+  );
+
+  const getDisplayStatus = useCallback(
+    (record: {
+      date: string;
+      status: string;
+      checkIn: string | null;
+      checkOut: string | null;
+    }) => {
+      if (isPaidPublicHolidayRecord(record)) {
+        return 'paid_holiday';
+      }
+
+      return record.status;
+    },
+    [isPaidPublicHolidayRecord],
+  );
+
   const getStatusBadge = (status: string) => {
     const statusConfig: Record<string, { label: string; className: string }> = {
       present: { label: '출근', className: 'status-green' },
@@ -65,7 +161,9 @@ export function EmployeeAttendanceDetail({
       absent: { label: '결근', className: 'status-red' },
       leave: { label: '휴가', className: 'status-purple' },
       half_day: { label: '반차', className: 'status-yellow' },
+      paid_holiday: { label: '유급휴일', className: 'status-purple' },
     };
+
     const config = statusConfig[status] || { label: status, className: '' };
     return <Badge className={config.className}>{config.label}</Badge>;
   };
@@ -82,90 +180,121 @@ export function EmployeeAttendanceDetail({
     return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
   };
 
-  // KST 시간 추출 헬퍼 (브라우저 타임존 무관)
   const getKSTMinutes = (date: Date) => {
     const kst = new Date(date.getTime() + 9 * 60 * 60 * 1000);
     return kst.getUTCHours() * 60 + kst.getUTCMinutes();
   };
+
   const getNextDayStr = (dateStr: string) => {
     const [y, m, d] = dateStr.split('-').map(Number);
     const next = new Date(y, m - 1, d + 1);
     return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-${String(next.getDate()).padStart(2, '0')}`;
   };
 
-  const calculateWorkHours = (checkIn: string | null, checkOut: string | null, breakMinutes: number = 0, recordDate?: string, workType?: string) => {
-    if (!checkIn || !checkOut) return '-';
-    
-    const checkInDate = new Date(checkIn);
-    const checkOutDate = new Date(checkOut);
-    const isNight = workType === 'night';
-    
-    // 주간/야간에 따라 설정값 선택
-    const workStartTime = isNight ? settings.shift_tier1_start : settings.work_start_time;
-    const workEndTime = isNight ? settings.shift_tier3_end : settings.work_end_time;
-    const lateThreshold = isNight ? settings.shift_late_threshold : settings.late_threshold;
-    const checkoutThreshold = isNight ? settings.shift_checkout_threshold : settings.checkout_threshold;
-    
-    const [startH, startM] = workStartTime.split(':').map(Number);
-    const workStartMinutes = startH * 60 + startM;
-    const checkInMinutes = getKSTMinutes(checkInDate);
-    
-    let effectiveCheckIn = checkInDate.getTime();
-    if (checkInMinutes < workStartMinutes || (checkInMinutes >= workStartMinutes && checkInMinutes <= workStartMinutes + lateThreshold)) {
-      const dateStr = recordDate || checkIn.split('T')[0];
-      effectiveCheckIn = new Date(`${dateStr}T${workStartTime}:00+09:00`).getTime();
-    }
-    
-    // 퇴근 기준 보정
-    const [endH, endM] = workEndTime.split(':').map(Number);
-    const workEndMinutes = endH * 60 + endM;
-    const checkOutMinutes = getKSTMinutes(checkOutDate);
-    
-    let effectiveCheckOut = checkOutDate.getTime();
-    if (isNight) {
-      if (checkOutMinutes >= workEndMinutes && checkOutMinutes <= workEndMinutes + checkoutThreshold) {
+  const calculateWorkHours = useCallback(
+    (
+      checkIn: string | null,
+      checkOut: string | null,
+      breakMinutes: number = 0,
+      recordDate?: string,
+      workType?: string,
+    ) => {
+      if (!checkIn || !checkOut) return '-';
+
+      const checkInDate = new Date(checkIn);
+      const checkOutDate = new Date(checkOut);
+      const isNight = workType === 'night';
+
+      const workStartTime = isNight ? settings.shift_tier1_start : settings.work_start_time;
+      const workEndTime = isNight ? settings.shift_tier3_end : settings.work_end_time;
+      const lateThreshold = isNight ? settings.shift_late_threshold : settings.late_threshold;
+      const checkoutThreshold = isNight ? settings.shift_checkout_threshold : settings.checkout_threshold;
+
+      const [startH, startM] = workStartTime.split(':').map(Number);
+      const workStartMinutes = startH * 60 + startM;
+      const checkInMinutes = getKSTMinutes(checkInDate);
+
+      let effectiveCheckIn = checkInDate.getTime();
+      if (
+        checkInMinutes < workStartMinutes ||
+        (checkInMinutes >= workStartMinutes && checkInMinutes <= workStartMinutes + lateThreshold)
+      ) {
         const dateStr = recordDate || checkIn.split('T')[0];
-        const nextDayStr = getNextDayStr(dateStr);
-        effectiveCheckOut = new Date(`${nextDayStr}T${workEndTime}:00+09:00`).getTime();
+        effectiveCheckIn = new Date(`${dateStr}T${workStartTime}:00+09:00`).getTime();
       }
-    } else {
-      if (checkOutMinutes >= workEndMinutes && checkOutMinutes <= workEndMinutes + checkoutThreshold) {
-        const dateStr = recordDate || checkOut.split('T')[0];
-        effectiveCheckOut = new Date(`${dateStr}T${workEndTime}:00+09:00`).getTime();
-      }
-    }
-    
-    // break_minutes가 0/null이면 조직 설정의 휴게시간 사용
-    let effectiveBreak = breakMinutes;
-    if (effectiveBreak === 0) {
+
+      const [endH, endM] = workEndTime.split(':').map(Number);
+      const workEndMinutes = endH * 60 + endM;
+      const checkOutMinutes = getKSTMinutes(checkOutDate);
+
+      let effectiveCheckOut = checkOutDate.getTime();
       if (isNight) {
-        effectiveBreak = settings.shift_break_minutes || 0;
+        if (checkOutMinutes >= workEndMinutes && checkOutMinutes <= workEndMinutes + checkoutThreshold) {
+          const dateStr = recordDate || checkIn.split('T')[0];
+          const nextDayStr = getNextDayStr(dateStr);
+          effectiveCheckOut = new Date(`${nextDayStr}T${workEndTime}:00+09:00`).getTime();
+        }
       } else {
-        const [bsH, bsM] = settings.break_start_time.split(':').map(Number);
-        const [beH, beM] = settings.break_end_time.split(':').map(Number);
-        effectiveBreak = (beH * 60 + beM) - (bsH * 60 + bsM);
+        if (checkOutMinutes >= workEndMinutes && checkOutMinutes <= workEndMinutes + checkoutThreshold) {
+          const dateStr = recordDate || checkOut.split('T')[0];
+          effectiveCheckOut = new Date(`${dateStr}T${workEndTime}:00+09:00`).getTime();
+        }
       }
-      if (effectiveBreak < 0) effectiveBreak = 0;
-    }
 
-    const diffMs = effectiveCheckOut - effectiveCheckIn;
-    let totalMinutes = Math.max(0, Math.round(diffMs / 60000) - effectiveBreak);
-    
-    // 주간조: 초과근무 휴게시간 추가 차감
-    if (!isNight) {
-      const standardMinutes = settings.standard_work_hours * 60;
-      const overtime = totalMinutes - standardMinutes;
-      if (overtime >= 240) {
-        totalMinutes = Math.max(0, totalMinutes - settings.overtime_break_4h);
-      } else if (overtime >= 120) {
-        totalMinutes = Math.max(0, totalMinutes - settings.overtime_break_2h);
+      let effectiveBreak = breakMinutes;
+      if (effectiveBreak === 0) {
+        if (isNight) {
+          effectiveBreak = settings.shift_break_minutes || 0;
+        } else {
+          const [bsH, bsM] = settings.break_start_time.split(':').map(Number);
+          const [beH, beM] = settings.break_end_time.split(':').map(Number);
+          effectiveBreak = beH * 60 + beM - (bsH * 60 + bsM);
+        }
+
+        if (effectiveBreak < 0) effectiveBreak = 0;
       }
-    }
 
-    const hours = Math.floor(totalMinutes / 60);
-    const minutes = totalMinutes % 60;
-    return `${hours}시간 ${minutes}분`;
-  };
+      const diffMs = effectiveCheckOut - effectiveCheckIn;
+      let totalMinutes = Math.max(0, Math.round(diffMs / 60000) - effectiveBreak);
+
+      if (!isNight) {
+        const standardMinutes = settings.standard_work_hours * 60;
+        const overtime = totalMinutes - standardMinutes;
+
+        if (overtime >= 240) {
+          totalMinutes = Math.max(0, totalMinutes - settings.overtime_break_4h);
+        } else if (overtime >= 120) {
+          totalMinutes = Math.max(0, totalMinutes - settings.overtime_break_2h);
+        }
+      }
+
+      return formatMinutes(totalMinutes);
+    },
+    [settings],
+  );
+
+  const getDisplayWorkHours = useCallback(
+    (record: {
+      date: string;
+      checkIn: string | null;
+      checkOut: string | null;
+      breakMinutes: number;
+      workType: string;
+    }) => {
+      if (isPaidPublicHolidayRecord(record)) {
+        return `유급 ${formatMinutes(getPaidHolidayMinutes())}`;
+      }
+
+      return calculateWorkHours(
+        record.checkIn,
+        record.checkOut,
+        record.breakMinutes,
+        record.date,
+        record.workType,
+      );
+    },
+    [isPaidPublicHolidayRecord, getPaidHolidayMinutes, calculateWorkHours],
+  );
 
   const exportToExcel = useCallback(async () => {
     if (!employee || employeeRecords.length === 0) return;
@@ -188,25 +317,35 @@ export function EmployeeAttendanceDetail({
     headerRow.height = 24;
 
     const statusLabels: Record<string, string> = {
-      present: '출근', late: '지각', absent: '결근', leave: '휴가', half_day: '반차',
+      present: '출근',
+      late: '지각',
+      absent: '결근',
+      leave: '휴가',
+      half_day: '반차',
+      paid_holiday: '유급휴일',
     };
 
     employeeRecords.forEach((r) => {
+      const displayStatus = getDisplayStatus(r);
+
       const row = worksheet.addRow({
         date: formatDate(r.date),
-        status: statusLabels[r.status] || r.status,
+        status: statusLabels[displayStatus] || displayStatus,
         checkIn: formatTime(r.checkIn),
         checkOut: formatTime(r.checkOut),
-        workHours: calculateWorkHours(r.checkIn, r.checkOut, r.breakMinutes, r.date, r.workType),
+        workHours: getDisplayWorkHours(r),
       });
+
       row.alignment = { vertical: 'middle', horizontal: 'center' };
     });
 
     worksheet.eachRow((row) => {
       row.eachCell((cell) => {
         cell.border = {
-          top: { style: 'thin' }, left: { style: 'thin' },
-          bottom: { style: 'thin' }, right: { style: 'thin' },
+          top: { style: 'thin' },
+          left: { style: 'thin' },
+          bottom: { style: 'thin' },
+          right: { style: 'thin' },
         };
       });
     });
@@ -215,13 +354,14 @@ export function EmployeeAttendanceDetail({
     const blob = new Blob([buffer], {
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     });
+
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
     link.download = `${employee.name}_근태기록_${startDate}_${endDate}.xlsx`;
     link.click();
     URL.revokeObjectURL(url);
-  }, [employee, employeeRecords, startDate, endDate]);
+  }, [employee, employeeRecords, startDate, endDate, getDisplayStatus, getDisplayWorkHours]);
 
   if (!employee) return null;
 
@@ -234,13 +374,16 @@ export function EmployeeAttendanceDetail({
             {employee.name} 상세 근태 기록
           </DialogTitle>
         </DialogHeader>
-        
+
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-4 text-sm text-muted-foreground">
             <span>사원번호: {employee.employeeNumber}</span>
             <span>부서: {employee.department}</span>
-            <span>기간: {startDate} ~ {endDate}</span>
+            <span>
+              기간: {startDate} ~ {endDate}
+            </span>
           </div>
+
           <Button variant="outline" size="sm" onClick={exportToExcel} disabled={employeeRecords.length === 0}>
             <Download className="w-4 h-4 mr-1" />
             엑셀
@@ -273,18 +416,18 @@ export function EmployeeAttendanceDetail({
                 </TableHead>
               </TableRow>
             </TableHeader>
+
             <TableBody>
               {employeeRecords.map((record) => (
                 <TableRow key={record.id}>
                   <TableCell className="font-medium">{formatDate(record.date)}</TableCell>
-                  <TableCell className="text-center">{getStatusBadge(record.status)}</TableCell>
+                  <TableCell className="text-center">{getStatusBadge(getDisplayStatus(record))}</TableCell>
                   <TableCell className="text-center">{formatTime(record.checkIn)}</TableCell>
                   <TableCell className="text-center">{formatTime(record.checkOut)}</TableCell>
-                  <TableCell className="text-center">
-                    {calculateWorkHours(record.checkIn, record.checkOut, record.breakMinutes, record.date, record.workType)}
-                  </TableCell>
+                  <TableCell className="text-center">{getDisplayWorkHours(record)}</TableCell>
                 </TableRow>
               ))}
+
               {employeeRecords.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
