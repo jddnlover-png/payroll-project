@@ -392,8 +392,10 @@ if (settings.apply_public_holiday && isDbPublicHoliday && isScheduledForPaidHoli
       ).length;
 
       const correctedTotalMinutes = totalMinutes + nightShiftDays * 60;
-      const totalHours = Math.floor(correctedTotalMinutes / 60);
-      const remainingMinutes = correctedTotalMinutes % 60;
+const displayTotalMinutes = correctedTotalMinutes + totalPaidPublicHolidayMinutes;
+
+const totalHours = Math.floor(displayTotalMinutes / 60);
+const remainingMinutes = displayTotalMinutes % 60;
 
       const attendanceRate =
         dateRange.daysInPeriod > 0 ? Math.round(((presentDays + lateDays) / dateRange.daysInPeriod) * 100) : 0;
@@ -424,7 +426,7 @@ if (settings.apply_public_holiday && isDbPublicHoliday && isScheduledForPaidHoli
         absentDays,
         leaveDays,
         totalWorkTime: `${totalHours}시간 ${remainingMinutes}분`,
-        totalMinutes: correctedTotalMinutes,
+        totalMinutes: displayTotalMinutes,
         totalStayMinutes,
         totalBreakMinutes,
         totalLateTruncation,
@@ -673,7 +675,7 @@ publicHolidayMap,
           emp.totalOvertimeTruncation > 0 ? `-${emp.totalOvertimeTruncation}분` : "0분",
           emp.totalEarlyLeaveTruncation > 0 ? `-${emp.totalEarlyLeaveTruncation}분` : "0분",
           emp.totalOutingTruncation > 0 ? `-${emp.totalOutingTruncation}분` : "0분",
-          emp.totalWorkTime,
+          fmtMin(emp.totalMinutes),
           fmtMin(emp.displayRegularMinutes ?? emp.totalRegularMinutes ?? 0),
           fmtMin(emp.displayOvertimeMinutes ?? emp.totalOvertimeWorkMinutes ?? 0),
           fmtMin(emp.displayNightWorkMinutes ?? emp.totalNightWorkMinutes ?? 0),
