@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useEmployeeStore } from "@/store/employeeStore";
 import { useEmployees, Employee } from "@/hooks/useEmployees";
 import { useAttendance, ShiftType } from "@/hooks/useAttendance";
@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
 import {
   Calendar,
   Filter,
@@ -59,6 +60,7 @@ const statusConfig = {
   sick: { label: "병가", class: "status-red" },
   personal: { label: "경조사", class: "status-purple" },
   other: { label: "기타휴가", class: "status-purple" },
+  paid_holiday: { label: "유급휴일", class: "status-purple" },
 };
 
 export function DailyAttendance() {
@@ -92,6 +94,34 @@ export function DailyAttendance() {
     updateShiftType,
   } = useAttendance(selectedDate);
   const { settings, loading: settingsLoading } = useOrganizationSettings();
+    const [publicHolidayMap, setPublicHolidayMap] = useState<Map<string, string>>(new Map());
+
+  useEffect(() => {
+    const fetchPublicHoliday = async () => {
+      const { data, error } = await (supabase as any)
+  .from("public_holidays")
+  .select("holiday_date, holiday_name, is_holiday")
+  .eq("holiday_date", selectedDate)
+  .eq("is_holiday", true);
+
+      if (error) {
+        console.error("공휴일 조회 실패:", error);
+        setPublicHolidayMap(new Map());
+        return;
+      }
+
+      setPublicHolidayMap(
+  new Map(
+    (data || []).map((h: { holiday_date: string; holiday_name: string }) => [
+      h.holiday_date,
+      h.holiday_name,
+    ]),
+  ),
+);
+    };
+
+    fetchPublicHoliday();
+  }, [selectedDate]);
 
   // 선택된 날짜에 해당하는 휴가 기록 조회
   const leaveRecordsByEmployee = useMemo(() => {
@@ -228,7 +258,39 @@ export function DailyAttendance() {
       return next;
     });
   };
+  const isScheduledWorkday = (dateStr: string) => {
+    const date = new Date(`${dateStr}T00:00:00`);
+    const day = date.getDay();
 
+    const anySettings = settings as any;
+    const scheduledDays =
+      anySettings?.scheduled_work_days ||
+      anySettings?.work_days ||
+      anySettings?.workdays ||
+      [1, 2, 3, 4, 5];
+
+    if (Array.isArray(scheduledDays)) {
+      return scheduledDays.includes(day) || scheduledDays.includes(String(day));
+    }
+
+    return day >= 1 && day <= 5;
+  };
+
+  const getPaidHolidayMinutes = () => {
+    return Math.round((settings.standard_work_hours || 8) * 60);
+  };
+
+  const isPaidPublicHolidayRecord = (rec: any) => {
+    const hasActualWork = !!(rec.rawCheckIn && rec.rawCheckOut);
+    const isHoliday = publicHolidayMap.has(rec.date || selectedDate);
+
+    return (
+      settings.apply_public_holiday &&
+      isHoliday &&
+      isScheduledWorkday(rec.date || selectedDate) &&
+      !hasActualWork
+    );
+  };
   const getKstMinutes = (value: string | null) => {
     if (!value) return null;
     const d = new Date(value);
@@ -270,7 +332,9 @@ export function DailyAttendance() {
     return checkOutMin < endMin ? endMin - checkOutMin : 0;
   };
 
-  const getDisplayStatus = (rec: any, hoverData?: any) => {
+    const getDisplayStatus = (rec: any, hoverData?: any) => {
+    if (isPaidPublicHolidayRecord(rec)) return "paid_holiday";
+
     if (rec.status !== "present") return rec.status;
 
     const lateMinutes = getActualLateMinutes(rec);
@@ -293,12 +357,13 @@ export function DailyAttendance() {
   };
 
   const stats = {
-    present: filteredAttendance.filter((a) => getDisplayStatus(a) === "present").length,
-    late: filteredAttendance.filter((a) => getDisplayStatus(a) === "late").length,
-    absent: filteredAttendance.filter((a) => getDisplayStatus(a) === "absent").length,
-    unrecorded: filteredAttendance.filter((a) => getDisplayStatus(a) === "unrecorded").length,
-    leave: filteredAttendance.filter((a) => getDisplayStatus(a) === "leave").length,
-  };
+  present: filteredAttendance.filter((a) => getDisplayStatus(a) === "present").length,
+  late: filteredAttendance.filter((a) => getDisplayStatus(a) === "late").length,
+  absent: filteredAttendance.filter((a) => getDisplayStatus(a) === "absent").length,
+  unrecorded: filteredAttendance.filter((a) => getDisplayStatus(a) === "unrecorded").length,
+  leave: filteredAttendance.filter((a) => getDisplayStatus(a) === "leave").length,
+  paid_holiday: filteredAttendance.filter((a) => getDisplayStatus(a) === "paid_holiday").length,
+};
 
   const isAllSelected = filteredAttendance.length > 0 && selectedIds.length === filteredAttendance.length;
   const isSomeSelected = selectedIds.length > 0 && selectedIds.length < filteredAttendance.length;
@@ -494,14 +559,15 @@ export function DailyAttendance() {
 
         {/* 메인 컨텐츠 */}
         <div className="flex-1 space-y-4 min-w-0">
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
             {[
-              { key: "present", label: "출근", value: stats.present, cls: "status-green" },
-              { key: "late", label: "지각", value: stats.late, cls: "status-yellow" },
-              { key: "absent", label: "결근", value: stats.absent, cls: "status-red" },
-              { key: "unrecorded", label: "미기록", value: stats.unrecorded, cls: "bg-muted text-muted-foreground" },
-              { key: "leave", label: "휴가", value: stats.leave, cls: "status-purple" },
-            ].map((item) => (
+  { key: "present", label: "출근", value: stats.present, cls: "status-green" },
+  { key: "late", label: "지각", value: stats.late, cls: "status-yellow" },
+  { key: "absent", label: "결근", value: stats.absent, cls: "status-red" },
+  { key: "unrecorded", label: "미기록", value: stats.unrecorded, cls: "bg-muted text-muted-foreground" },
+  { key: "leave", label: "휴가", value: stats.leave, cls: "status-purple" },
+  { key: "paid_holiday", label: "유급휴일", value: stats.paid_holiday, cls: "status-purple" },
+].map((item) => (
               <div
                 key={item.key}
                 role="button"
@@ -662,8 +728,13 @@ export function DailyAttendance() {
               <TableBody>
                 {groupedAttendance.length > 0 ? (
                   groupedAttendance.map((group) => {
-                    const groupWorkMinutes = group.items.reduce((sum, record) => {
+                                        const groupWorkMinutes = group.items.reduce((sum, record) => {
                       const rec = record as any;
+
+                      if (isPaidPublicHolidayRecord(rec)) {
+                        return sum + getPaidHolidayMinutes();
+                      }
+
                       if (rec.rawCheckIn && rec.rawCheckOut) {
                         const shiftType: ShiftType = rec.shiftType || "day";
                         const isNight = shiftType === "night";
@@ -677,6 +748,7 @@ export function DailyAttendance() {
                         );
                         return sum + breakdown.recognizedMinutes;
                       }
+
                       return sum;
                     }, 0);
 
@@ -694,9 +766,28 @@ export function DailyAttendance() {
                         {!collapsedDepts.has(group.department) &&
                           group.items.map((record) => {
                             const rec = record as any;
-                            let workHours = "-";
+                                                        let workHours = "-";
                             let hoverData: any = null;
-                            if (rec.rawCheckIn && rec.rawCheckOut) {
+
+                            if (isPaidPublicHolidayRecord(rec)) {
+                              const paidHolidayMinutes = getPaidHolidayMinutes();
+
+                              workHours = `유급 ${formatWorkHours(paidHolidayMinutes)}`;
+                              hoverData = {
+                                isPaidHolidayOnly: true,
+                                paidHolidayMinutes,
+                                publicHolidayActualWorkMinutes: 0,
+                                recognizedMinutes: paidHolidayMinutes,
+                                regularMinutes: 0,
+                                overtimeWorkMinutes: 0,
+                                nightWorkMinutes: 0,
+                                nightShiftWorkMinutes: 0,
+                                nightShiftTier1Minutes: 0,
+                                nightShiftTier2Minutes: 0,
+                                nightShiftTier3Minutes: 0,
+                                nightShiftTier4Minutes: 0,
+                              };
+                            } else if (rec.rawCheckIn && rec.rawCheckOut) {
                               const shiftType: ShiftType = rec.shiftType || "day";
                               const isNight = shiftType === "night";
                               const breakdown = calculateSingleAttendance(
@@ -707,8 +798,19 @@ export function DailyAttendance() {
                                 isNight,
                                 settings,
                               );
+
                               workHours = formatWorkHours(breakdown.recognizedMinutes);
-                              hoverData = breakdown;
+                              const isPublicHolidayWork =
+  settings.apply_public_holiday &&
+  publicHolidayMap.has(rec.date || selectedDate) &&
+  isScheduledWorkday(rec.date || selectedDate);
+
+hoverData = {
+  ...breakdown,
+  isPaidHolidayOnly: false,
+  paidHolidayMinutes: isPublicHolidayWork ? getPaidHolidayMinutes() : 0,
+  publicHolidayActualWorkMinutes: isPublicHolidayWork ? breakdown.recognizedMinutes : 0,
+};
                             }
 
                             return (
@@ -913,6 +1015,23 @@ export function DailyAttendance() {
                                               <span className="text-muted-foreground text-xs">야간근무시간</span>
                                               <span className="text-xs font-medium">
                                                 {formatWorkHours(hoverData.nightWorkMinutes)}
+                                              </span>
+                                            </div>
+                                                                                        <div className="flex justify-between pl-2">
+                                              <span className="text-muted-foreground text-xs">
+                                                공휴일 유급인정시간
+                                              </span>
+                                              <span className="text-xs font-medium">
+                                                {formatWorkHours(hoverData.paidHolidayMinutes || 0)}
+                                              </span>
+                                            </div>
+
+                                            <div className="flex justify-between pl-2">
+                                              <span className="text-muted-foreground text-xs">
+                                                공휴일 실제근무시간
+                                              </span>
+                                              <span className="text-xs font-medium">
+                                                {formatWorkHours(hoverData.publicHolidayActualWorkMinutes || 0)}
                                               </span>
                                             </div>
                                             <div className="flex justify-between pl-2">
