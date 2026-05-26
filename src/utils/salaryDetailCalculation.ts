@@ -201,30 +201,53 @@ function calculateWeeklyStats(
   weekAttendance: AttendanceRawRecord[],
   settings: OrganizationSettings,
   weekDates: string[],
+  publicHolidayDates?: Set<string>,
 ): { totalMinutes: number; scheduledDaysWorked: number; scheduledDaysTotal: number } {
   let totalMinutes = 0;
   let scheduledDaysWorked = 0;
   let scheduledDaysTotal = 0;
 
+  const dailyPaidHolidayMinutes = (settings.standard_work_hours || 8) * 60;
+
   for (const dateStr of weekDates) {
     const isScheduled = isScheduledWorkday(dateStr, settings);
+    const isPubHoliday = isPublicHoliday(dateStr, publicHolidayDates);
+    const isLabor = isLaborDay(dateStr);
+
     if (isScheduled) scheduledDaysTotal++;
 
     const att = weekAttendance.find((a) => a.date === dateStr);
-    if (att && att.check_in && att.check_out) {
+    const hasActualWork = !!(att && att.check_in && att.check_out);
+
+    if (hasActualWork) {
       const isNight = att.work_type === "night";
       const breakdown = calculateSingleAttendance(
-        att.check_in,
-        att.check_out,
+        att.check_in!,
+        att.check_out!,
         att.date,
         att.break_minutes ?? 0,
         isNight,
         settings,
       );
+
       totalMinutes += breakdown.recognizedMinutes;
+
       if (isScheduled && (att.status === "present" || att.status === "late")) {
         scheduledDaysWorked++;
       }
+
+      continue;
+    }
+
+    const isPaidPublicHoliday =
+      settings.apply_public_holiday &&
+      isScheduled &&
+      isPubHoliday &&
+      (settings.company_size === "over5" || isLabor);
+
+    if (isPaidPublicHoliday) {
+      totalMinutes += dailyPaidHolidayMinutes;
+      scheduledDaysWorked++;
     }
   }
 
@@ -575,7 +598,7 @@ if (prevCarryDays > 0 && weeks.length > 0) {
   // 이번 달 첫 주 날짜만 기준으로 개근/15시간 여부를 판정한다.
   const currentMonthWeekDates = firstWeek.dates;
   const weekAtt = empAllAtt.filter((a) => currentMonthWeekDates.includes(a.date));
-  const stats = calculateWeeklyStats(weekAtt, settings, currentMonthWeekDates);
+  const stats = calculateWeeklyStats(weekAtt, settings, currentMonthWeekDates, publicHolidayDates);
 
   if (
     stats.totalMinutes >= 15 * 60 &&
@@ -603,16 +626,28 @@ for (const week of weeks) {
   if (scheduledInMonth.length < workDays) {
     // 실제 출근한 날수만 저장 (결근 제외)
     const workedInWeek = scheduledInMonth.filter((d) => {
-      const att = empAllAtt.find((a) => a.date === d);
-      return att && (att.status === "present" || att.status === "late");
-    });
+  const att = empAllAtt.find((a) => a.date === d);
+  const isPubHoliday = isPublicHoliday(d, publicHolidayDates);
+  const isLabor = isLaborDay(d);
+
+  const isPaidPublicHoliday =
+    settings.apply_public_holiday &&
+    isScheduledWorkday(d, settings) &&
+    isPubHoliday &&
+    (settings.company_size === "over5" || isLabor);
+
+  return (
+    (att && (att.status === "present" || att.status === "late")) ||
+    isPaidPublicHoliday
+  );
+});
     carryDays = workedInWeek.length;
     continue;
   }
 
   // 전체 주간 근태로 판정
   const weekAtt = empAllAtt.filter((a) => fullWeekDates.includes(a.date));
-  const stats = calculateWeeklyStats(weekAtt, settings, fullWeekDates);
+  const stats = calculateWeeklyStats(weekAtt, settings, fullWeekDates, publicHolidayDates);
 
   if (
     stats.totalMinutes >= 15 * 60 &&
