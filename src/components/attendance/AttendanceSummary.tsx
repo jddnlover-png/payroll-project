@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useEmployeeStore } from "@/store/employeeStore";
 import { useEmployees } from "@/hooks/useEmployees";
 import { useAttendanceRange } from "@/hooks/useAttendance";
@@ -43,6 +43,7 @@ import { EmployeeAttendanceDetail } from "./EmployeeAttendanceDetail";
 import { EmployeeCombobox } from "@/components/employee/EmployeeCombobox";
 import { Employee } from "@/types/employee";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 export function AttendanceSummary() {
   const { settings } = useOrganizationSettings();
@@ -122,6 +123,36 @@ export function AttendanceSummary() {
   }, [viewType, selectedMonth, startDate, endDate]);
 
   const { data: dbAttendance = [] } = useAttendanceRange(dateRange.start, dateRange.end);
+
+const [publicHolidayMap, setPublicHolidayMap] = useState<Map<string, string>>(new Map());
+
+useEffect(() => {
+  const fetchPublicHolidays = async () => {
+    const { data, error } = await (supabase as any)
+      .from("public_holidays")
+      .select("holiday_date, holiday_name, is_holiday")
+      .gte("holiday_date", dateRange.start)
+      .lte("holiday_date", dateRange.end)
+      .eq("is_holiday", true);
+
+    if (error) {
+      console.error("공휴일 조회 실패:", error);
+      setPublicHolidayMap(new Map());
+      return;
+    }
+
+    setPublicHolidayMap(
+      new Map(
+        (data || []).map((h: { holiday_date: string; holiday_name: string }) => [
+          h.holiday_date,
+          h.holiday_name,
+        ]),
+      ),
+    );
+  };
+
+  fetchPublicHolidays();
+}, [dateRange.start, dateRange.end]);
 
   const attendance = useMemo(() => {
     if (dbAttendance.length > 0) {
@@ -281,17 +312,43 @@ export function AttendanceSummary() {
       });
 
       let holidayNightShiftMinutes = 0;
-      let holidayNightShiftTier1Minutes = 0;
-      let holidayNightShiftTier2Minutes = 0;
-      let holidayNightShiftTier3Minutes = 0;
-      let holidayNightShiftTier4Minutes = 0;
+let holidayNightShiftTier1Minutes = 0;
+let holidayNightShiftTier2Minutes = 0;
+let holidayNightShiftTier3Minutes = 0;
+let holidayNightShiftTier4Minutes = 0;
+
+let totalPaidPublicHolidayMinutes = 0;
+let totalPublicHolidayActualWorkMinutes = 0;
 
       empAttendance.forEach((att: any) => {
-        const ci = att.rawCheckIn || att.checkIn;
-        const co = att.rawCheckOut || att.checkOut;
-        const isNight = (att.workType || "day") === "night";
+  const ci = att.rawCheckIn || att.checkIn;
+  const co = att.rawCheckOut || att.checkOut;
+  const isNight = (att.workType || "day") === "night";
 
-        if (!ci || !co || !isNight) return;
+  const isDbPublicHoliday = publicHolidayMap.has(att.date);
+const isScheduledForPaidHoliday = isScheduledWorkday(att.date, settings);
+const hasActualWork = !!(ci && co);
+
+if (settings.apply_public_holiday && isDbPublicHoliday && isScheduledForPaidHoliday) {
+    const paidMinutes = Math.round((settings.standard_work_hours || 8) * 60);
+    totalPaidPublicHolidayMinutes += paidMinutes;
+
+    if (hasActualWork) {
+      const bd = calculateSingleAttendance(
+        ci,
+        co,
+        att.date,
+        att.breakMinutes ?? 0,
+        isNight,
+        settings,
+        false,
+      );
+
+      totalPublicHolidayActualWorkMinutes += bd.recognizedMinutes;
+    }
+  }
+
+  if (!ci || !co || !isNight) return;
 
         const isWeeklyHol = isWeeklyHoliday(att.date, settings);
         const isPubHol = isPublicHoliday(att.date);
@@ -405,9 +462,12 @@ export function AttendanceSummary() {
         displayHolidayOver8hMinutes,
 
         totalActualLateMinutes,
-        totalActualEarlyLeaveMinutes,
+totalActualEarlyLeaveMinutes,
 
-        attendanceRate,
+totalPaidPublicHolidayMinutes,
+totalPublicHolidayActualWorkMinutes,
+
+attendanceRate,
       };
     });
   }, [
@@ -421,7 +481,8 @@ export function AttendanceSummary() {
     dateRange,
     settings,
     payrollTimeMap,
-  ]);
+publicHolidayMap,
+]);
 
   const overallStats = useMemo(() => {
     const totalPresent = employeeSummary.reduce((sum, e) => sum + e.presentDays, 0);
@@ -518,7 +579,7 @@ export function AttendanceSummary() {
 
       const titleRow = sheet.addRow([periodText]);
       titleRow.font = { bold: true, size: 12 };
-      sheet.mergeCells(1, 1, 1, 28);
+      sheet.mergeCells(1, 1, 1, 30);
       titleRow.height = 24;
 
       sheet.addRow([]);
@@ -545,9 +606,11 @@ export function AttendanceSummary() {
         "정규근무시간",
         "연장근무시간",
         "야간근무시간",
-        "휴일근로(8h이내)",
-        "휴일근로(8h초과)",
-        "야간교대근무시간",
+"공휴일 유급인정시간",
+"공휴일 실제근무시간",
+"휴일근로(8h이내)",
+"휴일근로(8h초과)",
+"야간교대근무시간",
         "1단계(정규+비야간)",
         "2단계(정규+야간)",
         "3단계(연장+야간)",
@@ -577,9 +640,11 @@ export function AttendanceSummary() {
         { width: 16 },
         { width: 16 },
         { width: 16 },
-        { width: 18 },
-        { width: 18 },
-        { width: 18 },
+{ width: 20 },
+{ width: 20 },
+{ width: 18 },
+{ width: 18 },
+{ width: 18 },
         { width: 18 },
         { width: 16 },
         { width: 16 },
@@ -612,9 +677,11 @@ export function AttendanceSummary() {
           fmtMin(emp.displayRegularMinutes ?? emp.totalRegularMinutes ?? 0),
           fmtMin(emp.displayOvertimeMinutes ?? emp.totalOvertimeWorkMinutes ?? 0),
           fmtMin(emp.displayNightWorkMinutes ?? emp.totalNightWorkMinutes ?? 0),
-          fmtMin(emp.displayHoliday8hMinutes || 0),
-          fmtMin(emp.displayHolidayOver8hMinutes || 0),
-          fmtMin(emp.displayNightShiftWorkMinutes ?? emp.totalNightShiftWorkMinutes ?? 0),
+fmtMin(emp.totalPaidPublicHolidayMinutes || 0),
+fmtMin(emp.totalPublicHolidayActualWorkMinutes || 0),
+fmtMin(emp.displayHoliday8hMinutes || 0),
+fmtMin(emp.displayHolidayOver8hMinutes || 0),
+fmtMin(emp.displayNightShiftWorkMinutes ?? emp.totalNightShiftWorkMinutes ?? 0),
           emp.totalNightShiftTier1Minutes > 0 ? fmtMin(emp.totalNightShiftTier1Minutes) : "-",
           emp.totalNightShiftTier2Minutes > 0 ? fmtMin(emp.totalNightShiftTier2Minutes) : "-",
           emp.totalNightShiftTier3Minutes > 0 ? fmtMin(emp.totalNightShiftTier3Minutes) : "-",
@@ -660,12 +727,14 @@ export function AttendanceSummary() {
       const workbook = new ExcelJS.Workbook();
 
       const statusLabels: Record<string, string> = {
-        present: "출근",
-        late: "지각",
-        absent: "결근",
-        leave: "휴가",
-        half_day: "반차",
-      };
+  present: "출근",
+  late: "지각",
+  absent: "결근",
+  leave: "휴가",
+  half_day: "반차",
+  paid_holiday: "유급휴일",
+  paid_holiday_work: "유급휴일 출근",
+};
 
       const formatDate = (dateStr: string) => {
         const date = new Date(dateStr + "T00:00:00");
@@ -723,17 +792,43 @@ export function AttendanceSummary() {
         let totalHoliday8h = 0;
         let totalHolidayOver8h = 0;
         let totalHolidayNightShift = 0;
-        let totalHolidayNightShiftTier1 = 0;
-        let totalHolidayNightShiftTier2 = 0;
-        let totalHolidayNightShiftTier3 = 0;
-        let totalHolidayNightShiftTier4 = 0;
+let totalHolidayNightShiftTier1 = 0;
+let totalHolidayNightShiftTier2 = 0;
+let totalHolidayNightShiftTier3 = 0;
+let totalHolidayNightShiftTier4 = 0;
+
+let totalPaidPublicHolidayMinutes = 0;
+let totalPublicHolidayActualWorkMinutes = 0;
 
         empRecords.forEach((r: any) => {
-          const ci = r.rawCheckIn || r.checkIn;
-          const co = r.rawCheckOut || r.checkOut;
-          let workTimeStr = "-";
+  const ci = r.rawCheckIn || r.checkIn;
+  const co = r.rawCheckOut || r.checkOut;
+  let workTimeStr = "-";
 
-          if (ci && co) {
+  const isDbPublicHoliday = publicHolidayMap.has(r.date);
+  const hasActualWork = !!(ci && co);
+
+  const isPaidPublicHolidayOnly =
+    settings.apply_public_holiday &&
+    isDbPublicHoliday &&
+    isScheduledWorkday(r.date, settings) &&
+    !hasActualWork;
+
+const isPaidPublicHolidayWork =
+  settings.apply_public_holiday &&
+  isDbPublicHoliday &&
+  isScheduledWorkday(r.date, settings) &&
+  hasActualWork;
+
+  if (isPaidPublicHolidayOnly) {
+    const paidMinutes = Math.round((settings.standard_work_hours || 8) * 60);
+
+    workTimeStr = `유급 ${fmtMinutes(paidMinutes)}`;
+    totalPaidPublicHolidayMinutes += paidMinutes;
+    totalRecognized += paidMinutes;
+  }
+
+  if (ci && co) {
             const isNight = (r.workType || "day") === "night";
 
             const isHolidayDay =
@@ -750,9 +845,16 @@ export function AttendanceSummary() {
             );
 
             workTimeStr = fmtMinutes(bd.recognizedMinutes);
-            totalStay += bd.stayMinutes;
-            totalBreak += bd.breakMinutes;
-            totalLate += bd.lateTruncation;
+totalStay += bd.stayMinutes;
+totalBreak += bd.breakMinutes;
+
+if (isPaidPublicHolidayWork) {
+  const paidMinutes = Math.round((settings.standard_work_hours || 8) * 60);
+  totalPaidPublicHolidayMinutes += paidMinutes;
+  totalPublicHolidayActualWorkMinutes += bd.recognizedMinutes;
+}
+
+totalLate += bd.lateTruncation;
             totalOT += bd.overtimeTruncation;
             totalEarly += bd.earlyLeaveTruncation;
             totalOuting += bd.outingTruncation;
@@ -786,11 +888,18 @@ export function AttendanceSummary() {
             }
           }
 
-          const row = sheet.addRow([
-            formatDate(r.date),
-            statusLabels[r.status] || r.status,
-            ci
-              ? new Date(ci).toLocaleTimeString("ko-KR", {
+
+const displayStatus = isPaidPublicHolidayOnly
+  ? "paid_holiday"
+  : isPaidPublicHolidayWork
+    ? "paid_holiday_work"
+    : r.status;
+
+const row = sheet.addRow([
+  formatDate(r.date),
+  statusLabels[displayStatus] || displayStatus,
+  ci
+    ? new Date(ci).toLocaleTimeString("ko-KR", {
                   hour: "2-digit",
                   minute: "2-digit",
                   hour12: false,
@@ -864,9 +973,12 @@ export function AttendanceSummary() {
             ["  정규근무시간", fmtMinutes((emp as any).displayRegularMinutes ?? totalRegular)],
             ["  연장근무시간", fmtMinutes((emp as any).displayOvertimeMinutes ?? totalOvertime)],
             ["  야간근무시간", fmtMinutes((emp as any).displayNightWorkMinutes ?? totalNight)],
-            ["  휴일근로(8h이내)", fmtMinutes(displayHoliday8h)],
-            ["  휴일근로(8h초과)", fmtMinutes(displayHolidayOver8h)],
-            ["  야간교대근무시간", fmtMinutes((emp as any).displayNightShiftWorkMinutes ?? totalNightShift)],
+["  공휴일 유급인정시간", fmtMinutes(totalPaidPublicHolidayMinutes)],
+["  공휴일 실제근무시간", fmtMinutes(totalPublicHolidayActualWorkMinutes)],
+["  주휴수당 인정시간", fmtMinutes((emp as any).weeklyHolidayMinutes ?? 0)],
+["  휴일근로(8h이내)", fmtMinutes(displayHoliday8h)],
+["  휴일근로(8h초과)", fmtMinutes(displayHolidayOver8h)],
+["  야간교대근무시간", fmtMinutes((emp as any).displayNightShiftWorkMinutes ?? totalNightShift)],
 
             ...(totalHolidayNightShift > 0
               ? [
@@ -1348,15 +1460,31 @@ export function AttendanceSummary() {
                                               </span>
                                             </div>
                                             <div className="flex justify-between">
-                                              <span className="text-muted-foreground text-xs">야간근무시간</span>
-                                              <span className="text-xs">
-                                                {Math.floor(emp.displayNightWorkMinutes / 60)}시간{" "}
-                                                {emp.displayNightWorkMinutes % 60}분
-                                              </span>
-                                            </div>
+  <span className="text-muted-foreground text-xs">야간근무시간</span>
+  <span className="text-xs">
+    {Math.floor(emp.displayNightWorkMinutes / 60)}시간{" "}
+    {emp.displayNightWorkMinutes % 60}분
+  </span>
+</div>
 
-                                            {(emp.displayHoliday8hMinutes > 0 ||
-                                              emp.displayHolidayOver8hMinutes > 0) && (
+<div className="flex justify-between">
+  <span className="text-muted-foreground text-xs">공휴일 유급인정시간</span>
+  <span className="text-xs">
+    {Math.floor((emp.totalPaidPublicHolidayMinutes || 0) / 60)}시간{" "}
+    {(emp.totalPaidPublicHolidayMinutes || 0) % 60}분
+  </span>
+</div>
+
+<div className="flex justify-between">
+  <span className="text-muted-foreground text-xs">공휴일 실제근무시간</span>
+  <span className="text-xs">
+    {Math.floor((emp.totalPublicHolidayActualWorkMinutes || 0) / 60)}시간{" "}
+    {(emp.totalPublicHolidayActualWorkMinutes || 0) % 60}분
+  </span>
+</div>
+
+{(emp.displayHoliday8hMinutes > 0 ||
+  emp.displayHolidayOver8hMinutes > 0) && (
                                               <>
                                                 <div className="flex justify-between">
                                                   <span className="text-muted-foreground text-xs">
