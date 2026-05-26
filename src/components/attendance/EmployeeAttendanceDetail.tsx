@@ -51,12 +51,12 @@ export function EmployeeAttendanceDetail({
 
   useEffect(() => {
     const fetchPublicHolidays = async () => {
-      const { data, error } = await supabase
-        .from('public_holidays')
-        .select('holiday_date, holiday_name, is_holiday')
-        .gte('holiday_date', startDate)
-        .lte('holiday_date', endDate)
-        .eq('is_holiday', true);
+      const { data, error } = await (supabase as any)
+  .from('public_holidays')
+  .select('holiday_date, holiday_name, is_holiday')
+  .gte('holiday_date', startDate)
+  .lte('holiday_date', endDate)
+  .eq('is_holiday', true);
 
       if (error) {
         console.error('공휴일 조회 실패:', error);
@@ -70,9 +70,11 @@ export function EmployeeAttendanceDetail({
     fetchPublicHolidays();
   }, [startDate, endDate]);
 
-  const publicHolidayMap = useMemo(() => {
-    return new Map(publicHolidays.map((h) => [h.holiday_date, h.holiday_name]));
-  }, [publicHolidays]);
+  const publicHolidayMap = useMemo<Map<string, string>>(() => {
+  return new Map(
+    publicHolidays.map((h) => [h.holiday_date, h.holiday_name] as [string, string]),
+  );
+}, [publicHolidays]);
 
   const employeeRecords = useMemo(() => {
     if (!employee) return [];
@@ -274,27 +276,79 @@ export function EmployeeAttendanceDetail({
   );
 
   const getDisplayWorkHours = useCallback(
-    (record: {
-      date: string;
-      checkIn: string | null;
-      checkOut: string | null;
-      breakMinutes: number;
-      workType: string;
-    }) => {
-      if (isPaidPublicHolidayRecord(record)) {
-        return `유급 ${formatMinutes(getPaidHolidayMinutes())}`;
-      }
+  (record: {
+    date: string;
+    checkIn: string | null;
+    checkOut: string | null;
+    breakMinutes: number;
+    workType: string;
+  }) => {
+    if (isPaidPublicHolidayRecord(record)) {
+      return `유급 ${formatMinutes(getPaidHolidayMinutes())}`;
+    }
 
-      return calculateWorkHours(
-        record.checkIn,
-        record.checkOut,
-        record.breakMinutes,
-        record.date,
-        record.workType,
-      );
-    },
-    [isPaidPublicHolidayRecord, getPaidHolidayMinutes, calculateWorkHours],
-  );
+    return calculateWorkHours(
+      record.checkIn,
+      record.checkOut,
+      record.breakMinutes,
+      record.date,
+      record.workType,
+    );
+  },
+  [isPaidPublicHolidayRecord, getPaidHolidayMinutes, calculateWorkHours],
+);
+
+const getWeeklyHolidayPaidMinutes = useCallback(() => {
+  const dailyMinutes = getPaidHolidayMinutes();
+
+  const recordsByWeek = new Map<
+    string,
+    {
+      scheduledTotal: number;
+      scheduledWorked: number;
+    }
+  >();
+
+  employeeRecords.forEach((record) => {
+    if (!isScheduledWorkday(record.date)) return;
+
+    const date = new Date(`${record.date}T00:00:00`);
+    const day = date.getDay();
+    const monday = new Date(date);
+    monday.setDate(date.getDate() - ((day + 6) % 7));
+
+    const weekKey = monday.toISOString().slice(0, 10);
+
+    const current = recordsByWeek.get(weekKey) || {
+      scheduledTotal: 0,
+      scheduledWorked: 0,
+    };
+
+    current.scheduledTotal += 1;
+
+    const displayStatus = getDisplayStatus(record);
+
+    if (
+      displayStatus === 'present' ||
+      displayStatus === 'late' ||
+      displayStatus === 'paid_holiday'
+    ) {
+      current.scheduledWorked += 1;
+    }
+
+    recordsByWeek.set(weekKey, current);
+  });
+
+  let eligibleWeeks = 0;
+
+  recordsByWeek.forEach((week) => {
+    if (week.scheduledTotal > 0 && week.scheduledWorked === week.scheduledTotal) {
+      eligibleWeeks += 1;
+    }
+  });
+
+  return eligibleWeeks * dailyMinutes;
+}, [employeeRecords, getPaidHolidayMinutes, isScheduledWorkday, getDisplayStatus]);
 
   const exportToExcel = useCallback(async () => {
     if (!employee || employeeRecords.length === 0) return;
@@ -326,29 +380,77 @@ export function EmployeeAttendanceDetail({
     };
 
     employeeRecords.forEach((r) => {
-      const displayStatus = getDisplayStatus(r);
+  const displayStatus = getDisplayStatus(r);
 
-      const row = worksheet.addRow({
-        date: formatDate(r.date),
-        status: statusLabels[displayStatus] || displayStatus,
-        checkIn: formatTime(r.checkIn),
-        checkOut: formatTime(r.checkOut),
-        workHours: getDisplayWorkHours(r),
-      });
+  const row = worksheet.addRow({
+    date: formatDate(r.date),
+    status: statusLabels[displayStatus] || displayStatus,
+    checkIn: formatTime(r.checkIn),
+    checkOut: formatTime(r.checkOut),
+    workHours: getDisplayWorkHours(r),
+  });
 
-      row.alignment = { vertical: 'middle', horizontal: 'center' };
-    });
+  row.alignment = { vertical: 'middle', horizontal: 'center' };
+});
 
-    worksheet.eachRow((row) => {
-      row.eachCell((cell) => {
-        cell.border = {
-          top: { style: 'thin' },
-          left: { style: 'thin' },
-          bottom: { style: 'thin' },
-          right: { style: 'thin' },
-        };
-      });
-    });
+const paidPublicHolidayMinutes = employeeRecords.reduce((sum, r) => {
+  return isPaidPublicHolidayRecord(r) ? sum + getPaidHolidayMinutes() : sum;
+}, 0);
+
+const actualPublicHolidayWorkMinutes = employeeRecords.reduce((sum, r) => {
+  const hasActualWork = !!(r.checkIn && r.checkOut);
+  const isPublicHolidayWork =
+    settings.apply_public_holiday &&
+    publicHolidayMap.has(r.date) &&
+    isScheduledWorkday(r.date) &&
+    hasActualWork;
+
+  if (!isPublicHolidayWork) return sum;
+
+  const workHoursText = calculateWorkHours(
+    r.checkIn,
+    r.checkOut,
+    r.breakMinutes,
+    r.date,
+    r.workType,
+  );
+
+  const match = workHoursText.match(/(\d+)시간\s*(\d+)분/);
+  if (!match) return sum;
+
+  return sum + Number(match[1]) * 60 + Number(match[2]);
+}, 0);
+
+const weeklyHolidayPaidMinutes = getWeeklyHolidayPaidMinutes();
+
+worksheet.addRow({});
+worksheet.addRow({ date: '근무시간 상세' });
+
+worksheet.addRow({
+  date: '공휴일 유급인정시간',
+  status: formatMinutes(paidPublicHolidayMinutes),
+});
+
+worksheet.addRow({
+  date: '공휴일 실제근무시간',
+  status: formatMinutes(actualPublicHolidayWorkMinutes),
+});
+
+worksheet.addRow({
+  date: '주휴수당 인정시간',
+  status: formatMinutes(weeklyHolidayPaidMinutes),
+});
+
+worksheet.eachRow((row) => {
+  row.eachCell((cell) => {
+    cell.border = {
+      top: { style: 'thin' },
+      left: { style: 'thin' },
+      bottom: { style: 'thin' },
+      right: { style: 'thin' },
+    };
+  });
+});
 
     const buffer = await workbook.xlsx.writeBuffer();
     const blob = new Blob([buffer], {
@@ -361,7 +463,21 @@ export function EmployeeAttendanceDetail({
     link.download = `${employee.name}_근태기록_${startDate}_${endDate}.xlsx`;
     link.click();
     URL.revokeObjectURL(url);
-  }, [employee, employeeRecords, startDate, endDate, getDisplayStatus, getDisplayWorkHours]);
+  }, [
+  employee,
+  employeeRecords,
+  startDate,
+  endDate,
+  getDisplayStatus,
+  getDisplayWorkHours,
+  isPaidPublicHolidayRecord,
+  getPaidHolidayMinutes,
+  publicHolidayMap,
+  isScheduledWorkday,
+  settings.apply_public_holiday,
+  calculateWorkHours,
+  getWeeklyHolidayPaidMinutes,
+]);
 
   if (!employee) return null;
 
