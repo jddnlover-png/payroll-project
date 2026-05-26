@@ -518,10 +518,19 @@ export function calculateSalaryDetail(
         nightMinutes += breakdown.nightWorkMinutes;
         holidayNightMin += breakdown.nightWorkMinutes;
       } else {
-        // 휴무일 처리 (REST_DAY): 주 40h 초과분만 연장
+                // 휴무일 처리 (REST_DAY): 주 40h 초과분만 연장
         const weeklyLimitMinutes = (settings.weekly_work_hours || 40) * 60;
         const weekDates = getWeekDates(dateStr);
-        // 해당 주 소정근로일 근무시간 합산 (토요일 제외)
+
+        // 해당 주 소정근로일의 "정규 인정시간"만 합산한다.
+        // 중요:
+        // 평일 일별 연장시간은 이미 breakdown.overtimeWorkMinutes로 overtimeMinutes에 반영된다.
+        // 따라서 주40시간 초과 판정용 누적시간에 recognizedMinutes를 넣으면
+        // 평일 연장시간이 다시 한 번 포함되어 연장근무가 중복 계산된다.
+        //
+        // 예: 3/12 평일 1시간 8분 연장
+        // 기존: 평일 8시간 8분 전체를 주 누적에 포함 → 토요일 연장도 1시간 8분 더 증가
+        // 수정: 평일 정규 7시간만 주 누적에 포함 → 중복 제거
         const weekScheduledMinutes = attendance
           .filter(
             (a) =>
@@ -540,12 +549,15 @@ export function calculateSalaryDetail(
               a.work_type === "night",
               settings,
             );
-            return sum + bd.recognizedMinutes;
+
+            return sum + bd.regularMinutes;
           }, 0);
+
         const nonNightMin = recognized - breakdown.nightWorkMinutes;
         const remainingCapacity = Math.max(0, weeklyLimitMinutes - weekScheduledMinutes);
         const regularPart = Math.min(nonNightMin, remainingCapacity);
         const overtimePart = Math.max(0, nonNightMin - remainingCapacity);
+
         regularMinutes += regularPart;
         overtimeMinutes += overtimePart;
         nightMinutes += breakdown.nightWorkMinutes;
