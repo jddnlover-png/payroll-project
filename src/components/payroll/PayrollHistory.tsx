@@ -188,7 +188,7 @@ export function PayrollHistory({ open, onOpenChange, employee }: PayrollHistoryP
                       <TableHead>월</TableHead>
                       <TableHead className="text-center">출근/지각/결근</TableHead>
                       <TableHead className="text-right">기본급</TableHead>
-                      <TableHead className="text-right">연장수당</TableHead>
+                      <TableHead className="text-right">연장근로가산수당</TableHead>
                       <TableHead className="text-right">공제</TableHead>
                       <TableHead className="text-right">실지급액</TableHead>
                       <TableHead className="text-center">변동</TableHead>

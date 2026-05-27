@@ -16,6 +16,16 @@ const formatMinutesToHM = (minutes: number): string => {
   return `${h}시간 ${m}분`;
 };
 
+const getDisplayPaymentItemName = (name: string) =>
+  name
+    .replace(/공휴일\s*근로수당/g, "공휴일근로가산수당")
+    .replace(/휴일근로수당/g, "휴일근로가산수당")
+    .replace(/연장근로수당/g, "연장근로가산수당")
+    .replace(/야간근로수당/g, "야간근로가산수당")
+    .replace(/야간\+연장수당/g, "야간+연장가산수당")
+    .replace(/연장수당/g, "연장근로가산수당")
+    .replace(/야간수당/g, "야간근로가산수당");
+
 // 임금대장 엑셀 내보내기
 export async function exportPayrollLedger(
   payrollData: PayrollRecord[],
@@ -73,7 +83,7 @@ export async function exportPayrollLedger(
     'No', '사원번호', '성명', '부서', '고용형태', '급여유형',
     '출근일', '지각', '결근',
     '총근로시간', '정규근무시간', '연장근무시간', '야간근무시간', '야간교대근로시간',
-    ...activePayments.map(i => i.name),
+    ...activePayments.map(i => getDisplayPaymentItemName(i.name)),
     '지급합계',
     ...activeDeductions.map(i => i.name),
     '공제합계',
@@ -303,7 +313,7 @@ export async function exportPayslips(
     activePayments.forEach(item => {
       const val = getPayVal(record, item.id);
       totalPay += val;
-      const r = ws.addRow([item.name, formatNumber(val)]);
+      const r = ws.addRow([getDisplayPaymentItemName(item.name), formatNumber(val)]);
       r.getCell(2).numFmt = '#,##0';
       r.eachCell(c => { c.border = { bottom: { style: 'thin', color: { argb: 'FFE0E0E0' } } }; });
     });
