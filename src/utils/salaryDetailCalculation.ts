@@ -275,10 +275,30 @@ function getWeekDates(dateStr: string): string[] {
 
 /** 주 단위 근무유형별 1일 기준시간 산정 (주휴수당용) */
 function calcDailyBaseHours(weekAtt: AttendanceRawRecord[], settings: OrganizationSettings): number {
+  const standardDailyHours = Math.min(settings.standard_work_hours || 8, 8);
+
   const weekAttWithCheckIn = weekAtt.filter((a) => a.check_in && a.check_out);
+
+  const hasNightWork = weekAttWithCheckIn.some((wa) => {
+    if (wa.work_type === "night") return true;
+    if (!wa.check_in) return false;
+
+    const ciDate = new Date(wa.check_in);
+    return ciDate.getHours() + ciDate.getMinutes() / 60 >= 14;
+  });
+
+  // 주간 고정근무자는 실제 출근일 평균이 아니라
+  // 회사 설정의 1일 정규근무시간을 주휴 기준시간으로 사용한다.
+  // 이유:
+  // - 유급공휴일에 쉬어도 주휴가 깎이면 안 됨
+  // - 토요일/휴무일 짧은 근무시간이 주휴 1일 기준시간을 줄이면 안 됨
+  if (!hasNightWork) {
+    return standardDailyHours;
+  }
 
   if (weekAttWithCheckIn.length > 0) {
     let totalScheduledMinutes = 0;
+    let scheduledNightWorkDays = 0;
 
     for (const wa of weekAttWithCheckIn) {
       const waIsNight =
@@ -289,41 +309,30 @@ function calcDailyBaseHours(weekAtt: AttendanceRawRecord[], settings: Organizati
           return ciDate.getHours() + ciDate.getMinutes() / 60 >= 14;
         })();
 
-      if (waIsNight) {
-        const checkIn = new Date(wa.check_in!);
-        const checkOut = new Date(wa.check_out!);
-        const t4 = calculate4TierNightShift(checkIn, checkOut, settings);
+      if (!waIsNight) continue;
 
-        const nightRecognized =
-          t4.tier1Minutes +
-          t4.tier2Minutes +
-          t4.tier3Minutes +
-          t4.tier4Minutes;
+      const checkIn = new Date(wa.check_in!);
+      const checkOut = new Date(wa.check_out!);
+      const t4 = calculate4TierNightShift(checkIn, checkOut, settings);
 
-        const nightOvertime = t4.tier3Minutes + t4.tier4Minutes;
+      const nightRecognized =
+        t4.tier1Minutes +
+        t4.tier2Minutes +
+        t4.tier3Minutes +
+        t4.tier4Minutes;
 
-        totalScheduledMinutes += nightRecognized - nightOvertime;
-      } else {
-        const bd = calculateSingleAttendance(
-          wa.check_in!,
-          wa.check_out!,
-          wa.date,
-          wa.break_minutes ?? 0,
-          false,
-          settings,
-        );
+      const nightOvertime = t4.tier3Minutes + t4.tier4Minutes;
 
-        totalScheduledMinutes += bd.recognizedMinutes - bd.overtimeWorkMinutes;
-      }
+      totalScheduledMinutes += nightRecognized - nightOvertime;
+      scheduledNightWorkDays++;
     }
 
-    return Math.min(totalScheduledMinutes / 60 / weekAttWithCheckIn.length, 8);
+    if (scheduledNightWorkDays > 0) {
+      return Math.min(totalScheduledMinutes / 60 / scheduledNightWorkDays, 8);
+    }
   }
 
-  const weeklyWorkHours = settings.weekly_work_hours || 40;
-  const scheduledWorkDays = settings.work_days || 5;
-
-  return Math.min(weeklyWorkHours / scheduledWorkDays, 8);
+  return standardDailyHours;
 }
 
 /**
