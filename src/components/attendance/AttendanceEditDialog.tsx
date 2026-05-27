@@ -53,6 +53,8 @@ const statusOptions = [
   { value: 'half_day', label: '반차' },
 ];
 
+const NON_WORK_STATUSES = ['absent', 'leave', 'half_day'];
+
 export function AttendanceEditDialog({ open, onOpenChange, record }: AttendanceEditDialogProps) {
   const { currentOrganization } = useOrganization();
   const { settings } = useOrganizationSettings();
@@ -108,7 +110,21 @@ export function AttendanceEditDialog({ open, onOpenChange, record }: AttendanceE
     setStatus(isLate ? 'late' : 'present');
   }, [checkIn, settings.work_start_time, settings.shift_tier1_start, settings.late_threshold, settings.shift_late_threshold]);
 
-  const hasChanges = () => {
+  const handleStatusChange = (nextStatus: string) => {
+  setStatus(nextStatus);
+
+  // 결근/휴가/반차는 실근로가 없는 상태로 처리한다.
+  // 기존 출퇴근 시간이 남아 있으면 주40시간 연장 계산에서 근무로 오인될 수 있으므로 초기화한다.
+  if (NON_WORK_STATUSES.includes(nextStatus)) {
+    setCheckIn('');
+    setCheckOut('');
+  } else if (!checkIn && !checkOut && (nextStatus === 'present' || nextStatus === 'late')) {
+    setCheckIn(record.checkIn || '');
+    setCheckOut(record.checkOut || '');
+  }
+};
+
+const hasChanges = () => {
     return (
       checkIn !== (record.checkIn || '') ||
       checkOut !== (record.checkOut || '') ||
@@ -146,8 +162,10 @@ export function AttendanceEditDialog({ open, onOpenChange, record }: AttendanceE
 
       if (fetchError) throw fetchError;
 
-      // 날짜와 시간을 합쳐서 timestamp 생성
-      const newCheckIn = checkIn ? `${record.date}T${checkIn}:00+09:00` : null;
+      const isNonWorkStatus = NON_WORK_STATUSES.includes(status);
+
+// 날짜와 시간을 합쳐서 timestamp 생성
+const newCheckIn = !isNonWorkStatus && checkIn ? `${record.date}T${checkIn}:00+09:00` : null;
       
       // 야간조: 퇴근 시간이 출근 시간보다 이른 경우 다음 날로 처리
       let checkOutDate = record.date;
@@ -163,11 +181,11 @@ export function AttendanceEditDialog({ open, onOpenChange, record }: AttendanceE
           checkOutDate = nextDay.toISOString().split('T')[0];
         }
       }
-      const newCheckOut = checkOut ? `${checkOutDate}T${checkOut}:00+09:00` : null;
+      const newCheckOut = !isNonWorkStatus && checkOut ? `${checkOutDate}T${checkOut}:00+09:00` : null;
 
       // 시프트별 초과근무 계산 (출퇴근 보정 적용)
       let overtimeHours = 0;
-      if (newCheckIn && newCheckOut) {
+if (!isNonWorkStatus && newCheckIn && newCheckOut) {
         let checkInDate = new Date(newCheckIn);
         let checkOutDate2 = new Date(newCheckOut);
 
@@ -236,12 +254,12 @@ export function AttendanceEditDialog({ open, onOpenChange, record }: AttendanceE
       const { error: updateError } = await supabase
         .from('attendance_records')
         .update({
-          check_in: newCheckIn,
-          check_out: newCheckOut,
-          status: status as any,
-          overtime_hours: overtimeHours,
-          work_type: detectedShift,
-        })
+  check_in: newCheckIn,
+  check_out: newCheckOut,
+  status: status as any,
+  overtime_hours: overtimeHours,
+  work_type: isNonWorkStatus ? null : detectedShift,
+})
         .eq('id', record.id);
 
       if (updateError) throw updateError;
@@ -378,25 +396,28 @@ export function AttendanceEditDialog({ open, onOpenChange, record }: AttendanceE
               <div className="space-y-2">
                 <Label htmlFor="edit-checkin">출근시간</Label>
                 <Input
-                  id="edit-checkin"
-                  type="time"
-                  value={checkIn}
-                  onChange={(e) => setCheckIn(e.target.value)}
-                />
+  id="edit-checkin"
+  type="time"
+  value={checkIn}
+  onChange={(e) => setCheckIn(e.target.value)}
+  disabled={NON_WORK_STATUSES.includes(status)}
+/>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="edit-checkout">퇴근시간</Label>
                 <Input
-                  id="edit-checkout"
-                  type="time"
-                  value={checkOut}
-                  onChange={(e) => setCheckOut(e.target.value)}
-                />
+  id="edit-checkout"
+  type="time"
+  value={checkOut}
+  onChange={(e) => setCheckOut(e.target.value)}
+  disabled={NON_WORK_STATUSES.includes(status)}
+/>
               </div>
             </div>
 
             {/* 근무조 & 근무시간 미리보기 */}
-            <div className="grid grid-cols-2 gap-4 p-3 rounded-lg bg-muted/30 border">
+{!NON_WORK_STATUSES.includes(status) && (
+<div className="grid grid-cols-2 gap-4 p-3 rounded-lg bg-muted/30 border">
               <div>
                 <span className="text-xs text-muted-foreground">판별 근무조</span>
                 <p className="text-sm font-semibold">
@@ -412,10 +433,11 @@ export function AttendanceEditDialog({ open, onOpenChange, record }: AttendanceE
                 </div>
               )}
             </div>
+)}
 
-            <div className="space-y-2">
-              <Label htmlFor="edit-status">상태</Label>
-              <Select value={status} onValueChange={setStatus}>
+<div className="space-y-2">
+  <Label htmlFor="edit-status">상태</Label>
+              <Select value={status} onValueChange={handleStatusChange}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
