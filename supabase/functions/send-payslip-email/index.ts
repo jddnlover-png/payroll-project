@@ -485,9 +485,9 @@ const handler = async (req: Request): Promise<Response> => {
                       <span class="value">${formatCurrency(data.baseSalary)}</span>
                     </div>
                     <div class="row">
-                      <span class="label">연장수당</span>
-                      <span class="value positive">+${formatCurrency(data.overtime)}</span>
-                    </div>
+  <span class="label">연장근로가산수당</span>
+  <span class="value positive">+${formatCurrency(data.overtime)}</span>
+</div>
                     <div class="row">
                       <span class="label">상여금</span>
                       <span class="value positive">+${formatCurrency(data.bonus)}</span>
