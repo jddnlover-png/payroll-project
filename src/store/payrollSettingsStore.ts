@@ -120,16 +120,53 @@ export const usePayrollSettingsStore = create<PayrollSettingsStore>()(
     }),
     {
       name: "payroll-settings-storage",
-      version: 5,
-      migrate: (persistedState: any, version: number) => {
-        if (version < 5) {
-          return {
-            paymentItems: defaultPaymentItems,
-            deductionItems: defaultDeductionItems,
-          };
-        }
-        return persistedState;
-      },
+      version: 6,
+migrate: (persistedState: any, version: number) => {
+  if (version < 5) {
+    return {
+      paymentItems: defaultPaymentItems,
+      deductionItems: defaultDeductionItems,
+    };
+  }
+
+  if (version < 6) {
+    const paymentItems = (persistedState?.paymentItems || defaultPaymentItems).map((item: PayrollItem) => {
+      if (item.id === "overtime") {
+        return {
+          ...item,
+          name: "연장근로가산수당",
+          description: "연장근로 가산수당",
+        };
+      }
+
+      if (item.id === "night-shift-allowance") {
+        return {
+          ...item,
+          name: "야간근로가산수당",
+          description: "야간근로 가산수당",
+        };
+      }
+
+      if (item.id === "holiday-work-allowance") {
+        return {
+          ...item,
+          name: "휴일근로가산수당",
+          description: "휴일근로 가산수당",
+        };
+      }
+
+      return item;
+    });
+
+    return {
+      ...persistedState,
+      paymentItems,
+      deductionItems: persistedState?.deductionItems || defaultDeductionItems,
+    };
+  }
+
+  return persistedState;
+},
     },
   ),
 );
