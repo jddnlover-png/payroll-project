@@ -92,6 +92,16 @@ const companySettings = useEmployeeStore((state) => state.companySettings);
 
   const formatPlainMinutes = (minutes: number) => `${minutes}분`;
 
+const getDisplayPaymentItemName = (name: string) =>
+  name
+    .replace(/공휴일\s*근로수당/g, "공휴일근로가산수당")
+    .replace(/휴일근로수당/g, "휴일근로가산수당")
+    .replace(/연장근로수당/g, "연장근로가산수당")
+    .replace(/야간근로수당/g, "야간근로가산수당")
+    .replace(/야간\+연장수당/g, "야간+연장가산수당")
+    .replace(/연장수당/g, "연장근로가산수당")
+    .replace(/야간수당/g, "야간근로가산수당");
+
   // 적용 시급 계산
   const standardWorkHours = orgSettings.standard_work_hours || 8;
   const appliedHourlyRate = (() => {
@@ -627,7 +637,7 @@ const companySettings = useEmployeeStore((state) => state.companySettings);
                 .map((item) => (
                   <div key={item.itemId} className="flex justify-between text-sm">
                     <span>
-                      {item.name}
+  {getDisplayPaymentItemName(item.name)}
                       {item.itemId === "base-salary" && employee?.payType === "monthly" && (
                         <span className="text-[10px] text-muted-foreground ml-1">(주휴수당 포함)</span>
                       )}
@@ -776,7 +786,7 @@ const companySettings = useEmployeeStore((state) => state.companySettings);
                     .filter((i) => i.amount !== 0 || i.itemId === "base-salary")
                     .map((item) => (
                       <div key={item.itemId} className="grid grid-cols-[1fr_auto_1.2fr] gap-2 text-xs items-center">
-                        <span className="font-medium">{item.name}</span>
+                        <span className="font-medium">{getDisplayPaymentItemName(item.name)}</span>
                         <span className="text-right whitespace-nowrap">{formatCurrency(item.amount)}</span>
                         <span className="text-muted-foreground text-[10px]">{getPaymentFormula(item)}</span>
                       </div>

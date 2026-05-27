@@ -11,6 +11,16 @@ const formatMinutesToTime = (minutes: number) => {
 const formatCurrency = (amount: number) =>
   new Intl.NumberFormat("ko-KR", { style: "currency", currency: "KRW" }).format(amount);
 
+const getDisplayPaymentItemName = (name: string) =>
+  name
+    .replace(/공휴일\s*근로수당/g, "공휴일근로가산수당")
+    .replace(/휴일근로수당/g, "휴일근로가산수당")
+    .replace(/연장근로수당/g, "연장근로가산수당")
+    .replace(/야간근로수당/g, "야간근로가산수당")
+    .replace(/야간\+연장수당/g, "야간+연장가산수당")
+    .replace(/연장수당/g, "연장근로가산수당")
+    .replace(/야간수당/g, "야간근로가산수당");
+
 const fmtNum = (n: number) => new Intl.NumberFormat("ko-KR").format(n);
 
 interface PayslipHtmlParams {
@@ -271,7 +281,7 @@ export function generatePayslipHtml({
       const isBase = item.itemId === "base-salary";
       return `
         <tr>
-          <td>${DOMPurify.sanitize(item.name)}${
+          <td>${DOMPurify.sanitize(getDisplayPaymentItemName(item.name))}${
             isBase && employee?.payType === "monthly"
               ? ' <span style="font-size:8px;color:#888;">(주휴수당 포함)</span>'
               : ""
@@ -314,7 +324,7 @@ export function generatePayslipHtml({
 
       rows += "<tr>";
       rows += p
-        ? `<td>${DOMPurify.sanitize(p.name)}</td><td style="text-align:right;">${formatCurrency(p.amount)}</td><td class="formula">${DOMPurify.sanitize(getPaymentFormula(p))}</td>`
+        ? `<td>${DOMPurify.sanitize(getDisplayPaymentItemName(p.name))}</td><td style="text-align:right;">${formatCurrency(p.amount)}</td><td class="formula">${DOMPurify.sanitize(getPaymentFormula(p))}</td>`
         : "<td></td><td></td><td></td>";
       rows += d
         ? `<td>${DOMPurify.sanitize(d.name)}</td><td style="text-align:right;color:#c62828;">${formatCurrency(d.amount)}</td><td class="formula">${DOMPurify.sanitize(getDeductionFormula(d))}</td>`

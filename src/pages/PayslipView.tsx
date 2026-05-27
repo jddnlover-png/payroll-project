@@ -7,6 +7,16 @@ import { Loader2, AlertCircle, Building2 } from 'lucide-react';
 const formatCurrency = (amount: number) =>
   new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(amount);
 
+const getDisplayPaymentItemName = (name: string) =>
+  name
+    .replace(/공휴일\s*근로수당/g, "공휴일근로가산수당")
+    .replace(/휴일근로수당/g, "휴일근로가산수당")
+    .replace(/연장근로수당/g, "연장근로가산수당")
+    .replace(/야간근로수당/g, "야간근로가산수당")
+    .replace(/야간\+연장수당/g, "야간+연장가산수당")
+    .replace(/연장수당/g, "연장근로가산수당")
+    .replace(/야간수당/g, "야간근로가산수당");
+
 interface PayslipData {
   payslipType?: "monthly" | "daily";
   payroll: any;
@@ -267,7 +277,7 @@ const periodLabel = `${payroll.period_year}년 ${payroll.period_month}월`;
             {paymentItems.length > 0 ? (
               paymentItems.map((item: any, idx: number) => (
                 <div key={idx} className="flex justify-between">
-                  <span className="text-muted-foreground">{item.name}</span>
+                  <span className="text-muted-foreground">{getDisplayPaymentItemName(item.name)}</span>
                   <span className="font-medium">{formatCurrency(item.amount)}</span>
                 </div>
               ))
@@ -294,7 +304,7 @@ const periodLabel = `${payroll.period_year}년 ${payroll.period_month}월`;
             {deductionItems.length > 0 ? (
               deductionItems.map((item: any, idx: number) => (
                 <div key={idx} className="flex justify-between">
-                  <span className="text-muted-foreground">{item.name}</span>
+                  <span className="text-muted-foreground">{getDisplayPaymentItemName(item.name)}</span>
                   <span className="font-medium text-destructive">-{formatCurrency(Math.abs(item.amount))}</span>
                 </div>
               ))
