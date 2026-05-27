@@ -659,25 +659,45 @@ for (const week of weeks) {
   const monthDatesInWeek = week.dates;
   const scheduledInMonth = monthDatesInWeek.filter((d) => isScheduledWorkday(d, settings));
 
-  // 소정근로일 수가 설정 기준 미만 = 미완성 주 → 이월
+    // 소정근로일 수가 설정 기준 미만 = 월초/월말 걸친 미완성 주
+  // 먼저 전체 주차(fullWeekDates)를 실제 근태 기준으로 판정한다.
+  // 예: 2026-04 첫 주는 3/30~4/5 전체를 봐야 하므로,
+  // 3월 근태가 allAttendance에 들어와 있으면 4월 주휴수당으로 인정해야 한다.
   if (scheduledInMonth.length < workDays) {
-    // 실제 출근한 날수만 저장 (결근 제외)
+    const weekAtt = empAllAtt.filter((a) => fullWeekDates.includes(a.date));
+    const stats = calculateWeeklyStats(weekAtt, settings, fullWeekDates, publicHolidayDates);
+
+    if (
+      stats.totalMinutes >= 15 * 60 &&
+      stats.scheduledDaysTotal > 0 &&
+      stats.scheduledDaysWorked >= stats.scheduledDaysTotal
+    ) {
+      weeklyHolidayQualified = true;
+      const dailyBaseHours = calcDailyBaseHours(weekAtt, settings);
+      qualifiedWeeklyHolidayPay += floor1(dailyBaseHours * hourlyRate);
+      eligibleWeeks++;
+      continue;
+    }
+
+    // 전체 주차로도 확정 지급이 안 되면 월말 이월값으로 저장한다.
+    // 예: 4월 마지막 주처럼 다음 달 근태가 아직 없는 경우.
     const workedInWeek = scheduledInMonth.filter((d) => {
-  const att = empAllAtt.find((a) => a.date === d);
-  const isPubHoliday = isPublicHoliday(d, publicHolidayDates);
-  const isLabor = isLaborDay(d);
+      const att = empAllAtt.find((a) => a.date === d);
+      const isPubHoliday = isPublicHoliday(d, publicHolidayDates);
+      const isLabor = isLaborDay(d);
 
-  const isPaidPublicHoliday =
-    settings.apply_public_holiday &&
-    isScheduledWorkday(d, settings) &&
-    isPubHoliday &&
-    (settings.company_size === "over5" || isLabor);
+      const isPaidPublicHoliday =
+        settings.apply_public_holiday &&
+        isScheduledWorkday(d, settings) &&
+        isPubHoliday &&
+        (settings.company_size === "over5" || isLabor);
 
-  return (
-    (att && (att.status === "present" || att.status === "late")) ||
-    isPaidPublicHoliday
-  );
-});
+      return (
+        (att && (att.status === "present" || att.status === "late")) ||
+        isPaidPublicHoliday
+      );
+    });
+
     carryDays = workedInWeek.length;
     continue;
   }
