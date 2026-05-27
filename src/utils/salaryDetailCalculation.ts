@@ -411,8 +411,11 @@ export function calculateSalaryDetail(
   let totalWeeklyHolidayPay = 0;
   let weeklyHolidayQualified = false;
 
-  // STEP 0: 주휴수당 사전 판정 — 직전 최대 4주 평균 소정근로시간 >= 15h
-  const empAllAttForAvg = allAttendance.filter((a) => a.employee_id === employee.id);
+  // 직원 전체 근태: 월말~월초 주차 연결 판단용
+const empAllAtt = allAttendance.filter((a) => a.employee_id === employee.id);
+
+// STEP 0: 주휴수당 사전 판정 — 직전 최대 4주 평균 소정근로시간 >= 15h
+const empAllAttForAvg = empAllAtt;
   const prior4WeekMinutes = new Map<string, number>();
   for (const att of empAllAttForAvg) {
     if (!att.check_in || !att.check_out) continue;
@@ -540,27 +543,40 @@ export function calculateSalaryDetail(
         // 예: 3/12 평일 1시간 8분 연장
         // 기존: 평일 8시간 8분 전체를 주 누적에 포함 → 토요일 연장도 1시간 8분 더 증가
         // 수정: 평일 정규 7시간만 주 누적에 포함 → 중복 제거
-        const weekScheduledMinutes = attendance
-          .filter(
-            (a) =>
-              weekDates.includes(a.date) &&
-              a.date !== dateStr &&
-              isScheduledWorkday(a.date, settings) &&
-              a.check_in &&
-              a.check_out,
-          )
-          .reduce((sum, a) => {
-            const bd = calculateSingleAttendance(
-              a.check_in!,
-              a.check_out!,
-              a.date,
-              a.break_minutes ?? 0,
-              a.work_type === "night",
-              settings,
-            );
+        const correctionMonth = (settings as any).payroll_start_month || null;
 
-            return sum + bd.regularMinutes;
-          }, 0);
+const weekScheduledMinutes = weekDates
+  .filter((d) => d !== dateStr && isScheduledWorkday(d, settings))
+  .reduce((sum, d) => {
+    const actualRecord = empAllAtt.find((a) => a.date === d);
+
+    // 1순위: 실제 근태기록이 있으면 실제 근태를 우선 적용
+    if (actualRecord) {
+      if (!actualRecord.check_in || !actualRecord.check_out) {
+        return sum;
+      }
+
+      const bd = calculateSingleAttendance(
+        actualRecord.check_in,
+        actualRecord.check_out,
+        actualRecord.date,
+        actualRecord.break_minutes ?? 0,
+        actualRecord.work_type === "night",
+        settings,
+      );
+
+      return sum + bd.regularMinutes;
+    }
+
+    // 2순위: 실제 근태기록이 없고,
+    // 첫 달 전월 마지막주차 연결 보정월에 해당하면 정상근무로 보정
+    if (correctionMonth && d.startsWith(correctionMonth)) {
+      return sum + standardMinutes;
+    }
+
+    // 3순위: 실제 근태도 없고 보정도 없으면 미반영
+    return sum;
+  }, 0);
 
         const nonNightMin = recognized - breakdown.nightWorkMinutes;
         const remainingCapacity = Math.max(0, weeklyLimitMinutes - weekScheduledMinutes);
@@ -607,7 +623,7 @@ export function calculateSalaryDetail(
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([weekKey, dates]) => ({ weekKey, dates }));
 
-    const empAllAtt = allAttendance.filter((a) => a.employee_id === employee.id);
+  
 
     // ① 전달 이월 처리
 if (prevCarryDays > 0 && weeks.length > 0) {

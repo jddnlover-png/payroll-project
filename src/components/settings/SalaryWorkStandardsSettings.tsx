@@ -480,64 +480,52 @@ export function SalaryWorkStandardsSettings({
         {/* 탭4: 기타 제도 */}
         <TabsContent value="etc" className="space-y-4 mt-0">
           <Card className="rounded-xl">
-            <CardHeader className="pb-3">
-              <div className="flex items-center gap-2">
-                <ArrowRightLeft className="h-5 w-5 text-primary" />
-                <CardTitle className="text-base">휴일대체 제도</CardTitle>
-              </div>
-              <CardDescription>휴일을 다른 날로 대체할 수 있는 제도를 설정합니다.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label className="text-sm font-medium">휴일대체 제도 사용</Label>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {holSub
-                      ? "ON: 휴일을 다른 근무일로 대체할 수 있습니다. (휴일근로수당 미발생)"
-                      : "OFF: 휴일 근무 시 휴일근로수당이 자동 계산됩니다."}
-                  </p>
-                </div>
-                <Switch checked={holSub} onCheckedChange={setHolSub} />
-              </div>
-            </CardContent>
-          </Card>
+  <CardHeader className="pb-3">
+    <div className="flex items-center gap-2">
+      <CalendarDays className="h-5 w-5 text-primary" />
+      <CardTitle className="text-base">첫 달 전월 마지막주차 연결 보정</CardTitle>
+    </div>
+    <CardDescription>
+      프로그램 도입 첫 달에 전월 마지막 주차 근태자료가 없는 경우, 전월을 입력해 보정할 수 있습니다.
+    </CardDescription>
+  </CardHeader>
+  <CardContent className="space-y-3">
+    <div className="rounded-md bg-muted/50 p-3 text-xs text-muted-foreground space-y-1">
+      <p>예: 3월 도입 → 2026년 2월 입력</p>
+      <p>예: 4월 도입 → 2026년 3월 입력</p>
+      <p className="pt-1 font-medium text-foreground">비어 있음 = 보정 OFF / 전월 입력 = 보정 ON</p>
+    </div>
 
-          <Card className="rounded-xl">
-            <CardHeader className="pb-3">
-              <div className="flex items-center gap-2">
-                <CalendarDays className="h-5 w-5 text-primary" />
-                <CardTitle className="text-base">첫 달 주휴수당 보정</CardTitle>
-              </div>
-              <CardDescription>
-                이 프로그램 도입 전달에도 직원들이 근무했다면 아래에 그 달을 입력하세요.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="rounded-md bg-muted/50 p-3 text-xs text-muted-foreground space-y-1">
-                <p>예: 3월 도입 → 2026년 2월 입력</p>
-                <p>예: 4월 도입 → 2026년 3월 입력</p>
-              </div>
-              <Input
-                type="month"
-                value={pStartMonth}
-                onChange={(e) => setPStartMonth(e.target.value)}
-                className="w-48"
-                placeholder="YYYY-MM"
-              />
-              <div className="rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 p-3 text-xs text-amber-800 dark:text-amber-300 space-y-1">
-                <div className="flex items-start gap-1.5">
-                  <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                  <p>전달 마지막 주 근태 기록이 없으면 첫 달 월초 주휴수당이 지급되지 않을 수 있습니다.</p>
-                </div>
-              </div>
-              <div className="rounded-md bg-muted/50 p-3 text-xs text-muted-foreground space-y-1">
-                <div className="flex items-start gap-1.5">
-                  <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                  <p>입력하지 않아도 오류는 없습니다. 이번 달부터 주휴수당이 정상 계산됩니다.</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+    <Input
+      type="month"
+      value={pStartMonth}
+      onChange={(e) => setPStartMonth(e.target.value)}
+      className="w-48"
+      placeholder="YYYY-MM"
+    />
+
+    <div className="rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 p-3 text-xs text-amber-800 dark:text-amber-300 space-y-1">
+      <div className="flex items-start gap-1.5">
+        <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+        <p>
+          전월 마지막 주 근태 기록이 없으면 첫 달 월초 주휴수당과 주40시간 초과 연장근로가 정확히 계산되지 않을 수 있습니다.
+        </p>
+      </div>
+    </div>
+
+    <div className="rounded-md bg-muted/50 p-3 text-xs text-muted-foreground space-y-2">
+      <div className="flex items-start gap-1.5">
+        <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+        <div className="space-y-1">
+          <p className="font-medium text-foreground">적용 우선순위</p>
+          <p>1. 직원별 실제 근태기록이 있으면 실제 근태를 우선 적용합니다.</p>
+          <p>2. 실제 근태기록이 없는 직원만 전월 마지막주차 보정을 적용합니다.</p>
+          <p>3. 전월을 입력하지 않으면 보정 없이 당월 근태자료만으로 계산합니다.</p>
+        </div>
+      </div>
+    </div>
+  </CardContent>
+</Card>
         </TabsContent>
 
         {/* 하단 고정 저장 버튼 */}
