@@ -694,15 +694,12 @@ for (const week of weeks) {
       // (이미 쉬는 날이므로 추가 유급 불필요)
       if (!isScheduledWorkday(dateStr, settings)) continue;
 
-      // 해당 공휴일에 근무했으면 유급수당은 미지급 (근로수당으로 대체)
-      const workedOnDay = attendance.some((a) => a.date === dateStr && a.check_in && a.check_out);
-      if (workedOnDay) continue;
-
       // 5인 미만: 근로자의 날만 유급
-      if (settings.company_size === "under5" && !isLabor) continue;
+if (settings.company_size === "under5" && !isLabor) continue;
 
-      // 유급휴일수당: 8시간 × 시급
-      totalPublicHolidayPay += floor1((standardMinutes / 60) * hourlyRate);
+// 유급휴일수당: 회사 설정 1일 정규근무시간 × 시급
+// 실제 근무 여부와 관계없이 지급
+totalPublicHolidayPay += floor1((standardMinutes / 60) * hourlyRate);
     }
   }
 
