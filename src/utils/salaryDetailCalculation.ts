@@ -625,70 +625,22 @@ const weekScheduledMinutes = weekDates
 
   
 
-    // ① 전달 이월 처리
-if (prevCarryDays > 0 && weeks.length > 0) {
-  const firstWeek = weeks[0];
+        // ① + ② 월말~월초 연결 주휴수당 판정
+    // 핵심:
+    // - 소정근로일이 전월+당월에 걸친 월초 주차는 이번 달에서 전체 주차로 판정한다.
+    // - 소정근로일이 당월+다음 달에 걸친 월말 주차는 이번 달에서 지급하지 않고 다음 달로 이월한다.
+    // - 소정근로일이 모두 이번 달 안에서 끝나는 주차는 이번 달에서 지급한다.
+    const monthStart = `${yearStr}-${monthStr}-01`;
+    const monthEnd = `${yearStr}-${monthStr}-${String(lastDay).padStart(2, "0")}`;
 
-  // firstWeek.dates는 이번 달에 속한 날짜만 들어있다.
-  // 예: 2026년 4월 첫 주 → ["2026-04-01", "2026-04-02", "2026-04-03", ...]
-  // 전달 이월값이 있으면 이전 달 날짜는 결근으로 보지 않고,
-  // 이번 달 첫 주 날짜만 기준으로 개근/15시간 여부를 판정한다.
-  const currentMonthWeekDates = firstWeek.dates;
-  const weekAtt = empAllAtt.filter((a) => currentMonthWeekDates.includes(a.date));
-  const stats = calculateWeeklyStats(weekAtt, settings, currentMonthWeekDates, publicHolidayDates);
-
-  if (
-    stats.totalMinutes >= 15 * 60 &&
-    stats.scheduledDaysTotal > 0 &&
-    stats.scheduledDaysWorked >= stats.scheduledDaysTotal
-  ) {
-    const dailyBaseHours = calcDailyBaseHours(weekAtt, settings);
-    qualifiedWeeklyHolidayPay += floor1(dailyBaseHours * hourlyRate);
-    eligibleWeeks++;
-    weeklyHolidayQualified = true;
-  }
-
-  // 첫 주는 이월로 처리했으므로 아래 루프에서 제외
-  weeks.shift();
-}
-
-    // ② 이번 달 각 주 판정
-for (const week of weeks) {
-  const fullWeekDates = getWeekDates(week.dates[0]);
-  // 이 달에 속하는 소정근로일만 카운트
-  const monthDatesInWeek = week.dates;
-  const scheduledInMonth = monthDatesInWeek.filter((d) => isScheduledWorkday(d, settings));
-
-    // 소정근로일 수가 설정 기준 미만 = 월초/월말 걸친 미완성 주
-  // 먼저 전체 주차(fullWeekDates)를 실제 근태 기준으로 판정한다.
-  // 예: 2026-04 첫 주는 3/30~4/5 전체를 봐야 하므로,
-  // 3월 근태가 allAttendance에 들어와 있으면 4월 주휴수당으로 인정해야 한다.
-  if (scheduledInMonth.length < workDays) {
-    const weekAtt = empAllAtt.filter((a) => fullWeekDates.includes(a.date));
-    const stats = calculateWeeklyStats(weekAtt, settings, fullWeekDates, publicHolidayDates);
-
-    if (
-      stats.totalMinutes >= 15 * 60 &&
-      stats.scheduledDaysTotal > 0 &&
-      stats.scheduledDaysWorked >= stats.scheduledDaysTotal
-    ) {
-      weeklyHolidayQualified = true;
-      const dailyBaseHours = calcDailyBaseHours(weekAtt, settings);
-      qualifiedWeeklyHolidayPay += floor1(dailyBaseHours * hourlyRate);
-      eligibleWeeks++;
-      continue;
-    }
-
-    // 전체 주차로도 확정 지급이 안 되면 월말 이월값으로 저장한다.
-    // 예: 4월 마지막 주처럼 다음 달 근태가 아직 없는 경우.
-    const workedInWeek = scheduledInMonth.filter((d) => {
-      const att = empAllAtt.find((a) => a.date === d);
-      const isPubHoliday = isPublicHoliday(d, publicHolidayDates);
-      const isLabor = isLaborDay(d);
+    const isWorkedOrPaidScheduledDay = (dateStr: string): boolean => {
+      const att = empAllAtt.find((a) => a.date === dateStr);
+      const isPubHoliday = isPublicHoliday(dateStr, publicHolidayDates);
+      const isLabor = isLaborDay(dateStr);
 
       const isPaidPublicHoliday =
         settings.apply_public_holiday &&
-        isScheduledWorkday(d, settings) &&
+        isScheduledWorkday(dateStr, settings) &&
         isPubHoliday &&
         (settings.company_size === "over5" || isLabor);
 
@@ -696,27 +648,104 @@ for (const week of weeks) {
         (att && (att.status === "present" || att.status === "late")) ||
         isPaidPublicHoliday
       );
-    });
+    };
 
-    carryDays = workedInWeek.length;
-    continue;
-  }
+    for (const week of weeks) {
+      const fullWeekDates = getWeekDates(week.dates[0]);
 
-  // 전체 주간 근태로 판정
-  const weekAtt = empAllAtt.filter((a) => fullWeekDates.includes(a.date));
-  const stats = calculateWeeklyStats(weekAtt, settings, fullWeekDates, publicHolidayDates);
+      // 전체 주차 중 회사 설정상 소정근로일만 추출
+      // work_day_list가 월~금, 월~토, 월/수/금 등으로 바뀌어도 여기서 그대로 반영된다.
+      const scheduledFullWeek = fullWeekDates.filter((d) =>
+        isScheduledWorkday(d, settings)
+      );
 
-  if (
-    stats.totalMinutes >= 15 * 60 &&
-    stats.scheduledDaysTotal > 0 &&
-    stats.scheduledDaysWorked >= stats.scheduledDaysTotal
-  ) {
-    weeklyHolidayQualified = true;
-    const dailyBaseHours = calcDailyBaseHours(weekAtt, settings);
-    qualifiedWeeklyHolidayPay += floor1(dailyBaseHours * hourlyRate);
-    eligibleWeeks++;
-  }
-}
+      const scheduledInCurrentMonth = scheduledFullWeek.filter(
+        (d) => d >= monthStart && d <= monthEnd
+      );
+
+      // 이번 달에 해당하는 소정근로일이 하나도 없으면 계산 대상 아님
+      if (scheduledInCurrentMonth.length === 0) {
+        continue;
+      }
+
+      const hasPrevMonthScheduledDay = scheduledFullWeek.some(
+        (d) => d < monthStart
+      );
+
+      const hasNextMonthScheduledDay = scheduledFullWeek.some(
+        (d) => d > monthEnd
+      );
+
+      // 월말 주차: 소정근로일이 다음 달까지 이어지면 이번 달에서 지급하지 않는다.
+      // 예: 월~토 소정근로인데 토요일이 다음 달 1일이면, 이번 달 지급 금지 후 다음 달에서 최종 판정.
+      if (hasNextMonthScheduledDay) {
+        const workedInCurrentMonth = scheduledInCurrentMonth.filter((d) =>
+          isWorkedOrPaidScheduledDay(d)
+        );
+
+        carryDays = workedInCurrentMonth.length;
+        continue;
+      }
+
+      // 월초 주차 또는 이번 달 안에서 소정근로일이 끝나는 주차는 전체 주차 기준으로 판정한다.
+      const weekAtt = empAllAtt.filter((a) =>
+        fullWeekDates.includes(a.date)
+      );
+
+      const stats = calculateWeeklyStats(
+        weekAtt,
+        settings,
+        fullWeekDates,
+        publicHolidayDates
+      );
+
+      // 전월 근태가 allAttendance에 없고 prevCarryDays만 넘어온 경우를 위한 보정.
+      // 기본은 실제 전월 근태기록 우선, 없을 때만 prevCarryDays를 보조로 사용한다.
+      const prevScheduledDates = scheduledFullWeek.filter(
+        (d) => d < monthStart
+      );
+
+      const prevAttendanceDates = new Set(
+        empAllAtt
+          .filter((a) => prevScheduledDates.includes(a.date))
+          .map((a) => a.date)
+      );
+
+      const missingPrevScheduledDays = Math.max(
+        0,
+        prevScheduledDates.length - prevAttendanceDates.size
+      );
+
+      const carryDaysToApply =
+        hasPrevMonthScheduledDay && missingPrevScheduledDays > 0
+          ? Math.min(prevCarryDays, missingPrevScheduledDays)
+          : 0;
+
+      const adjustedScheduledDaysWorked =
+        stats.scheduledDaysWorked + carryDaysToApply;
+
+      const adjustedTotalMinutes =
+        stats.totalMinutes + carryDaysToApply * standardMinutes;
+
+      if (
+        adjustedTotalMinutes >= 15 * 60 &&
+        stats.scheduledDaysTotal > 0 &&
+        adjustedScheduledDaysWorked >= stats.scheduledDaysTotal
+      ) {
+        weeklyHolidayQualified = true;
+
+        const dailyBaseHours = calcDailyBaseHours(
+          weekAtt,
+          settings
+        );
+
+        qualifiedWeeklyHolidayPay += floor1(
+          dailyBaseHours * hourlyRate
+        );
+
+        eligibleWeeks++;
+      }
+    }
   }
 
   // 주휴수당: 사전 판정(4주 평균 >= 15h) 통과 시에만 반영
