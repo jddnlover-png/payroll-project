@@ -736,69 +736,124 @@ totalPublicHolidayPay += floor1((standardMinutes / 60) * hourlyRate);
     totalWorkMinutes += nightShiftDays * 60;
   }
 
-  // === 5단계: 기본급 + Alpha 분리 계산 ===
-  // 기본급 = 모든 실근무시간 × 시급 × 1.0
-  const allActualMinutes = totalWorkMinutes;
-  const basePay = floor1((allActualMinutes / 60) * hourlyRate);
+    // === 5단계: 정식 하이브리드 계산 ===
+  // 기본급 = 정규근로시간만 × 시급
+  // 연장근로수당 = 연장시간 × 시급 × 1.5
+  // 야간근로수당 = 야간시간 × 시급 × 0.5
+  // 휴일근로수당 = 휴일 8h 이내 × 1.5 / 8h 초과 × 2.0
 
-  // 가산수당(Alpha): (배율 - 1.0) × 시간 × 시급
-  const overtimeAlphaRate = settings.overtime_rate - 1.0; // 보통 0.5
+  const overtimeMultiplier =
+    settings.overtime_rate || settings.overtime_multiplier || 1.5;
 
-  const overtimePay = floor1((overtimeMinutes / 60) * hourlyRate * overtimeAlphaRate);
-  // 야간근로수당: 설정 배율 - 1.0 (가산분)
-  const nightAlphaRate = settings.night_shift_multiplier - 1.0;
-  const nightPay = floor1((nightMinutes / 60) * hourlyRate * nightAlphaRate);
+  const nightAlphaRate =
+    (settings.night_shift_multiplier || 1.5) - 1.0;
 
-  // 휴일 가산율 (야간교대 + 주간조 공통)
-  const holidayAlpha8h = settings.holiday_alpha_8h; // 가산분 (기본 0.5)
-  const holidayAlphaOt = settings.holiday_alpha_ot; // 가산분 (기본 1.0)
+  const holidayAlpha8h = settings.holiday_alpha_8h ?? 0.5;
+  const holidayAlphaOt = settings.holiday_alpha_ot ?? 1.0;
 
-  // 야간교대 Alpha (비휴일)
-  const t1Alpha = settings.shift_tier1_multiplier - 1.0;
-  const t2Alpha = settings.shift_tier2_multiplier - 1.0;
-  const t3Alpha = settings.shift_tier3_multiplier - 1.0;
-  const t4Alpha = (settings.shift_tier4_multiplier || 1.5) - 1.0;
+  const holidayWithin8hMultiplier = 1.0 + holidayAlpha8h; // 보통 1.5
+  const holidayOver8hMultiplier = 1.0 + holidayAlphaOt; // 보통 2.0
+
+  const t1Multiplier = settings.shift_tier1_multiplier || 1.0;
+  const t2Multiplier = settings.shift_tier2_multiplier || 1.5;
+  const t3Multiplier = settings.shift_tier3_multiplier || 2.0;
+  const t4Multiplier = settings.shift_tier4_multiplier || 1.5;
+
+  const t1Alpha = t1Multiplier - 1.0;
+  const t2Alpha = t2Multiplier - 1.0;
+
+  // 혼합 근무자 야간교대 휴게 보정분은 기존 totalWorkMinutes 보정과 동일하게
+  // 기본급 정규시간에 포함한다.
+  const mixedNightShiftBreakRestoreMinutes =
+    nightShiftDays > 0 && dayShiftDays > 0 ? nightShiftDays * 60 : 0;
+
+  // 기본급 대상 시간:
+  // 주간 정규 + 야간교대 1단계(정규+비야간) + 야간교대 2단계(정규+야간)
+  // 단, 연장 구간과 휴일 근로 구간은 기본급에서 제외한다.
+  const regularBaseMinutes =
+    regularMinutes +
+    shiftTier1Min +
+    shiftTier2Min +
+    mixedNightShiftBreakRestoreMinutes;
+
+  const basePay = floor1((regularBaseMinutes / 60) * hourlyRate);
+
+  // 주간조 일반 연장근로수당: 연장시간 × 시급 × 1.5
+  const overtimePay = floor1(
+    (overtimeMinutes / 60) * hourlyRate * overtimeMultiplier,
+  );
+
+  // 주간조 야간근로수당: 야간시간 × 시급 × 0.5
+  const nightPay = floor1(
+    (nightMinutes / 60) * hourlyRate * nightAlphaRate,
+  );
+
+  // 비휴일 야간교대
+  // 1단계 정규+비야간: 기본급에 포함, 별도 수당 없음
+  // 2단계 정규+야간: 기본급 + 야간가산 0.5
+  // 3단계 연장+야간: 기본급 제외, 2.0배 전체 지급
+  // 4단계 연장+비야간: 기본급 제외, 1.5배 전체 지급
   const shiftPay1 = floor1((shiftTier1Min / 60) * hourlyRate * t1Alpha);
   const shiftPay2 = floor1((shiftTier2Min / 60) * hourlyRate * t2Alpha);
-  const shiftPay3 = floor1((shiftTier3Min / 60) * hourlyRate * t3Alpha);
-  const shiftPay4 = floor1((shiftTier4Min / 60) * hourlyRate * t4Alpha);
+  const shiftPay3 = floor1((shiftTier3Min / 60) * hourlyRate * t3Multiplier);
+  const shiftPay4 = floor1((shiftTier4Min / 60) * hourlyRate * t4Multiplier);
 
-  // 휴일 야간교대 가산: 각 단계 배율에 휴일 가산을 추가
-  // 1단계: base(1.0) + holiday(0.5) → 가산분 = 0.5
-  // 2단계: base(1.0) + night(0.5) + holiday(0.5) → 가산분 = tier2Alpha + 0.5
-  //        하지만 tier2Alpha는 이미 야간(0.5) 포함 → 추가 holiday 0.5만
-  // 3단계: base(1.0) + night(0.5) + overtime(0.5) + holiday(1.0) → 가산분 = tier3Alpha + 1.0
-  // 4단계: base(1.0) + overtime(0.5) + holiday(1.0) → 가산분 = tier4Alpha + 1.0
-  // 하지만 base(1.0)은 기본급에 이미 포함 → 가산분만 계산
-  // 비휴일 가산분: t1Alpha, t2Alpha, t3Alpha, t4Alpha
-  // 휴일 추가 가산: 1단계 +0.5, 2단계 +0.5, 3단계 +1.0, 4단계 +1.0
-  // 휴일 야간교대: 연장가산은 휴일가산에 흡수 (중복 금지, 근로기준법 제56조 제2항)
-  // T1: holiday_8h(0.5) = 0.5
-  // T2: night(0.5) + holiday_8h(0.5) = 1.0
-  // T3: night(0.5) + holiday_ot(1.0) = 1.5 (연장0.5은 휴일1.0에 흡수)
-  // T4: holiday_ot(1.0) = 1.0 (연장0.5은 휴일1.0에 흡수)
-  const nightAlpha = t2Alpha; // 야간 가산분 = 0.5
-  const holShiftT1Pay = floor1((holShiftT1Min / 60) * hourlyRate * (t1Alpha + holidayAlpha8h));
-  const holShiftT2Pay = floor1((holShiftT2Min / 60) * hourlyRate * (t2Alpha + holidayAlpha8h));
-  const holShiftT3Pay = floor1((holShiftT3Min / 60) * hourlyRate * (nightAlpha + holidayAlphaOt));
-  const holShiftT4Pay = floor1((holShiftT4Min / 60) * hourlyRate * holidayAlphaOt);
+  // 휴일 야간교대
+  // 휴일 8h 이내 = 1.5
+  // 휴일 8h 초과 = 2.0
+  // 휴일 + 야간 = 위 휴일 배율에 야간 0.5 추가
+  // 휴일 + 연장 중복은 별도 연장 1.5로 계산하지 않고 휴일초과 2.0으로 처리
+  const nightAlpha = t2Alpha; // 보통 0.5
 
-  // 주간조 주휴일 근로: 일별 8h 기준 분리 (DB 설정값 사용, 하드코딩 금지)
-  const holidayWork8hPay = floor1((holidayWork8hMin / 60) * hourlyRate * holidayAlpha8h);
-  const holidayWorkOver8hPay = floor1((holidayWorkOver8hMin / 60) * hourlyRate * holidayAlphaOt);
-  // 주간조 휴일 야간: 야간가산(0.5) + 휴일초과가산(1.0) = 1.5 중첩 적용
-  const holidayNightAlpha = nightAlphaRate + holidayAlphaOt; // 0.5 + 1.0 = 1.5
-  const holidayNightPay = floor1((holidayNightMin / 60) * hourlyRate * holidayNightAlpha);
-  const holidayWorkPay = holidayWork8hPay + holidayWorkOver8hPay + holidayNightPay;
+  const holShiftT1Pay = floor1(
+    (holShiftT1Min / 60) * hourlyRate * holidayWithin8hMultiplier,
+  );
+
+  const holShiftT2Pay = floor1(
+    (holShiftT2Min / 60) * hourlyRate * (holidayWithin8hMultiplier + nightAlpha),
+  );
+
+  const holShiftT3Pay = floor1(
+    (holShiftT3Min / 60) * hourlyRate * (holidayOver8hMultiplier + nightAlpha),
+  );
+
+  const holShiftT4Pay = floor1(
+    (holShiftT4Min / 60) * hourlyRate * holidayOver8hMultiplier,
+  );
+
+  // 주간조 주휴일 근로
+  const holidayWork8hPay = floor1(
+    (holidayWork8hMin / 60) * hourlyRate * holidayWithin8hMultiplier,
+  );
+
+  const holidayWorkOver8hPay = floor1(
+    (holidayWorkOver8hMin / 60) * hourlyRate * holidayOver8hMultiplier,
+  );
+
+  // 주간조 휴일 야간: 휴일초과 2.0 + 야간 0.5 = 2.5
+  const holidayNightMultiplier = holidayOver8hMultiplier + nightAlphaRate;
+
+  const holidayNightPay = floor1(
+    (holidayNightMin / 60) * hourlyRate * holidayNightMultiplier,
+  );
+
+  const holidayWorkPay =
+    holidayWork8hPay + holidayWorkOver8hPay + holidayNightPay;
+
   const holidayWorkOvertimePay = 0; // 호환 유지
 
-  // 공휴일 근로 Alpha
+  // 공휴일 실제 근로
+  // 공휴일 유급수당(public_holiday_pay)은 별도 지급되고,
+  // 실제 근로분은 휴일근로수당 1.5 / 2.0으로 지급한다.
   let publicHolidayWorkPay = 0;
+
   if (settings.company_size === "over5") {
     const pubWithin8h = Math.min(publicHolidayWorkMin, standardMinutes);
     const pubOver8h = Math.max(0, publicHolidayWorkMin - standardMinutes);
+
     publicHolidayWorkPay =
-      floor1((pubWithin8h / 60) * hourlyRate * holidayAlpha8h) + floor1((pubOver8h / 60) * hourlyRate * holidayAlphaOt);
+      floor1((pubWithin8h / 60) * hourlyRate * holidayWithin8hMultiplier) +
+      floor1((pubOver8h / 60) * hourlyRate * holidayOver8hMultiplier);
   } else {
     publicHolidayWorkPay = 0;
   }
