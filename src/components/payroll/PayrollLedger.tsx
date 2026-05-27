@@ -22,6 +22,16 @@ const formatMinutesToHM = (minutes: number): string => {
   return `${h}시간 ${m}분`;
 };
 
+const getDisplayPaymentItemName = (name: string) =>
+  name
+    .replace(/공휴일\s*근로수당/g, "공휴일근로가산수당")
+    .replace(/휴일근로수당/g, "휴일근로가산수당")
+    .replace(/연장근로수당/g, "연장근로가산수당")
+    .replace(/야간근로수당/g, "야간근로가산수당")
+    .replace(/야간\+연장수당/g, "야간+연장가산수당")
+    .replace(/연장수당/g, "연장근로가산수당")
+    .replace(/야간수당/g, "야간근로가산수당");
+
 interface DailyPayrollSummary {
   employeeId: string;
   employeeName: string;
@@ -245,12 +255,12 @@ const { currentOrganization } = useOrganization();
 
     // 지급 항목 행 생성 (2열 그리드)
     const payItems = activePaymentItems
-      .map((item) => ({
-        id: item.id,
-        name: item.name,
-        amount: getPaymentItemValue(record, item.id),
-      }))
-      .filter((item) => item.amount !== 0);
+  .map((item) => ({
+    id: item.id,
+    name: getDisplayPaymentItemName(item.name),
+    amount: getPaymentItemValue(record, item.id),
+  }))
+  .filter((item) => item.amount !== 0);
 
     const dedItems = activeDeductionItems
       .map((item) => ({
@@ -748,13 +758,13 @@ const { currentOrganization } = useOrganization();
                   휴일근로
                 </TableHead>
                 {activePaymentItems.map((item) => (
-                  <TableHead
-                    key={item.id}
-                    className="text-right px-1 py-0.5 text-[10px] bg-green-50 dark:bg-green-950/30 whitespace-nowrap"
-                  >
-                    {item.name}
-                  </TableHead>
-                ))}
+  <TableHead
+    key={item.id}
+    className="text-right px-1 py-0.5 text-[10px] bg-green-50 dark:bg-green-950/30 whitespace-nowrap"
+  >
+    {getDisplayPaymentItemName(item.name)}
+  </TableHead>
+))}
                 <TableHead className="text-right px-1 py-0.5 text-[10px] bg-green-100 dark:bg-green-900/40 whitespace-nowrap font-bold">
                   지급합계
                 </TableHead>
