@@ -120,7 +120,7 @@ export const usePayrollSettingsStore = create<PayrollSettingsStore>()(
     }),
     {
       name: "payroll-settings-storage",
-      version: 6,
+      version: 7,
 migrate: (persistedState: any, version: number) => {
   if (version < 5) {
     return {
@@ -129,29 +129,29 @@ migrate: (persistedState: any, version: number) => {
     };
   }
 
-  if (version < 6) {
+  if (version < 7) {
     const paymentItems = (persistedState?.paymentItems || defaultPaymentItems).map((item: PayrollItem) => {
       if (item.id === "overtime") {
         return {
           ...item,
-          name: "연장근로가산수당",
-          description: "연장근로 가산수당",
+          name: "연장근로수당",
+          description: "연장근로수당",
         };
       }
 
       if (item.id === "night-shift-allowance") {
         return {
           ...item,
-          name: "야간근로가산수당",
-          description: "야간근로 가산수당",
+          name: "야간근로수당",
+          description: "야간근로수당",
         };
       }
 
       if (item.id === "holiday-work-allowance") {
         return {
           ...item,
-          name: "휴일근로가산수당",
-          description: "휴일근로 가산수당",
+          name: "휴일근로수당",
+          description: "휴일근로수당",
         };
       }
 
