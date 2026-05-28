@@ -203,14 +203,17 @@ const getDisplayPaymentItemName = (name: string) =>
       if (appliedHourlyRate > 0 && overtimeHours > 0)
         return `${fmtNum(appliedHourlyRate)}원 × ${overtimeRate} × ${overtimeHours.toFixed(1)}시간`;
       return "해당 없음";
-    } else if (
+        } else if (
       item.itemId === "night-shift-allowance" ||
       (item.name.includes("야간") && !item.itemId?.startsWith("night-shift-tier"))
     ) {
       const nightAlpha = (orgSettings.night_shift_multiplier || 2.0) - 1.0; // 가산분 (예: 0.5)
-      const nightWorkHours = (record.nightWorkMinutes || 0) / 60; // 주간조 야간시간만
-      if (appliedHourlyRate > 0 && nightWorkHours > 0)
+
+      if (appliedHourlyRate > 0 && item.amount > 0 && nightAlpha > 0) {
+        const nightWorkHours = item.amount / (appliedHourlyRate * nightAlpha);
         return `${fmtNum(appliedHourlyRate)}원 × ${nightAlpha.toFixed(1)}가산 × ${nightWorkHours.toFixed(1)}시간`;
+      }
+
       return "해당 없음";
     } else if (item.itemId?.startsWith("night-shift-tier") || item.itemId?.startsWith("hol-shift-tier")) {
       const tierMinutes = (item as any).shiftTierMinutes || 0;
@@ -219,32 +222,28 @@ const getDisplayPaymentItemName = (name: string) =>
       if (appliedHourlyRate > 0 && tierMinutes > 0)
         return `${fmtNum(appliedHourlyRate)}원 × ${alphaRate.toFixed(1)} × ${(tierMinutes / 60).toFixed(1)}시간`;
       return "해당 없음";
-    } else if (item.itemId === "holiday-work-allowance" || item.name.includes("휴일근로")) {
+        } else if (item.itemId === "holiday-work-allowance" || item.name.includes("휴일근로")) {
       if (appliedHourlyRate > 0 && item.amount > 0) {
         const hol8h = (item as any).holidayWork8hMinutes || 0;
         const holOver8h = (item as any).holidayWorkOver8hMinutes || 0;
-        const holNight = (item as any).holidayNightMinutes || 0;
         const holidayAlpha8h = orgSettings.holiday_alpha_8h || 0.5;
         const lines: string[] = [];
+
         if (hol8h > 0) {
           const h = (hol8h / 60).toFixed(1);
           lines.push(`8h이내: ${fmtNum(appliedHourlyRate)}원 × ${1.0 + holidayAlpha8h}배 × ${h}시간`);
         }
-        // 8h초과 중 비야간 부분 (holOver8h는 이미 nonNightMin에서 산출되므로 night 차감 불필요)
+
         if (holOver8h > 0) {
           const h = (holOver8h / 60).toFixed(1);
           lines.push(
             `8h초과: ${fmtNum(appliedHourlyRate)}원 × ${1.0 + (orgSettings.holiday_alpha_ot || 1.0)}배 × ${h}시간`,
           );
         }
-        if (holNight > 0) {
-          const nightRate = orgSettings.night_shift_multiplier || 2.0;
-          const compositeRate = 1.0 + (orgSettings.holiday_alpha_ot || 1.0) + 0.5;
-          const h = (holNight / 60).toFixed(1);
-          lines.push(`야간포함: ${fmtNum(appliedHourlyRate)}원 × ${compositeRate}배 × ${h}시간`);
-        }
+
         return lines.length > 0 ? lines.join(" / ") : "해당 없음";
       }
+
       return "해당 없음";
     } else if (item.itemId === "weekly-holiday-allowance" || item.name.includes("주휴")) {
       if (appliedHourlyRate > 0 && item.amount > 0) {

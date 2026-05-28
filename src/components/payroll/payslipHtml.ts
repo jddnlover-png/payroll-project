@@ -164,15 +164,17 @@ export function generatePayslipHtml({
       return "해당 없음";
     }
 
-    if (
+        if (
       item.itemId === "night-shift-allowance" ||
       (item.name.includes("야간") && !item.itemId?.startsWith("night-shift-tier"))
     ) {
       const nightAlpha = (orgSettings?.night_shift_multiplier || 2.0) - 1.0;
-      const nightWorkHours = (record.nightWorkMinutes || 0) / 60;
-      if (appliedHourlyRate > 0 && nightWorkHours > 0) {
+
+      if (appliedHourlyRate > 0 && item.amount > 0 && nightAlpha > 0) {
+        const nightWorkHours = item.amount / (appliedHourlyRate * nightAlpha);
         return `${fmtNum(appliedHourlyRate)}원 × ${nightAlpha.toFixed(1)}가산 × ${nightWorkHours.toFixed(1)}시간`;
       }
+
       return "해당 없음";
     }
 
@@ -186,11 +188,10 @@ export function generatePayslipHtml({
       return "해당 없음";
     }
 
-    if (item.itemId === "holiday-work-allowance" || item.name.includes("휴일근로")) {
+        if (item.itemId === "holiday-work-allowance" || item.name.includes("휴일근로")) {
       if (appliedHourlyRate > 0 && item.amount > 0) {
         const hol8h = (item as any).holidayWork8hMinutes || 0;
         const holOver8h = (item as any).holidayWorkOver8hMinutes || 0;
-        const holNight = (item as any).holidayNightMinutes || 0;
         const holidayAlpha8h = orgSettings?.holiday_alpha_8h || 0.5;
         const lines: string[] = [];
 
@@ -203,13 +204,6 @@ export function generatePayslipHtml({
         if (holOver8h > 0) {
           lines.push(
             `8h초과: ${fmtNum(appliedHourlyRate)}원 × ${1.0 + (orgSettings?.holiday_alpha_ot || 1.0)}배 × ${(holOver8h / 60).toFixed(1)}시간`,
-          );
-        }
-
-        if (holNight > 0) {
-          const compositeRate = 1.0 + (orgSettings?.holiday_alpha_ot || 1.0) + 0.5;
-          lines.push(
-            `야간포함: ${fmtNum(appliedHourlyRate)}원 × ${compositeRate}배 × ${(holNight / 60).toFixed(1)}시간`,
           );
         }
 
