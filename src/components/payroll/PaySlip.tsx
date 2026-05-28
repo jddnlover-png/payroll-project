@@ -259,12 +259,14 @@ const getDisplayPaymentItemName = (name: string) =>
       }
       return "해당 없음";
     } else if (item.itemId === "public-holiday-work-pay" || item.name.includes("공휴일 근로")) {
-      if (appliedHourlyRate > 0 && item.amount > 0) {
-        const hours = item.amount / (appliedHourlyRate * 0.5);
-        return `${fmtNum(appliedHourlyRate)}원 × 0.5 × ${hours.toFixed(1)}시간`;
-      }
-      return "해당 없음";
-    } else {
+  if (appliedHourlyRate > 0 && item.amount > 0) {
+    const publicHolidayWorkMultiplier = 1.5;
+    const hours = item.amount / (appliedHourlyRate * publicHolidayWorkMultiplier);
+
+    return `${fmtNum(appliedHourlyRate)}원 × ${publicHolidayWorkMultiplier.toFixed(1)} × ${hours.toFixed(1)}시간`;
+  }
+  return "해당 없음";
+} else {
       const si = paymentItems.find((pi) => pi.id === item.itemId);
       if (si?.calculationType === "percentage" && si.defaultValue) return `기본급 × ${si.defaultValue}%`;
       return "월정액 지급";
