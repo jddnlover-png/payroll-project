@@ -973,7 +973,6 @@ const row = sheet.addRow([
             ["  연장근무시간", fmtMinutes((emp as any).displayOvertimeMinutes ?? totalOvertime)],
             ["  야간근무시간", fmtMinutes((emp as any).displayNightWorkMinutes ?? totalNight)],
 ["  공휴일 유급인정시간", fmtMinutes(totalPaidPublicHolidayMinutes)],
-["  주휴수당 인정시간", fmtMinutes((emp as any).weeklyHolidayMinutes ?? 0)],
 ["  휴일근로(8h이내)", fmtMinutes(displayHoliday8h)],
 ["  휴일근로(8h초과)", fmtMinutes(displayHolidayOver8h)],
 ["  야간교대근무시간", fmtMinutes((emp as any).displayNightShiftWorkMinutes ?? totalNightShift)],
