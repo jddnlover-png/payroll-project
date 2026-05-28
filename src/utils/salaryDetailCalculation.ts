@@ -827,48 +827,51 @@ totalPublicHolidayPay += floor1((standardMinutes / 60) * hourlyRate);
 
   const basePay = floor1((regularBaseMinutes / 60) * hourlyRate);
 
-  // 주간조 일반 연장근로수당: 연장시간 × 시급 × 1.5
-  const overtimePay = floor1(
+    // 주간조 일반 연장근로수당: 연장시간 × 시급 × 1.5
+  // 예: 09:00~24:00 근무 시, 정규시간 초과분은 여기로 들어간다.
+  let overtimePay = floor1(
     (overtimeMinutes / 60) * hourlyRate * overtimeMultiplier,
   );
 
   // 주간조 야간근로수당: 야간시간 × 시급 × 0.5
-  const nightPay = floor1(
+  // 예: 09:00~24:00 근무 시, 22:00~24:00은 여기로 들어간다.
+  let nightPay = floor1(
     (nightMinutes / 60) * hourlyRate * nightAlphaRate,
   );
 
-  // 비휴일 야간교대
-  // 1단계 정규+비야간: 기본급에 포함, 별도 수당 없음
-  // 2단계 정규+야간: 기본급 + 야간가산 0.5
-  // 3단계 연장+야간: 기본급 제외, 2.0배 전체 지급
-  // 4단계 연장+비야간: 기본급 제외, 1.5배 전체 지급
-  const shiftPay1 = floor1((shiftTier1Min / 60) * hourlyRate * t1Alpha);
-  const shiftPay2 = floor1((shiftTier2Min / 60) * hourlyRate * t2Alpha);
-  const shiftPay3 = floor1((shiftTier3Min / 60) * hourlyRate * t3Multiplier);
-  const shiftPay4 = floor1((shiftTier4Min / 60) * hourlyRate * t4Multiplier);
-
-  // 휴일 야간교대
-  // 휴일 8h 이내 = 1.5
-  // 휴일 8h 초과 = 2.0
-  // 휴일 + 야간 = 위 휴일 배율에 야간 0.5 추가
-  // 휴일 + 연장 중복은 별도 연장 1.5로 계산하지 않고 휴일초과 2.0으로 처리
+  // 비휴일 야간교대 분리형 처리
+  // 1단계 정규+비야간: 기본급 포함
+  // 2단계 정규+야간: 기본급 + 야간 0.5
+  // 3단계 연장+야간: 연장 1.5 + 야간 0.5
+  // 4단계 연장+비야간: 연장 1.5
   const nightAlpha = t2Alpha; // 보통 0.5
 
-  const holShiftT1Pay = floor1(
-    (holShiftT1Min / 60) * hourlyRate * holidayWithin8hMultiplier,
+  const shiftNightMinutes = shiftTier2Min + shiftTier3Min;
+  const shiftOvertimeMinutes = shiftTier3Min + shiftTier4Min;
+
+  nightPay += floor1(
+    (shiftNightMinutes / 60) * hourlyRate * nightAlpha,
   );
 
-  const holShiftT2Pay = floor1(
-    (holShiftT2Min / 60) * hourlyRate * (holidayWithin8hMultiplier + nightAlpha),
+  overtimePay += floor1(
+    (shiftOvertimeMinutes / 60) * hourlyRate * overtimeMultiplier,
   );
 
-  const holShiftT3Pay = floor1(
-    (holShiftT3Min / 60) * hourlyRate * (holidayOver8hMultiplier + nightAlpha),
-  );
+  // 야간교대 전용 수당 필드는 분리형 전환 후 중복 방지를 위해 0 처리한다.
+  // 시간 정보는 meta.shiftTier*Minutes에 그대로 남긴다.
+  const shiftPay1 = 0;
+  const shiftPay2 = 0;
+  const shiftPay3 = 0;
+  const shiftPay4 = 0;
 
-  const holShiftT4Pay = floor1(
-    (holShiftT4Min / 60) * hourlyRate * holidayOver8hMultiplier,
-  );
+  // 휴일 야간교대 분리형 처리
+  // 휴일 8h 이내 = 휴일근로수당 1.5
+  // 휴일 8h 초과 = 휴일근로수당 2.0
+  // 휴일 + 야간 = 야간근로수당 0.5 추가
+  // 휴일 + 연장은 별도 연장 1.5로 계산하지 않고 휴일초과 2.0으로 처리한다.
+  const holidayShiftWithin8hMinutes = holShiftT1Min + holShiftT2Min;
+  const holidayShiftOver8hMinutes = holShiftT3Min + holShiftT4Min;
+  const holidayShiftNightMinutes = holShiftT2Min + holShiftT3Min;
 
   // 주간조 주휴일 근로
   const holidayWork8hPay = floor1(
@@ -879,15 +882,43 @@ totalPublicHolidayPay += floor1((standardMinutes / 60) * hourlyRate);
     (holidayWorkOver8hMin / 60) * hourlyRate * holidayOver8hMultiplier,
   );
 
-  // 주간조 휴일 야간: 휴일초과 2.0 + 야간 0.5 = 2.5
-  const holidayNightMultiplier = holidayOver8hMultiplier + nightAlphaRate;
+  // 주간조 휴일 야간은 휴일초과 2.0 부분과 야간 0.5 부분을 분리한다.
+  // holidayNightMin은 holidayWork8hMin/holidayWorkOver8hMin에서 제외되어 있으므로
+  // 휴일근로수당에는 2.0을, 야간근로수당에는 0.5를 각각 더한다.
+  const holidayNightBasePay = floor1(
+    (holidayNightMin / 60) * hourlyRate * holidayOver8hMultiplier,
+  );
 
-  const holidayNightPay = floor1(
-    (holidayNightMin / 60) * hourlyRate * holidayNightMultiplier,
+  nightPay += floor1(
+    (holidayNightMin / 60) * hourlyRate * nightAlphaRate,
+  );
+
+  // 휴일 야간교대의 야간 0.5 추가분
+  nightPay += floor1(
+    (holidayShiftNightMinutes / 60) * hourlyRate * nightAlpha,
+  );
+
+  const holidayShiftWithin8hPay = floor1(
+    (holidayShiftWithin8hMinutes / 60) * hourlyRate * holidayWithin8hMultiplier,
+  );
+
+  const holidayShiftOver8hPay = floor1(
+    (holidayShiftOver8hMinutes / 60) * hourlyRate * holidayOver8hMultiplier,
   );
 
   const holidayWorkPay =
-    holidayWork8hPay + holidayWorkOver8hPay + holidayNightPay;
+    holidayWork8hPay +
+    holidayWorkOver8hPay +
+    holidayNightBasePay +
+    holidayShiftWithin8hPay +
+    holidayShiftOver8hPay;
+
+  // 휴일 야간교대 전용 수당 필드는 분리형 전환 후 중복 방지를 위해 0 처리한다.
+  // 시간 정보는 meta.holShiftTier*Minutes에 그대로 남긴다.
+  const holShiftT1Pay = 0;
+  const holShiftT2Pay = 0;
+  const holShiftT3Pay = 0;
+  const holShiftT4Pay = 0;
 
   const holidayWorkOvertimePay = 0; // 호환 유지
 
@@ -933,8 +964,13 @@ totalPublicHolidayPay += floor1((standardMinutes / 60) * hourlyRate);
     meta: {
       totalWorkMinutes,
       regularMinutes,
-      overtimeMinutes,
-      nightMinutes,
+            overtimeMinutes: overtimeMinutes + shiftTier3Min + shiftTier4Min,
+      nightMinutes:
+        nightMinutes +
+        shiftTier2Min +
+        shiftTier3Min +
+        holShiftT2Min +
+        holShiftT3Min,
       shiftTier1Minutes: shiftTier1Min,
       shiftTier2Minutes: shiftTier2Min,
       shiftTier3Minutes: shiftTier3Min,
@@ -943,10 +979,22 @@ totalPublicHolidayPay += floor1((standardMinutes / 60) * hourlyRate);
       holShiftTier2Minutes: holShiftT2Min,
       holShiftTier3Minutes: holShiftT3Min,
       holShiftTier4Minutes: holShiftT4Min,
-      holidayWorkMinutes: holidayWorkMin,
+            holidayWorkMinutes:
+        holidayWorkMin +
+        holShiftT1Min +
+        holShiftT2Min +
+        holShiftT3Min +
+        holShiftT4Min,
       holidayWorkOvertimeMinutes: 0,
-      holidayWork8hMinutes: holidayWork8hMin,
-      holidayWorkOver8hMinutes: holidayWorkOver8hMin,
+      holidayWork8hMinutes:
+        holidayWork8hMin +
+        holShiftT1Min +
+        holShiftT2Min,
+      holidayWorkOver8hMinutes:
+        holidayWorkOver8hMin +
+        holidayNightMin +
+        holShiftT3Min +
+        holShiftT4Min,
       holidayNightMinutes: holidayNightMin,
       publicHolidayWorkMinutes: publicHolidayWorkMin,
       weeklyHolidayMinutes: totalWeeklyHolidayPay > 0 ? Math.round((totalWeeklyHolidayPay / hourlyRate) * 60) : 0,
