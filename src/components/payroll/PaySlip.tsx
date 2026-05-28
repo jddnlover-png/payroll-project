@@ -189,10 +189,16 @@ const getDisplayPaymentItemName = (name: string) =>
         return employee.dailyRate
           ? `${fmtNum(employee.dailyRate)}원 × ${record.presentDays + record.lateDays}일`
           : "해당 없음";
-      if (employee.payType === "hourly")
-        return employee.hourlyRate
-          ? `${fmtNum(employee.hourlyRate)}원 × ${((record.totalWorkMinutes || 0) / 60).toFixed(1)}시간`
-          : "해당 없음";
+      if (employee.payType === "hourly") {
+  if (!employee.hourlyRate) return "해당 없음";
+
+  const baseHours =
+    employee.hourlyRate > 0
+      ? record.baseSalary / employee.hourlyRate
+      : 0;
+
+  return `${fmtNum(employee.hourlyRate)}원 × ${baseHours.toFixed(1)}시간`;
+}
     } else if (item.itemId === "overtime") {
       if (appliedHourlyRate > 0 && overtimeHours > 0)
         return `${fmtNum(appliedHourlyRate)}원 × ${overtimeRate} × ${overtimeHours.toFixed(1)}시간`;

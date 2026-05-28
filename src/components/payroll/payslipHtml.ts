@@ -146,10 +146,15 @@ export function generatePayslipHtml({
       }
 
       if (employee.payType === "hourly") {
-        return employee.hourlyRate
-          ? `${fmtNum(employee.hourlyRate)}원 × ${((record.totalWorkMinutes || 0) / 60).toFixed(1)}시간`
-          : "해당 없음";
-      }
+  if (!employee.hourlyRate) return "해당 없음";
+
+  const baseHours =
+    employee.hourlyRate > 0
+      ? record.baseSalary / employee.hourlyRate
+      : 0;
+
+  return `${fmtNum(employee.hourlyRate)}원 × ${baseHours.toFixed(1)}시간`;
+}
     }
 
     if (item.itemId === "overtime") {

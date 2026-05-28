@@ -811,19 +811,17 @@ totalPublicHolidayPay += floor1((standardMinutes / 60) * hourlyRate);
   const t1Alpha = t1Multiplier - 1.0;
   const t2Alpha = t2Multiplier - 1.0;
 
-  // 혼합 근무자 야간교대 휴게 보정분은 기존 totalWorkMinutes 보정과 동일하게
-  // 기본급 정규시간에 포함한다.
-  const mixedNightShiftBreakRestoreMinutes =
-    nightShiftDays > 0 && dayShiftDays > 0 ? nightShiftDays * 60 : 0;
-
-  // 기본급 대상 시간:
+    // 기본급 대상 시간:
   // 주간 정규 + 야간교대 1단계(정규+비야간) + 야간교대 2단계(정규+야간)
-  // 단, 연장 구간과 휴일 근로 구간은 기본급에서 제외한다.
+  // 단, 연장 구간, 휴일 근로 구간, 별도 유급수당 구간은 기본급에서 제외한다.
+  //
+  // 주의:
+  // mixedNightShiftBreakRestoreMinutes는 과거 혼합근무 보정용 값이었지만,
+  // 하이브리드 방식에서는 기본급에 더하면 야간교대 근무자의 기본급이 1일 1시간씩 과다 계산된다.
   const regularBaseMinutes =
     regularMinutes +
     shiftTier1Min +
-    shiftTier2Min +
-    mixedNightShiftBreakRestoreMinutes;
+    shiftTier2Min;
 
   const basePay = floor1((regularBaseMinutes / 60) * hourlyRate);
 
