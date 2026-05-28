@@ -609,7 +609,6 @@ publicHolidayMap,
         "연장근무시간",
         "야간근무시간",
 "공휴일 유급인정시간",
-"공휴일 실제근무시간",
 "휴일근로(8h이내)",
 "휴일근로(8h초과)",
 "야간교대근무시간",
@@ -642,7 +641,6 @@ publicHolidayMap,
         { width: 16 },
         { width: 16 },
         { width: 16 },
-{ width: 20 },
 { width: 20 },
 { width: 18 },
 { width: 18 },
@@ -680,7 +678,6 @@ publicHolidayMap,
           fmtMin(emp.displayOvertimeMinutes ?? emp.totalOvertimeWorkMinutes ?? 0),
           fmtMin(emp.displayNightWorkMinutes ?? emp.totalNightWorkMinutes ?? 0),
 fmtMin(emp.totalPaidPublicHolidayMinutes || 0),
-fmtMin(emp.totalPublicHolidayActualWorkMinutes || 0),
 fmtMin(emp.displayHoliday8hMinutes || 0),
 fmtMin(emp.displayHolidayOver8hMinutes || 0),
 fmtMin(emp.displayNightShiftWorkMinutes ?? emp.totalNightShiftWorkMinutes ?? 0),
@@ -976,7 +973,6 @@ const row = sheet.addRow([
             ["  연장근무시간", fmtMinutes((emp as any).displayOvertimeMinutes ?? totalOvertime)],
             ["  야간근무시간", fmtMinutes((emp as any).displayNightWorkMinutes ?? totalNight)],
 ["  공휴일 유급인정시간", fmtMinutes(totalPaidPublicHolidayMinutes)],
-["  공휴일 실제근무시간", fmtMinutes(totalPublicHolidayActualWorkMinutes)],
 ["  주휴수당 인정시간", fmtMinutes((emp as any).weeklyHolidayMinutes ?? 0)],
 ["  휴일근로(8h이내)", fmtMinutes(displayHoliday8h)],
 ["  휴일근로(8h초과)", fmtMinutes(displayHolidayOver8h)],
@@ -1477,13 +1473,6 @@ const row = sheet.addRow([
   </span>
 </div>
 
-<div className="flex justify-between">
-  <span className="text-muted-foreground text-xs">공휴일 실제근무시간</span>
-  <span className="text-xs">
-    {Math.floor((emp.totalPublicHolidayActualWorkMinutes || 0) / 60)}시간{" "}
-    {(emp.totalPublicHolidayActualWorkMinutes || 0) % 60}분
-  </span>
-</div>
 
 {(emp.displayHoliday8hMinutes > 0 ||
   emp.displayHolidayOver8hMinutes > 0) && (
