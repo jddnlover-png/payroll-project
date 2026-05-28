@@ -258,8 +258,21 @@ export function generatePayslipHtml({
     return rec?.exemptAmount ?? 0;
   })();
 
-  const taxBase = Math.max(0, totalPayments - thisMonthExemptForCalc - staticExemptDisplay);
+    const taxBase = Math.max(0, totalPayments - thisMonthExemptForCalc - staticExemptDisplay);
   const insuranceBase = totalPayments;
+
+  const publicHolidayPaidMinutesForDisplay = (() => {
+    const publicHolidayItem = displayPaymentItems.find(
+      (item) => item.itemId === "public-holiday-pay" || item.name.includes("공휴일 유급"),
+    );
+
+    if (!publicHolidayItem || appliedHourlyRate <= 0) return 0;
+
+    return Math.round((publicHolidayItem.amount / appliedHourlyRate) * 60);
+  })();
+
+  const displayTotalWorkMinutes =
+    (record.totalWorkMinutes || 0) + publicHolidayPaidMinutesForDisplay;
 
   const getDeductionFormula = (item: { itemId: string; name: string; amount: number }): string => {
     const si = deductionItems.find((di) => di.id === item.itemId);
@@ -498,7 +511,7 @@ export function generatePayslipHtml({
                 </td>
                 <td style="border-right:1px solid #e2e8f0;white-space:nowrap;">총근로시간</td>
 <td style="white-space:nowrap;">
-  ${formatMinutesToTime(record.totalWorkMinutes || 0)}
+  ${formatMinutesToTime(displayTotalWorkMinutes)}
 </td>
               </tr>
                             <tr>

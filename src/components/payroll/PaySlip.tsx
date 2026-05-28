@@ -295,6 +295,19 @@ const getDisplayPaymentItemName = (name: string) =>
 
   // 4대보험 기준: 비과세 제외 안 함 (법적 기준)
   const insuranceBase = totalPayments;
+  const publicHolidayPaidMinutesForDisplay = (() => {
+    const publicHolidayItem = displayPaymentItems.find(
+      (item) => item.itemId === "public-holiday-pay" || item.name.includes("공휴일 유급"),
+    );
+
+    if (!publicHolidayItem || appliedHourlyRate <= 0) return 0;
+
+    return Math.round((publicHolidayItem.amount / appliedHourlyRate) * 60);
+  })();
+
+  const displayTotalWorkMinutes =
+    (record.totalWorkMinutes || 0) + publicHolidayPaidMinutesForDisplay;
+
 
   const getDeductionFormula = (item: { itemId: string; name: string; amount: number }): string => {
     const si = deductionItems.find((di) => di.id === item.itemId);
@@ -564,9 +577,9 @@ const getDisplayPaymentItemName = (name: string) =>
             </CardHeader>
             <CardContent className="grid grid-cols-2 gap-2 text-sm pt-4">
               <div className="flex justify-between">
-                <span className="text-muted-foreground">총근로시간</span>
-                <span className="font-medium">{formatMinutesToTime(record.totalWorkMinutes || 0)}</span>
-              </div>
+  <span className="text-muted-foreground">총근로시간</span>
+  <span className="font-medium">{formatMinutesToTime(displayTotalWorkMinutes)}</span>
+</div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">정규근로시간</span>
                 <span className="font-medium">{formatMinutesToTime(record.regularWorkMinutes || 0)}</span>
