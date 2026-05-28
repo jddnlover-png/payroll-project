@@ -1026,14 +1026,7 @@ hoverData = {
                                               </span>
                                             </div>
 
-                                            <div className="flex justify-between pl-2">
-                                              <span className="text-muted-foreground text-xs">
-                                                공휴일 실제근무시간
-                                              </span>
-                                              <span className="text-xs font-medium">
-                                                {formatWorkHours(hoverData.publicHolidayActualWorkMinutes || 0)}
-                                              </span>
-                                            </div>
+                                            
                                             <div className="flex justify-between pl-2">
                                               <span className="text-muted-foreground text-xs">야간교대근무시간</span>
                                               <span className="text-xs font-medium">
