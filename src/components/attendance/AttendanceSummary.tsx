@@ -938,7 +938,10 @@ const row = sheet.addRow([
             return (r.workType || "day") === "night" && ci && co;
           }).length;
 
-          const correctedRecognized = totalRecognized + nightShiftDaysExcel * 60;
+          const correctedRecognized =
+  totalRecognized +
+  nightShiftDaysExcel * 60 +
+  totalPaidPublicHolidayMinutes;
 
           const nonHolidayNightShift = Math.max(0, totalNightShift - totalHolidayNightShift);
           const displayHoliday8h = totalHoliday8h + totalHolidayNightShiftTier1;
