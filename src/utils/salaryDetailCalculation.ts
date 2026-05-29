@@ -146,6 +146,19 @@ export function isLaborDay(dateStr: string): boolean {
   return m === 5 && d === 1;
 }
 
+/** 유급휴가/연차/휴가 상태 판별 */
+function isPaidLeaveStatus(status?: string | null): boolean {
+  return [
+    "leave",
+    "paid_leave",
+    "annual_leave",
+    "vacation",
+    "휴가",
+    "유급휴가",
+    "연차",
+  ].includes(status ?? "");
+}
+
 /** 요일 인덱스 (0=일, 1=월, ..., 6=토) */
 function getDayOfWeek(dateStr: string): number {
   const [y, m, d] = dateStr.split("-").map(Number);
@@ -216,7 +229,19 @@ function calculateWeeklyStats(
 
     if (isScheduled) scheduledDaysTotal++;
 
-    const att = weekAttendance.find((a) => a.date === dateStr);
+        const att = weekAttendance.find((a) => a.date === dateStr);
+
+    const isPaidLeave =
+      isScheduled &&
+      att &&
+      isPaidLeaveStatus(att.status);
+
+    if (isPaidLeave) {
+      totalMinutes += dailyPaidHolidayMinutes;
+      scheduledDaysWorked++;
+      continue;
+    }
+
     const hasActualWork = !!(att && att.check_in && att.check_out);
 
     if (hasActualWork) {
@@ -232,7 +257,14 @@ function calculateWeeklyStats(
 
       totalMinutes += breakdown.recognizedMinutes;
 
-      if (isScheduled && (att.status === "present" || att.status === "late")) {
+      if (
+        isScheduled &&
+        (
+          att.status === "present" ||
+          att.status === "late" ||
+          isPaidLeaveStatus(att.status)
+        )
+      ) {
         scheduledDaysWorked++;
       }
 
@@ -433,23 +465,33 @@ const empAllAtt = allAttendance.filter((a) => a.employee_id === employee.id);
 const empAllAttForAvg = empAllAtt;
   const prior4WeekMinutes = new Map<string, number>();
   for (const att of empAllAttForAvg) {
-    if (!att.check_in || !att.check_out) continue;
-    // 소정근로일만 집계
-    if (!isScheduledWorkday(att.date, settings)) continue;
+  // 소정근로일만 집계
+  if (!isScheduledWorkday(att.date, settings)) continue;
 
-    const wkDates = getWeekDates(att.date);
-    const wk = wkDates[0];
-    const isNight = att.work_type === "night";
-    const bd = calculateSingleAttendance(
-      att.check_in,
-      att.check_out,
-      att.date,
-      att.break_minutes ?? 0,
-      isNight,
-      settings,
+  const wkDates = getWeekDates(att.date);
+  const wk = wkDates[0];
+
+  if (isPaidLeaveStatus(att.status) && (!att.check_in || !att.check_out)) {
+    prior4WeekMinutes.set(
+      wk,
+      (prior4WeekMinutes.get(wk) || 0) + standardMinutes
     );
-    prior4WeekMinutes.set(wk, (prior4WeekMinutes.get(wk) || 0) + bd.recognizedMinutes);
+    continue;
   }
+
+  if (!att.check_in || !att.check_out) continue;
+
+  const isNight = att.work_type === "night";
+  const bd = calculateSingleAttendance(
+    att.check_in,
+    att.check_out,
+    att.date,
+    att.break_minutes ?? 0,
+    isNight,
+    settings,
+  );
+  prior4WeekMinutes.set(wk, (prior4WeekMinutes.get(wk) || 0) + bd.recognizedMinutes);
+}
   const weeksWithWork = prior4WeekMinutes.size;
   const totalScheduledMin = Array.from(prior4WeekMinutes.values()).reduce((s, m) => s + m, 0);
   const avgWeeklyMinutes = weeksWithWork > 0 ? totalScheduledMin / weeksWithWork : 0;
@@ -458,11 +500,26 @@ const empAllAttForAvg = empAllAtt;
   // 공휴일 유급수당 합계
   let totalPublicHolidayPay = 0;
 
-  // 각 출근일별 처리
+    // 각 출근일별 처리
   for (const att of attendance) {
+    const dateStr = att.date;
+    const isScheduled = isScheduledWorkday(dateStr, settings);
+
+    if (
+      isScheduled &&
+      isPaidLeaveStatus(att.status) &&
+      (!att.check_in || !att.check_out)
+    ) {
+      totalWorkMinutes += standardMinutes;
+      regularMinutes += standardMinutes;
+
+      // 실제 출근은 아니므로 workedDays/dayShiftDays는 증가시키지 않는다.
+      // 실제근로시간, 주40시간 초과 판정, 연장근로 계산에도 포함하지 않는다.
+      continue;
+    }
+
     if (!att.check_in || !att.check_out) continue;
 
-    const dateStr = att.date;
     const isNight = att.work_type === "night";
 
     const breakdown = calculateSingleAttendance(
@@ -480,10 +537,9 @@ const empAllAttForAvg = empAllAtt;
     const recognized = breakdown.recognizedMinutes;
     totalWorkMinutes += recognized;
 
-    const isWeeklyHol = isWeeklyHoliday(dateStr, settings);
+        const isWeeklyHol = isWeeklyHoliday(dateStr, settings);
     const isPubHoliday = att.is_holiday === true || isPublicHoliday(dateStr, publicHolidayDates);
     const isLabor = isLaborDay(dateStr);
-    const isScheduled = isScheduledWorkday(dateStr, settings);
 
     // === 요일별 분류 (record 단위 판단) ===
     // 핵심: 야간교대(isNight)인 경우 휴일/비휴일 모두 4단계 로직 적용
@@ -648,7 +704,7 @@ const weekScheduledMinutes = weekDates
     const monthStart = `${yearStr}-${monthStr}-01`;
     const monthEnd = `${yearStr}-${monthStr}-${String(lastDay).padStart(2, "0")}`;
 
-    const isWorkedOrPaidScheduledDay = (dateStr: string): boolean => {
+        const isWorkedOrPaidScheduledDay = (dateStr: string): boolean => {
       const att = empAllAtt.find((a) => a.date === dateStr);
       const isPubHoliday = isPublicHoliday(dateStr, publicHolidayDates);
       const isLabor = isLaborDay(dateStr);
@@ -660,7 +716,12 @@ const weekScheduledMinutes = weekDates
         (settings.company_size === "over5" || isLabor);
 
       return (
-        (att && (att.status === "present" || att.status === "late")) ||
+        (att &&
+          (
+            att.status === "present" ||
+            att.status === "late" ||
+            isPaidLeaveStatus(att.status)
+          )) ||
         isPaidPublicHoliday
       );
     };
