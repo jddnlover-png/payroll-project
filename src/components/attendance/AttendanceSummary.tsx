@@ -391,8 +391,7 @@ if (settings.apply_public_holiday && isDbPublicHoliday && isScheduledForPaidHoli
           ((att as any).rawCheckOut || att.checkOut),
       ).length;
 
-      const correctedTotalMinutes = totalMinutes + nightShiftDays * 60;
-const displayTotalMinutes = correctedTotalMinutes + totalPaidPublicHolidayMinutes;
+      const displayTotalMinutes = totalMinutes + totalPaidPublicHolidayMinutes;
 
 const totalHours = Math.floor(displayTotalMinutes / 60);
 const remainingMinutes = displayTotalMinutes % 60;
@@ -939,9 +938,7 @@ const row = sheet.addRow([
           }).length;
 
           const correctedRecognized =
-  totalRecognized +
-  nightShiftDaysExcel * 60 +
-  totalPaidPublicHolidayMinutes;
+  totalRecognized + totalPaidPublicHolidayMinutes;
 
           const nonHolidayNightShift = Math.max(0, totalNightShift - totalHolidayNightShift);
           const displayHoliday8h = totalHoliday8h + totalHolidayNightShiftTier1;
