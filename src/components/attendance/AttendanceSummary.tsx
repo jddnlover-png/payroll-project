@@ -363,11 +363,15 @@ if (settings.apply_public_holiday && isDbPublicHoliday && isScheduledForPaidHoli
 
         const bd = calculateSingleAttendance(ci, co, att.date, att.breakMinutes ?? 0, true, settings, false);
 
-        holidayNightShiftMinutes += bd.nightShiftWorkMinutes;
-        holidayNightShiftTier1Minutes += bd.nightShiftTier1Minutes;
-        holidayNightShiftTier2Minutes += bd.nightShiftTier2Minutes;
-        holidayNightShiftTier3Minutes += bd.nightShiftTier3Minutes;
-        holidayNightShiftTier4Minutes += bd.nightShiftTier4Minutes;
+const holidayWorkedMinutes = bd.recognizedMinutes || bd.nightShiftWorkMinutes || 0;
+actualHolidayWithin8Minutes += Math.min(holidayWorkedMinutes, 8 * 60);
+actualHolidayOver8Minutes += Math.max(0, holidayWorkedMinutes - 8 * 60);
+
+holidayNightShiftMinutes += bd.nightShiftWorkMinutes;
+holidayNightShiftTier1Minutes += bd.nightShiftTier1Minutes;
+holidayNightShiftTier2Minutes += bd.nightShiftTier2Minutes;
+holidayNightShiftTier3Minutes += bd.nightShiftTier3Minutes;
+holidayNightShiftTier4Minutes += bd.nightShiftTier4Minutes;
       });
 
       const nonHolidayNightShiftMinutes = Math.max(0, totalNightShiftWorkMinutes - holidayNightShiftMinutes);
@@ -375,14 +379,10 @@ if (settings.apply_public_holiday && isDbPublicHoliday && isScheduledForPaidHoli
       const nonHolidayNightShiftTier2Minutes = Math.max(0, totalNightShiftTier2Minutes - holidayNightShiftTier2Minutes);
       const nonHolidayNightShiftTier3Minutes = Math.max(0, totalNightShiftTier3Minutes - holidayNightShiftTier3Minutes);
       const nonHolidayNightShiftTier4Minutes = Math.max(0, totalNightShiftTier4Minutes - holidayNightShiftTier4Minutes);
-
-      const displayHoliday8hMinutes = totalHoliday8hMinutes + holidayNightShiftTier1Minutes;
-      const displayHolidayOver8hMinutes =
-        totalHolidayOver8hMinutes +
-        totalHolidayNightMinutes +
-        holidayNightShiftTier2Minutes +
-        holidayNightShiftTier3Minutes +
-        holidayNightShiftTier4Minutes;
+let actualHolidayWithin8Minutes = 0;
+let actualHolidayOver8Minutes = 0;
+      const displayHoliday8hMinutes = actualHolidayWithin8Minutes;
+const displayHolidayOver8hMinutes = actualHolidayOver8Minutes;
 
       const nightShiftDays = empAttendance.filter(
         (att) =>
@@ -788,8 +788,10 @@ fmtMin(emp.displayNightShiftWorkMinutes ?? emp.totalNightShiftWorkMinutes ?? 0),
         let totalTier3 = 0;
         let totalTier4 = 0;
         let totalHoliday8h = 0;
-        let totalHolidayOver8h = 0;
-        let totalHolidayNightShift = 0;
+let totalHolidayOver8h = 0;
+let totalHolidayNightShift = 0;
+let actualHolidayWithin8Minutes = 0;
+let actualHolidayOver8Minutes = 0;
 let totalHolidayNightShiftTier1 = 0;
 let totalHolidayNightShiftTier2 = 0;
 let totalHolidayNightShiftTier3 = 0;
@@ -866,12 +868,16 @@ totalLate += bd.lateTruncation;
               totalTier4 += bd.nightShiftTier4Minutes;
 
               if (isHolidayDay) {
-                totalHolidayNightShift += bd.nightShiftWorkMinutes;
-                totalHolidayNightShiftTier1 += bd.nightShiftTier1Minutes;
-                totalHolidayNightShiftTier2 += bd.nightShiftTier2Minutes;
-                totalHolidayNightShiftTier3 += bd.nightShiftTier3Minutes;
-                totalHolidayNightShiftTier4 += bd.nightShiftTier4Minutes;
-              }
+  const holidayWorkedMinutes = bd.recognizedMinutes || bd.nightShiftWorkMinutes || 0;
+  actualHolidayWithin8Minutes += Math.min(holidayWorkedMinutes, 8 * 60);
+  actualHolidayOver8Minutes += Math.max(0, holidayWorkedMinutes - 8 * 60);
+
+  totalHolidayNightShift += bd.nightShiftWorkMinutes;
+  totalHolidayNightShiftTier1 += bd.nightShiftTier1Minutes;
+  totalHolidayNightShiftTier2 += bd.nightShiftTier2Minutes;
+  totalHolidayNightShiftTier3 += bd.nightShiftTier3Minutes;
+  totalHolidayNightShiftTier4 += bd.nightShiftTier4Minutes;
+}
             } else if (isHolidayDay) {
               totalHoliday8h += bd.holidayMinutesWithin8h;
               totalHolidayOver8h += bd.holidayMinutesOver8h;
@@ -941,12 +947,8 @@ const row = sheet.addRow([
   totalRecognized + totalPaidPublicHolidayMinutes;
 
           const nonHolidayNightShift = Math.max(0, totalNightShift - totalHolidayNightShift);
-          const displayHoliday8h = totalHoliday8h + totalHolidayNightShiftTier1;
-          const displayHolidayOver8h =
-            totalHolidayOver8h +
-            totalHolidayNightShiftTier2 +
-            totalHolidayNightShiftTier3 +
-            totalHolidayNightShiftTier4;
+          const displayHoliday8h = actualHolidayWithin8Minutes;
+const displayHolidayOver8h = actualHolidayOver8Minutes;
 
           const summaryData = [
             ["체류시간", fmtMinutes(totalStay)],
