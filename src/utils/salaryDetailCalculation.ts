@@ -777,13 +777,9 @@ totalPublicHolidayPay += floor1((standardMinutes / 60) * hourlyRate);
     }
   }
 
-  // === 혼합 직원 야간교대 휴게 보정 ===
-  // 야간교대 1단계에서 60분 휴게가 차감되지만, 주간+야교 혼합 직원의 경우
-  // calculateSingleAttendance가 야간교대 record에도 주간 휴게를 적용하여 이중 차감 발생
-  // 보정: 주간 근무도 있는 혼합 직원에 한해 nightShiftDays × 60분을 복원
-  if (nightShiftDays > 0 && dayShiftDays > 0) {
-    totalWorkMinutes += nightShiftDays * 60;
-  }
+  // 혼합 직원 야간교대 1시간 보정은 제거한다.
+// 현재 calculateSingleAttendance()와 근태현황 기준에서 이미 출근/퇴근/휴게시간 기준 인정근무가 계산되므로,
+// 여기서 nightShiftDays × 60분을 추가하면 총근로시간이 과다 표시된다.
 
     // === 5단계: 정식 하이브리드 계산 ===
   // 기본급 = 정규근로시간만 × 시급
