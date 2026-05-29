@@ -829,12 +829,11 @@ const isPaidPublicHolidayWork =
   hasActualWork;
 
   if (isPaidPublicHolidayOnly) {
-    const paidMinutes = Math.round((settings.standard_work_hours || 8) * 60);
+  const paidMinutes = Math.round((settings.standard_work_hours || 8) * 60);
 
-    workTimeStr = `유급 ${fmtMinutes(paidMinutes)}`;
-    totalPaidPublicHolidayMinutes += paidMinutes;
-    totalRecognized += paidMinutes;
-  }
+  workTimeStr = `유급 ${fmtMinutes(paidMinutes)}`;
+  totalPaidPublicHolidayMinutes += paidMinutes;
+}
 
   if (ci && co) {
             const isNight = (r.workType || "day") === "night";
