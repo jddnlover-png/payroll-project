@@ -153,6 +153,7 @@ function isPaidLeaveStatus(status?: string | null): boolean {
     "paid_leave",
     "annual_leave",
     "vacation",
+    "annual",
     "휴가",
     "유급휴가",
     "연차",
