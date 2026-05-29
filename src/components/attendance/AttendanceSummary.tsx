@@ -317,6 +317,9 @@ let holidayNightShiftTier2Minutes = 0;
 let holidayNightShiftTier3Minutes = 0;
 let holidayNightShiftTier4Minutes = 0;
 
+let actualHolidayWithin8Minutes = 0;
+let actualHolidayOver8Minutes = 0;
+
 let totalPaidPublicHolidayMinutes = 0;
 let totalPublicHolidayActualWorkMinutes = 0;
 
@@ -379,8 +382,7 @@ holidayNightShiftTier4Minutes += bd.nightShiftTier4Minutes;
       const nonHolidayNightShiftTier2Minutes = Math.max(0, totalNightShiftTier2Minutes - holidayNightShiftTier2Minutes);
       const nonHolidayNightShiftTier3Minutes = Math.max(0, totalNightShiftTier3Minutes - holidayNightShiftTier3Minutes);
       const nonHolidayNightShiftTier4Minutes = Math.max(0, totalNightShiftTier4Minutes - holidayNightShiftTier4Minutes);
-let actualHolidayWithin8Minutes = 0;
-let actualHolidayOver8Minutes = 0;
+
       const displayHoliday8hMinutes = actualHolidayWithin8Minutes;
 const displayHolidayOver8hMinutes = actualHolidayOver8Minutes;
 
