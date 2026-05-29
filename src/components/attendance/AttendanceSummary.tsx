@@ -337,18 +337,24 @@ if (settings.apply_public_holiday && isDbPublicHoliday && isScheduledForPaidHoli
     totalPaidPublicHolidayMinutes += paidMinutes;
 
     if (hasActualWork) {
-      const bd = calculateSingleAttendance(
-        ci,
-        co,
-        att.date,
-        att.breakMinutes ?? 0,
-        isNight,
-        settings,
-        false,
-      );
+  const bd = calculateSingleAttendance(
+    ci,
+    co,
+    att.date,
+    att.breakMinutes ?? 0,
+    isNight,
+    settings,
+    false,
+  );
 
-      totalPublicHolidayActualWorkMinutes += bd.recognizedMinutes;
-    }
+  totalPublicHolidayActualWorkMinutes += bd.recognizedMinutes;
+
+  if (!isNight) {
+    const holidayWorkedMinutes = bd.recognizedMinutes || 0;
+    actualHolidayWithin8Minutes += Math.min(holidayWorkedMinutes, 8 * 60);
+    actualHolidayOver8Minutes += Math.max(0, holidayWorkedMinutes - 8 * 60);
+  }
+}
   }
 
   if (!ci || !co || !isNight) return;
@@ -854,6 +860,12 @@ if (isPaidPublicHolidayWork) {
   const paidMinutes = Math.round((settings.standard_work_hours || 8) * 60);
   totalPaidPublicHolidayMinutes += paidMinutes;
   totalPublicHolidayActualWorkMinutes += bd.recognizedMinutes;
+
+  if (!isNight) {
+    const holidayWorkedMinutes = bd.recognizedMinutes || 0;
+    actualHolidayWithin8Minutes += Math.min(holidayWorkedMinutes, 8 * 60);
+    actualHolidayOver8Minutes += Math.max(0, holidayWorkedMinutes - 8 * 60);
+  }
 }
 
 totalLate += bd.lateTruncation;
