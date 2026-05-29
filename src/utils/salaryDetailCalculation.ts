@@ -273,6 +273,8 @@ function getWeekDates(dateStr: string): string[] {
   return dates;
 }
 
+
+
 /** 해당 주차의 주휴일 날짜 반환 */
 function getWeeklyHolidayDateInWeek(
   weekDates: string[],
@@ -672,23 +674,19 @@ const weekScheduledMinutes = weekDates
         isScheduledWorkday(d, settings)
       );
 
-      const scheduledInCurrentMonth = scheduledFullWeek.filter(
+            const scheduledInCurrentMonth = scheduledFullWeek.filter(
         (d) => d >= monthStart && d <= monthEnd
       );
-
-      // 이번 달에 해당하는 소정근로일이 하나도 없으면 계산 대상 아님
-      if (scheduledInCurrentMonth.length === 0) {
-        continue;
-      }
 
       const weeklyHolidayDate = getWeeklyHolidayDateInWeek(
         fullWeekDates,
         settings
       );
 
-      // 주휴수당은 소정근로일 종료월이 아니라 주휴일이 속한 달에 지급한다.
+      // 주휴수당은 소정근로일이 속한 달이 아니라 주휴일이 속한 달에 지급한다.
       // 예: 1/26~2/1 주차의 주휴일이 2/1이면 2월 급여에 반영.
-      // 예: 12/29~1/4 주차의 주휴일이 1/4이면 1월 급여에 반영.
+      // 이 경우 2월 안에 소정근로일이 없어도 전체 주차를 판정해야 하므로
+      // scheduledInCurrentMonth.length === 0 조건으로 먼저 제외하면 안 된다.
       if (weeklyHolidayDate < monthStart || weeklyHolidayDate > monthEnd) {
         const workedInCurrentMonth = scheduledInCurrentMonth.filter((d) =>
           isWorkedOrPaidScheduledDay(d)
@@ -701,6 +699,7 @@ const weekScheduledMinutes = weekDates
       const hasPrevMonthScheduledDay = scheduledFullWeek.some(
         (d) => d < monthStart
       );
+
 
       // 월초 주차 또는 이번 달 안에서 소정근로일이 끝나는 주차는 전체 주차 기준으로 판정한다.
       const weekAtt = empAllAtt.filter((a) =>
