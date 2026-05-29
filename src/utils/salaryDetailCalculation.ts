@@ -273,6 +273,19 @@ function getWeekDates(dateStr: string): string[] {
   return dates;
 }
 
+/** 해당 주차의 주휴일 날짜 반환 */
+function getWeeklyHolidayDateInWeek(
+  weekDates: string[],
+  settings: OrganizationSettings,
+): string {
+  const weeklyHolidayIndex = getWeeklyHolidayIndex(settings.weekly_holiday);
+
+  return (
+    weekDates.find((dateStr) => getDayOfWeek(dateStr) === weeklyHolidayIndex) ||
+    weekDates[6]
+  );
+}
+
 /** 주 단위 근무유형별 1일 기준시간 산정 (주휴수당용) */
 function calcDailyBaseHours(weekAtt: AttendanceRawRecord[], settings: OrganizationSettings): number {
   const standardDailyHours = Math.min(settings.standard_work_hours || 8, 8);
@@ -651,7 +664,7 @@ const weekScheduledMinutes = weekDates
     };
 
     for (const week of weeks) {
-      const fullWeekDates = getWeekDates(week.dates[0]);
+            const fullWeekDates = getWeekDates(week.dates[0]);
 
       // 전체 주차 중 회사 설정상 소정근로일만 추출
       // work_day_list가 월~금, 월~토, 월/수/금 등으로 바뀌어도 여기서 그대로 반영된다.
@@ -668,17 +681,15 @@ const weekScheduledMinutes = weekDates
         continue;
       }
 
-      const hasPrevMonthScheduledDay = scheduledFullWeek.some(
-        (d) => d < monthStart
+      const weeklyHolidayDate = getWeeklyHolidayDateInWeek(
+        fullWeekDates,
+        settings
       );
 
-      const hasNextMonthScheduledDay = scheduledFullWeek.some(
-        (d) => d > monthEnd
-      );
-
-      // 월말 주차: 소정근로일이 다음 달까지 이어지면 이번 달에서 지급하지 않는다.
-      // 예: 월~토 소정근로인데 토요일이 다음 달 1일이면, 이번 달 지급 금지 후 다음 달에서 최종 판정.
-      if (hasNextMonthScheduledDay) {
+      // 주휴수당은 소정근로일 종료월이 아니라 주휴일이 속한 달에 지급한다.
+      // 예: 1/26~2/1 주차의 주휴일이 2/1이면 2월 급여에 반영.
+      // 예: 12/29~1/4 주차의 주휴일이 1/4이면 1월 급여에 반영.
+      if (weeklyHolidayDate < monthStart || weeklyHolidayDate > monthEnd) {
         const workedInCurrentMonth = scheduledInCurrentMonth.filter((d) =>
           isWorkedOrPaidScheduledDay(d)
         );
@@ -686,6 +697,10 @@ const weekScheduledMinutes = weekDates
         carryDays = workedInCurrentMonth.length;
         continue;
       }
+
+      const hasPrevMonthScheduledDay = scheduledFullWeek.some(
+        (d) => d < monthStart
+      );
 
       // 월초 주차 또는 이번 달 안에서 소정근로일이 끝나는 주차는 전체 주차 기준으로 판정한다.
       const weekAtt = empAllAtt.filter((a) =>
