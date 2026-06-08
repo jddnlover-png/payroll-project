@@ -358,20 +358,21 @@ if (settings.apply_public_holiday && isDbPublicHoliday && isScheduledForPaidHoli
 }
   }
 
+    const isPaidLeaveOnly =
+    (att.status === "leave" || att.status === "half_day") &&
+    isScheduledWorkday(att.date, settings) &&
+    !hasActualWork;
+
+  if (isPaidLeaveOnly) {
+    const paidMinutes =
+      att.status === "half_day"
+        ? Math.round(((settings.standard_work_hours || 8) * 60) / 2)
+        : Math.round((settings.standard_work_hours || 8) * 60);
+
+    totalPaidLeaveMinutes += paidMinutes;
+  }
+
   if (!ci || !co || !isNight) return;
-  const isPaidLeaveOnly =
-  (att.status === "leave" || att.status === "half_day") &&
-  isScheduledWorkday(att.date, settings) &&
-  !hasActualWork;
-
-if (isPaidLeaveOnly) {
-  const paidMinutes =
-    att.status === "half_day"
-      ? Math.round(((settings.standard_work_hours || 8) * 60) / 2)
-      : Math.round((settings.standard_work_hours || 8) * 60);
-
-  totalPaidLeaveMinutes += paidMinutes;
-}
 
         const isWeeklyHol = isWeeklyHoliday(att.date, settings);
         const isPubHol = isPublicHoliday(att.date);
@@ -1509,6 +1510,14 @@ const displayHolidayOver8h = actualHolidayOver8Minutes;
   <span className="text-xs">
     {Math.floor(emp.displayNightWorkMinutes / 60)}시간{" "}
     {emp.displayNightWorkMinutes % 60}분
+  </span>
+</div>
+
+<div className="flex justify-between">
+  <span className="text-muted-foreground text-xs">공휴일 유급인정시간</span>
+  <span className="text-xs">
+    {Math.floor((emp.totalPaidPublicHolidayMinutes || 0) / 60)}시간{" "}
+    {(emp.totalPaidPublicHolidayMinutes || 0) % 60}분
   </span>
 </div>
 
