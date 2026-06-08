@@ -18,9 +18,94 @@
  }
  
  export type LeaveRecordInsert = Omit<LeaveRecord, 'id' | 'organization_id' | 'created_at' | 'updated_at'>;
- export type LeaveRecordUpdate = Partial<Omit<LeaveRecord, 'id' | 'organization_id' | 'employee_id' | 'created_at' | 'updated_at'>>;
+export type LeaveRecordUpdate = Partial<Omit<LeaveRecord, 'id' | 'organization_id' | 'employee_id' | 'created_at' | 'updated_at'>>;
+
+function getDatesBetween(startDate: string, endDate: string): string[] {
+  const result: string[] = [];
+  const start = new Date(`${startDate}T00:00:00`);
+  const end = new Date(`${endDate}T00:00:00`);
+
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    result.push(
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
+    );
+  }
+
+  return result;
+}
+
+function getAttendanceStatusFromLeaveType(leaveType: string | null | undefined): string {
+  if (leaveType === 'half_day' || leaveType === 'half') return 'half_day';
+  if (leaveType === 'annual') return 'annual';
+  return 'leave';
+}
+
+const LEAVE_ATTENDANCE_STATUSES = ['leave', 'annual', 'half_day'];
+
+async function syncApprovedLeaveToAttendance(record: LeaveRecord) {
+  const dates = getDatesBetween(record.start_date, record.end_date);
+  const attendanceStatus = getAttendanceStatusFromLeaveType(record.leave_type);
+
+  for (const date of dates) {
+    const { data: existing, error: selectError } = await (supabase as any)
+      .from('attendance_records')
+      .select('id, check_in, check_out, status')
+      .eq('organization_id', record.organization_id)
+      .eq('employee_id', record.employee_id)
+      .eq('date', date)
+      .maybeSingle();
+
+    if (selectError) throw selectError;
+
+    if (existing?.id) {
+      const { error: updateError } = await (supabase as any)
+        .from('attendance_records')
+        .update({
+          status: attendanceStatus,
+          check_in: null,
+          check_out: null,
+          break_minutes: 0,
+          work_type: 'day',
+        })
+        .eq('id', existing.id);
+
+      if (updateError) throw updateError;
+    } else {
+      const { error: insertError } = await (supabase as any)
+        .from('attendance_records')
+        .insert({
+          organization_id: record.organization_id,
+          employee_id: record.employee_id,
+          date,
+          status: attendanceStatus,
+          check_in: null,
+          check_out: null,
+          break_minutes: 0,
+          work_type: 'day',
+        });
+
+      if (insertError) throw insertError;
+    }
+  }
+}
+
+async function removeLeaveFromAttendance(record: LeaveRecord) {
+  const dates = getDatesBetween(record.start_date, record.end_date);
+
+  const { error } = await (supabase as any)
+    .from('attendance_records')
+    .delete()
+    .eq('organization_id', record.organization_id)
+    .eq('employee_id', record.employee_id)
+    .in('date', dates)
+    .in('status', LEAVE_ATTENDANCE_STATUSES)
+    .is('check_in', null)
+    .is('check_out', null);
+
+  if (error) throw error;
+}
  
- export function useLeaveRecords() {
+export function useLeaveRecords() {
    const { currentOrganization } = useOrganization();
    const queryClient = useQueryClient();
  
@@ -67,7 +152,7 @@
      },
    });
  
-   const updateLeaveRecord = useMutation({
+      const updateLeaveRecord = useMutation({
      mutationFn: async ({ id, ...updates }: { id: string } & LeaveRecordUpdate) => {
        const { data, error } = await supabase
          .from('leave_records')
@@ -77,6 +162,17 @@
          .single();
  
        if (error) throw error;
+
+       const updatedRecord = data as LeaveRecord;
+
+       if (updatedRecord.status === 'approved') {
+         await syncApprovedLeaveToAttendance(updatedRecord);
+       }
+
+       if (updatedRecord.status === 'rejected' || updatedRecord.status === 'cancelled') {
+         await removeLeaveFromAttendance(updatedRecord);
+       }
+
        return data;
      },
      onSuccess: (_, variables) => {
@@ -95,8 +191,20 @@
      },
    });
  
-   const deleteLeaveRecord = useMutation({
+      const deleteLeaveRecord = useMutation({
      mutationFn: async (id: string) => {
+       const { data: existing, error: selectError } = await supabase
+         .from('leave_records')
+         .select('*')
+         .eq('id', id)
+         .single();
+
+       if (selectError) throw selectError;
+
+       if (existing) {
+         await removeLeaveFromAttendance(existing as LeaveRecord);
+       }
+
        const { error } = await supabase
          .from('leave_records')
          .delete()
