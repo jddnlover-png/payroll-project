@@ -176,8 +176,30 @@ const getDisplayPaymentItemName = (name: string) =>
     (holidayShiftItems.find((item: any) => item.itemId === "hol-shift-tier4") as any)?.shiftTierMinutes || 0;
 
   const nonHolidayNightShiftMinutes = record.nightShiftMinutes || 0;
-  const displayTotalNightShiftMinutes = nonHolidayNightShiftMinutes + holidayNightShiftMinutes;
-  const displayHolidayWorkMinutes = Math.max(record.holidayWorkMinutes || 0, holidayNightShiftMinutes);
+const displayTotalNightShiftMinutes = nonHolidayNightShiftMinutes + holidayNightShiftMinutes;
+const displayHolidayWorkMinutes = Math.max(record.holidayWorkMinutes || 0, holidayNightShiftMinutes);
+
+const publicHolidayPayItem = displayPaymentItems.find(
+  (item: any) => item.itemId === "public-holiday-pay" || item.name.includes("공휴일 유급"),
+);
+
+const paidLeavePayItem = displayPaymentItems.find(
+  (item: any) => item.itemId === "paid-leave-pay" || item.name.includes("휴가 유급"),
+);
+
+const displayPublicHolidayPaidMinutes =
+  (publicHolidayPayItem as any)?.publicHolidayMinutes ??
+  (publicHolidayPayItem?.amount && appliedHourlyRate > 0
+    ? Math.round((publicHolidayPayItem.amount / appliedHourlyRate) * 60)
+    : 0);
+
+const displayPaidLeaveMinutes =
+  (paidLeavePayItem as any)?.paidLeaveMinutes ??
+  (paidLeavePayItem?.amount && appliedHourlyRate > 0
+    ? Math.round((paidLeavePayItem.amount / appliedHourlyRate) * 60)
+    : 0);
+
+const displayLeaveDays = record.leaveDays || 0;
 
   // 계산방법 생성 함수
   const getPaymentFormula = (item: { itemId: string; name: string; amount: number }): string => {
@@ -252,12 +274,18 @@ const getDisplayPaymentItemName = (name: string) =>
       }
       return "해당 없음";
     } else if (item.itemId === "public-holiday-pay" || item.name.includes("공휴일 유급")) {
-      if (appliedHourlyRate > 0 && item.amount > 0) {
-        const hours = item.amount / appliedHourlyRate;
-        return `${fmtNum(appliedHourlyRate)}원 × ${hours.toFixed(1)}시간`;
-      }
-      return "해당 없음";
-    } else if (item.itemId === "public-holiday-work-pay" || item.name.includes("공휴일 근로")) {
+  if (appliedHourlyRate > 0 && item.amount > 0) {
+    const hours = item.amount / appliedHourlyRate;
+    return `${fmtNum(appliedHourlyRate)}원 × ${hours.toFixed(1)}시간`;
+  }
+  return "해당 없음";
+} else if (item.itemId === "paid-leave-pay" || item.name.includes("휴가 유급")) {
+  if (appliedHourlyRate > 0 && item.amount > 0) {
+    const hours = item.amount / appliedHourlyRate;
+    return `${fmtNum(appliedHourlyRate)}원 × ${hours.toFixed(1)}시간`;
+  }
+  return "해당 없음";
+} else if (item.itemId === "public-holiday-work-pay" || item.name.includes("공휴일 근로")) {
   if (appliedHourlyRate > 0 && item.amount > 0) {
     const publicHolidayWorkMultiplier = 1.5;
     const hours = item.amount / (appliedHourlyRate * publicHolidayWorkMultiplier);
@@ -564,9 +592,9 @@ const getDisplayPaymentItemName = (name: string) =>
                 <span className="font-medium">{record.absentDays}일</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">휴가일수</span>
-                <span className="font-medium">{record.leaveDays}일</span>
-              </div>
+  <span className="text-muted-foreground">휴가일수</span>
+  <span className="font-medium">{displayLeaveDays}일</span>
+</div>
             </CardContent>
           </Card>
 
@@ -581,13 +609,28 @@ const getDisplayPaymentItemName = (name: string) =>
   <span className="font-medium">{formatMinutesToTime(displayTotalWorkMinutes)}</span>
 </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">정규근로시간</span>
-                <span className="font-medium">{formatMinutesToTime(record.regularWorkMinutes || 0)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">연장근로시간</span>
-                <span className="font-medium">{formatMinutesToTime(record.overtimeMinutes || 0)}</span>
-              </div>
+  <span className="text-muted-foreground">정규근로시간</span>
+  <span className="font-medium">{formatMinutesToTime(record.regularWorkMinutes || 0)}</span>
+</div>
+
+{displayPublicHolidayPaidMinutes > 0 && (
+  <div className="flex justify-between">
+    <span className="text-muted-foreground">공휴일 유급시간</span>
+    <span className="font-medium">{formatMinutesToTime(displayPublicHolidayPaidMinutes)}</span>
+  </div>
+)}
+
+{displayPaidLeaveMinutes > 0 && (
+  <div className="flex justify-between">
+    <span className="text-muted-foreground">휴가 유급시간</span>
+    <span className="font-medium">{formatMinutesToTime(displayPaidLeaveMinutes)}</span>
+  </div>
+)}
+
+<div className="flex justify-between">
+  <span className="text-muted-foreground">연장근로시간</span>
+  <span className="font-medium">{formatMinutesToTime(record.overtimeMinutes || 0)}</span>
+</div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">야간근로시간</span>
                 <span className="font-medium">{formatMinutesToTime(record.nightWorkMinutes || 0)}</span>
