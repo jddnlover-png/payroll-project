@@ -322,6 +322,7 @@ let actualHolidayOver8Minutes = 0;
 
 let totalPaidPublicHolidayMinutes = 0;
 let totalPublicHolidayActualWorkMinutes = 0;
+let totalPaidLeaveMinutes = 0;
 
       empAttendance.forEach((att: any) => {
   const ci = att.rawCheckIn || att.checkIn;
@@ -358,6 +359,19 @@ if (settings.apply_public_holiday && isDbPublicHoliday && isScheduledForPaidHoli
   }
 
   if (!ci || !co || !isNight) return;
+  const isPaidLeaveOnly =
+  (att.status === "leave" || att.status === "half_day") &&
+  isScheduledWorkday(att.date, settings) &&
+  !hasActualWork;
+
+if (isPaidLeaveOnly) {
+  const paidMinutes =
+    att.status === "half_day"
+      ? Math.round(((settings.standard_work_hours || 8) * 60) / 2)
+      : Math.round((settings.standard_work_hours || 8) * 60);
+
+  totalPaidLeaveMinutes += paidMinutes;
+}
 
         const isWeeklyHol = isWeeklyHoliday(att.date, settings);
         const isPubHol = isPublicHoliday(att.date);
@@ -399,7 +413,8 @@ const displayHolidayOver8hMinutes = actualHolidayOver8Minutes;
           ((att as any).rawCheckOut || att.checkOut),
       ).length;
 
-      const displayTotalMinutes = totalMinutes + totalPaidPublicHolidayMinutes;
+      const displayTotalMinutes =
+  totalMinutes + totalPaidPublicHolidayMinutes + totalPaidLeaveMinutes;
 
 const totalHours = Math.floor(displayTotalMinutes / 60);
 const remainingMinutes = displayTotalMinutes % 60;
@@ -452,9 +467,9 @@ const remainingMinutes = displayTotalMinutes % 60;
         totalHolidayOver8hMinutes,
         totalHolidayNightMinutes,
 
-        displayRegularMinutes: payrollTime?.regularWorkMinutes ?? totalRegularMinutes,
-        displayOvertimeMinutes: payrollTime?.overtimeMinutes ?? totalOvertimeWorkMinutes,
-        displayNightWorkMinutes: payrollTime?.nightWorkMinutes ?? totalNightWorkMinutes,
+        displayRegularMinutes: totalRegularMinutes,
+displayOvertimeMinutes: payrollTime?.overtimeMinutes ?? totalOvertimeWorkMinutes,
+displayNightWorkMinutes: payrollTime?.nightWorkMinutes ?? totalNightWorkMinutes,
         displayNightShiftWorkMinutes: totalNightShiftWorkMinutes,
 
         holidayNightShiftMinutes,
@@ -474,6 +489,7 @@ const remainingMinutes = displayTotalMinutes % 60;
 totalActualEarlyLeaveMinutes,
 
 totalPaidPublicHolidayMinutes,
+totalPaidLeaveMinutes,
 totalPublicHolidayActualWorkMinutes,
 
 attendanceRate,
@@ -1497,10 +1513,10 @@ const displayHolidayOver8h = actualHolidayOver8Minutes;
 </div>
 
 <div className="flex justify-between">
-  <span className="text-muted-foreground text-xs">공휴일 유급인정시간</span>
+  <span className="text-muted-foreground text-xs">휴가 유급인정시간</span>
   <span className="text-xs">
-    {Math.floor((emp.totalPaidPublicHolidayMinutes || 0) / 60)}시간{" "}
-    {(emp.totalPaidPublicHolidayMinutes || 0) % 60}분
+    {Math.floor((emp.totalPaidLeaveMinutes || 0) / 60)}시간{" "}
+    {(emp.totalPaidLeaveMinutes || 0) % 60}분
   </span>
 </div>
 
