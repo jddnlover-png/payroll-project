@@ -37,6 +37,16 @@ interface PublicHoliday {
   is_holiday: boolean;
 }
 
+const DAY_MAP: Record<string, number> = {
+  SUN: 0,
+  MON: 1,
+  TUE: 2,
+  WED: 3,
+  THU: 4,
+  FRI: 5,
+  SAT: 6,
+};
+
 export function EmployeeAttendanceDetail({
   employee,
   open,
@@ -93,7 +103,7 @@ export function EmployeeAttendanceDetail({
       .sort((a, b) => b.date.localeCompare(a.date));
   }, [employee, dbAttendance]);
 
-  const isScheduledWorkday = useCallback(
+    const isScheduledWorkday = useCallback(
     (dateStr: string) => {
       const date = new Date(dateStr + 'T00:00:00');
       const day = date.getDay();
@@ -101,13 +111,21 @@ export function EmployeeAttendanceDetail({
       const anySettings = settings as any;
 
       const scheduledDays =
+        anySettings?.weekly_work_day_list ||
         anySettings?.scheduled_work_days ||
         anySettings?.work_days ||
         anySettings?.workdays ||
-        [1, 2, 3, 4, 5];
+        ['MON', 'TUE', 'WED', 'THU', 'FRI'];
 
       if (Array.isArray(scheduledDays)) {
-        return scheduledDays.includes(day) || scheduledDays.includes(String(day));
+        return scheduledDays.some((value) => {
+          if (typeof value === 'number') return value === day;
+
+          const upper = String(value).toUpperCase();
+          if (DAY_MAP[upper] !== undefined) return DAY_MAP[upper] === day;
+
+          return Number(value) === day;
+        });
       }
 
       return day >= 1 && day <= 5;
