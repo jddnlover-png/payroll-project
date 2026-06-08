@@ -807,8 +807,9 @@ let totalHolidayNightShiftTier4 = 0;
 
 let totalPaidPublicHolidayMinutes = 0;
 let totalPublicHolidayActualWorkMinutes = 0;
+let totalPaidLeaveMinutes = 0;
 
-        empRecords.forEach((r: any) => {
+empRecords.forEach((r: any) => {
   const ci = r.rawCheckIn || r.checkIn;
   const co = r.rawCheckOut || r.checkOut;
   let workTimeStr = "-";
@@ -835,7 +836,22 @@ const isPaidPublicHolidayWork =
   totalPaidPublicHolidayMinutes += paidMinutes;
 }
 
-  if (ci && co) {
+const isPaidLeaveOnly =
+  (r.status === "leave" || r.status === "half_day") &&
+  isScheduledWorkday(r.date, settings) &&
+  !hasActualWork;
+
+if (isPaidLeaveOnly) {
+  const paidMinutes =
+    r.status === "half_day"
+      ? Math.round(((settings.standard_work_hours || 8) * 60) / 2)
+      : Math.round((settings.standard_work_hours || 8) * 60);
+
+  workTimeStr = `유급 ${fmtMinutes(paidMinutes)}`;
+  totalPaidLeaveMinutes += paidMinutes;
+}
+
+if (ci && co) {
             const isNight = (r.workType || "day") === "night";
 
             const isHolidayDay =
@@ -957,7 +973,7 @@ const row = sheet.addRow([
           }).length;
 
           const correctedRecognized =
-  totalRecognized + totalPaidPublicHolidayMinutes;
+  totalRecognized + totalPaidPublicHolidayMinutes + totalPaidLeaveMinutes;
 
           const nonHolidayNightShift = Math.max(0, totalNightShift - totalHolidayNightShift);
           const displayHoliday8h = actualHolidayWithin8Minutes;
@@ -988,6 +1004,7 @@ const displayHolidayOver8h = actualHolidayOver8Minutes;
             ["  연장근무시간", fmtMinutes((emp as any).displayOvertimeMinutes ?? totalOvertime)],
             ["  야간근무시간", fmtMinutes((emp as any).displayNightWorkMinutes ?? totalNight)],
 ["  공휴일 유급인정시간", fmtMinutes(totalPaidPublicHolidayMinutes)],
+["  휴가 유급인정시간", fmtMinutes(totalPaidLeaveMinutes)],
 ["  휴일근로(8h이내)", fmtMinutes(displayHoliday8h)],
 ["  휴일근로(8h초과)", fmtMinutes(displayHolidayOver8h)],
 ["  야간교대근무시간", fmtMinutes((emp as any).displayNightShiftWorkMinutes ?? totalNightShift)],
