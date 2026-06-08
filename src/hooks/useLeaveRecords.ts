@@ -36,7 +36,9 @@ function getDatesBetween(startDate: string, endDate: string): string[] {
 
 function getAttendanceStatusFromLeaveType(leaveType: string | null | undefined): string {
   if (leaveType === 'half_day' || leaveType === 'half') return 'half_day';
-  if (leaveType === 'annual') return 'annual';
+
+  // attendance_records.status enum에는 annual이 없으므로
+  // 연차도 근태 계산용 상태는 leave로 저장한다.
   return 'leave';
 }
 
