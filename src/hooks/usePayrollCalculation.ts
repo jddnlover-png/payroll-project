@@ -213,7 +213,8 @@ export function usePayrollCalculation(year: number, month: number) {
               const totalHolidayPay = sdResult.holiday_work_pay + sdResult.holiday_work_overtime_pay;
               const weeklyHolidayPay = sdResult.weekly_holiday_pay;
               const publicHolidayPay = sdResult.public_holiday_pay;
-              const publicHolidayWorkPay = sdResult.public_holiday_work_pay;
+const publicHolidayWorkPay = sdResult.public_holiday_work_pay;
+const paidLeavePay = sdResult.paid_leave_pay;
 
               const meta = sdResult.meta;
 
@@ -353,6 +354,16 @@ export function usePayrollCalculation(year: number, month: number) {
                   type: "payment",
                 });
               }
+              // 휴가 유급수당 추가
+if (paidLeavePay > 0) {
+  paymentItemsValues.push({
+    itemId: "paid-leave-pay",
+    name: "휴가 유급수당",
+    amount: paidLeavePay,
+    type: "payment",
+    paidLeaveMinutes: meta.paidLeaveMinutes,
+  } as any);
+}
 
               // 공휴일 근로시간 메타 저장
               // 금액이 0원이어도 명세서 근무시간 표시를 위해 시간은 반드시 저장

@@ -73,8 +73,9 @@ export interface SalaryDetailResult {
   holiday_work_pay: number;
   holiday_work_overtime_pay: number;
   public_holiday_pay: number;
-  public_holiday_work_pay: number;
-  weekly_holiday_pay: number;
+public_holiday_work_pay: number;
+paid_leave_pay: number;
+weekly_holiday_pay: number;
   // 휴일 야간교대 가산 (4단계)
   hol_shift_t1_pay: number;
   hol_shift_t2_pay: number;
@@ -109,7 +110,8 @@ export interface SalaryDetailMeta {
   holidayWorkOver8hMinutes: number; // 주휴일 근로 8h 초과 (주간조, 일별 합산)
   holidayNightMinutes: number; // 주휴일 야간 시간 (주간조)
   publicHolidayWorkMinutes: number; // 공휴일 근로 분
-  weeklyHolidayMinutes: number; // 주휴수당 분
+paidLeaveMinutes: number; // 휴가 유급인정 분
+weeklyHolidayMinutes: number; // 주휴수당 분
   hourlyRate: number;
   workedDays: number;
   weeklyHolidayQualified: boolean;
@@ -499,7 +501,11 @@ const empAllAttForAvg = empAllAtt;
   const weeklyHolidayEligible = avgWeeklyMinutes >= 15 * 60;
 
   // 공휴일 유급수당 합계
-  let totalPublicHolidayPay = 0;
+let totalPublicHolidayPay = 0;
+
+// 휴가 유급수당 합계
+let totalPaidLeavePay = 0;
+let paidLeaveMinutes = 0;
 
     // 각 출근일별 처리
   for (const att of attendance) {
@@ -507,17 +513,19 @@ const empAllAttForAvg = empAllAtt;
     const isScheduled = isScheduledWorkday(dateStr, settings);
 
     if (
-      isScheduled &&
-      isPaidLeaveStatus(att.status) &&
-      (!att.check_in || !att.check_out)
-    ) {
-      totalWorkMinutes += standardMinutes;
-      regularMinutes += standardMinutes;
+  isScheduled &&
+  isPaidLeaveStatus(att.status) &&
+  (!att.check_in || !att.check_out)
+) {
+  totalWorkMinutes += standardMinutes;
+  paidLeaveMinutes += standardMinutes;
+  totalPaidLeavePay += floor1((standardMinutes / 60) * hourlyRate);
 
-      // 실제 출근은 아니므로 workedDays/dayShiftDays는 증가시키지 않는다.
-      // 실제근로시간, 주40시간 초과 판정, 연장근로 계산에도 포함하지 않는다.
-      continue;
-    }
+  // 휴가는 인정근무/주휴판단에는 반영하지만,
+  // 방법 B 기준에서는 기본급 regularMinutes에 포함하지 않고
+  // 휴가 유급수당으로 별도 지급한다.
+  continue;
+}
 
     if (!att.check_in || !att.check_out) continue;
 
@@ -1021,8 +1029,9 @@ totalPublicHolidayPay += floor1((standardMinutes / 60) * hourlyRate);
     holiday_work_pay: holidayWorkPay,
     holiday_work_overtime_pay: holidayWorkOvertimePay,
     public_holiday_pay: totalPublicHolidayPay,
-    public_holiday_work_pay: publicHolidayWorkPay,
-    weekly_holiday_pay: totalWeeklyHolidayPay,
+public_holiday_work_pay: publicHolidayWorkPay,
+paid_leave_pay: totalPaidLeavePay,
+weekly_holiday_pay: totalWeeklyHolidayPay,
     hol_shift_t1_pay: holShiftT1Pay,
     hol_shift_t2_pay: holShiftT2Pay,
     hol_shift_t3_pay: holShiftT3Pay,
@@ -1067,7 +1076,8 @@ totalPublicHolidayPay += floor1((standardMinutes / 60) * hourlyRate);
         holShiftT4Min,
       holidayNightMinutes: holidayNightMin,
       publicHolidayWorkMinutes: publicHolidayWorkMin,
-      weeklyHolidayMinutes: totalWeeklyHolidayPay > 0 ? Math.round((totalWeeklyHolidayPay / hourlyRate) * 60) : 0,
+paidLeaveMinutes,
+weeklyHolidayMinutes: totalWeeklyHolidayPay > 0 ? Math.round((totalWeeklyHolidayPay / hourlyRate) * 60) : 0,
       hourlyRate,
       workedDays,
       weeklyHolidayQualified,
