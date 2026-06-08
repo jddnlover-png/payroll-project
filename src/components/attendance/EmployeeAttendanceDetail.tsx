@@ -125,7 +125,7 @@ export function EmployeeAttendanceDetail({
     return Math.round((settings.standard_work_hours || 8) * 60);
   }, [settings.standard_work_hours]);
 
-  const isPaidPublicHolidayRecord = useCallback(
+    const isPaidPublicHolidayRecord = useCallback(
     (record: { date: string; checkIn: string | null; checkOut: string | null }) => {
       const hasActualWork = !!(record.checkIn && record.checkOut);
       const holidayName = publicHolidayMap.get(record.date);
@@ -138,6 +138,30 @@ export function EmployeeAttendanceDetail({
       );
     },
     [settings.apply_public_holiday, publicHolidayMap, isScheduledWorkday],
+  );
+
+  const isPaidLeaveRecord = useCallback(
+    (record: { date: string; status: string; checkIn: string | null; checkOut: string | null }) => {
+      const hasActualWork = !!(record.checkIn && record.checkOut);
+
+      return (
+        !hasActualWork &&
+        isScheduledWorkday(record.date) &&
+        (record.status === 'leave' || record.status === 'half_day')
+      );
+    },
+    [isScheduledWorkday],
+  );
+
+  const getPaidLeaveMinutes = useCallback(
+    (record: { status: string }) => {
+      if (record.status === 'half_day') {
+        return Math.round(getPaidHolidayMinutes() / 2);
+      }
+
+      return getPaidHolidayMinutes();
+    },
+    [getPaidHolidayMinutes],
   );
 
   const getDisplayStatus = useCallback(
@@ -275,9 +299,10 @@ export function EmployeeAttendanceDetail({
     [settings],
   );
 
-  const getDisplayWorkHours = useCallback(
+    const getDisplayWorkHours = useCallback(
   (record: {
     date: string;
+    status: string;
     checkIn: string | null;
     checkOut: string | null;
     breakMinutes: number;
@@ -285,6 +310,10 @@ export function EmployeeAttendanceDetail({
   }) => {
     if (isPaidPublicHolidayRecord(record)) {
       return `유급 ${formatMinutes(getPaidHolidayMinutes())}`;
+    }
+
+    if (isPaidLeaveRecord(record)) {
+      return `유급 ${formatMinutes(getPaidLeaveMinutes(record))}`;
     }
 
     return calculateWorkHours(
@@ -295,7 +324,13 @@ export function EmployeeAttendanceDetail({
       record.workType,
     );
   },
-  [isPaidPublicHolidayRecord, getPaidHolidayMinutes, calculateWorkHours],
+  [
+    isPaidPublicHolidayRecord,
+    isPaidLeaveRecord,
+    getPaidHolidayMinutes,
+    getPaidLeaveMinutes,
+    calculateWorkHours,
+  ],
 );
 
 const getWeeklyHolidayPaidMinutes = useCallback(() => {
@@ -328,10 +363,12 @@ const getWeeklyHolidayPaidMinutes = useCallback(() => {
 
     const displayStatus = getDisplayStatus(record);
 
-    if (
+        if (
       displayStatus === 'present' ||
       displayStatus === 'late' ||
-      displayStatus === 'paid_holiday'
+      displayStatus === 'paid_holiday' ||
+      displayStatus === 'leave' ||
+      displayStatus === 'half_day'
     ) {
       current.scheduledWorked += 1;
     }
@@ -397,6 +434,10 @@ const paidPublicHolidayMinutes = employeeRecords.reduce((sum, r) => {
   return isPaidPublicHolidayRecord(r) ? sum + getPaidHolidayMinutes() : sum;
 }, 0);
 
+const paidLeaveMinutes = employeeRecords.reduce((sum, r) => {
+  return isPaidLeaveRecord(r) ? sum + getPaidLeaveMinutes(r) : sum;
+}, 0);
+
 const actualPublicHolidayWorkMinutes = employeeRecords.reduce((sum, r) => {
   const hasActualWork = !!(r.checkIn && r.checkOut);
   const isPublicHolidayWork =
@@ -429,6 +470,11 @@ worksheet.addRow({ date: '근무시간 상세' });
 worksheet.addRow({
   date: '공휴일 유급인정시간',
   status: formatMinutes(paidPublicHolidayMinutes),
+});
+
+worksheet.addRow({
+  date: '휴가 유급인정시간',
+  status: formatMinutes(paidLeaveMinutes),
 });
 
 worksheet.addRow({
@@ -475,8 +521,10 @@ worksheet.eachRow((row) => {
   publicHolidayMap,
   isScheduledWorkday,
   settings.apply_public_holiday,
-  calculateWorkHours,
+    calculateWorkHours,
   getWeeklyHolidayPaidMinutes,
+  isPaidLeaveRecord,
+  getPaidLeaveMinutes,
 ]);
 
   if (!employee) return null;
