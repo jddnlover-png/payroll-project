@@ -139,11 +139,20 @@ export function useLeaveRecords() {
          .select()
          .single();
  
-       if (error) throw error;
+              if (error) throw error;
+
+       const createdRecord = data as LeaveRecord;
+
+       if (createdRecord.status === 'approved') {
+         await syncApprovedLeaveToAttendance(createdRecord);
+       }
+
        return data;
      },
-     onSuccess: () => {
+          onSuccess: () => {
        queryClient.invalidateQueries({ queryKey: ['leave_records', currentOrganization?.id] });
+       queryClient.invalidateQueries({ queryKey: ['attendance'] });
+       queryClient.invalidateQueries({ queryKey: ['attendance_records'] });
        toast.success('휴가가 신청되었습니다');
      },
      onError: (error) => {
