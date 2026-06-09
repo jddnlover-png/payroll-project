@@ -21,7 +21,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Check, X, Calendar as CalendarIcon, Users, ChevronLeft, ChevronRight, Download, Loader2 } from 'lucide-react';
+import { Plus, Check, X, Calendar as CalendarIcon, Users, ChevronLeft, ChevronRight, Download, Loader2, Pencil, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { EmployeePicker } from '@/components/employee/EmployeePicker';
 import { EmployeeCombobox } from '@/components/employee/EmployeeCombobox';
@@ -46,7 +46,7 @@ const statusConfig = {
 
 export function LeaveManagement() {
   const { employees, activeEmployees, isLoading: employeesLoading } = useEmployees();
-  const { leaveRecords, isLoading: leaveLoading, addLeaveRecord, updateLeaveRecord } = useLeaveRecords();
+  const { leaveRecords, isLoading: leaveLoading, addLeaveRecord, updateLeaveRecord, deleteLeaveRecord } = useLeaveRecords();
   const { settings } = useOrganizationSettings();
 
   const currentYear = new Date().getFullYear();

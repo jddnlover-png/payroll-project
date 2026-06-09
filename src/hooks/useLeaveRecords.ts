@@ -164,43 +164,56 @@ export function useLeaveRecords() {
    });
  
       const updateLeaveRecord = useMutation({
-     mutationFn: async ({ id, ...updates }: { id: string } & LeaveRecordUpdate) => {
-       const { data, error } = await supabase
-         .from('leave_records')
-         .update(updates)
-         .eq('id', id)
-         .select()
-         .single();
- 
-       if (error) throw error;
+  mutationFn: async ({ id, ...updates }: { id: string } & LeaveRecordUpdate) => {
+    const { data: existing, error: selectError } = await supabase
+      .from('leave_records')
+      .select('*')
+      .eq('id', id)
+      .single();
 
-       const updatedRecord = data as LeaveRecord;
+    if (selectError) throw selectError;
 
-       if (updatedRecord.status === 'approved') {
-         await syncApprovedLeaveToAttendance(updatedRecord);
-       }
+    const oldRecord = existing as LeaveRecord;
 
-       if (updatedRecord.status === 'rejected' || updatedRecord.status === 'cancelled') {
-         await removeLeaveFromAttendance(updatedRecord);
-       }
+    if (oldRecord.status === 'approved') {
+      await removeLeaveFromAttendance(oldRecord);
+    }
 
-       return data;
-     },
-     onSuccess: (_, variables) => {
-       queryClient.invalidateQueries({ queryKey: ['leave_records', currentOrganization?.id] });
-       if (variables.status === 'approved') {
-         toast.success('휴가가 승인되었습니다');
-       } else if (variables.status === 'rejected') {
-         toast.success('휴가가 반려되었습니다');
-       } else {
-         toast.success('휴가 정보가 수정되었습니다');
-       }
-     },
-     onError: (error) => {
-       console.error('Error updating leave record:', error);
-       toast.error('휴가 정보 수정 중 오류가 발생했습니다');
-     },
-   });
+    const { data, error } = await supabase
+      .from('leave_records')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    const updatedRecord = data as LeaveRecord;
+
+    if (updatedRecord.status === 'approved') {
+      await syncApprovedLeaveToAttendance(updatedRecord);
+    }
+
+    return data;
+  },
+  onSuccess: (_, variables) => {
+    queryClient.invalidateQueries({ queryKey: ['leave_records', currentOrganization?.id] });
+    queryClient.invalidateQueries({ queryKey: ['attendance'] });
+    queryClient.invalidateQueries({ queryKey: ['attendance_records'] });
+
+    if (variables.status === 'approved') {
+      toast.success('휴가가 승인되었습니다');
+    } else if (variables.status === 'rejected') {
+      toast.success('휴가가 반려되었습니다');
+    } else {
+      toast.success('휴가 정보가 수정되었습니다');
+    }
+  },
+  onError: (error) => {
+    console.error('Error updating leave record:', error);
+    toast.error('휴가 정보 수정 중 오류가 발생했습니다');
+  },
+});
  
       const deleteLeaveRecord = useMutation({
      mutationFn: async (id: string) => {
@@ -224,9 +237,11 @@ export function useLeaveRecords() {
        if (error) throw error;
      },
      onSuccess: () => {
-       queryClient.invalidateQueries({ queryKey: ['leave_records', currentOrganization?.id] });
-       toast.success('휴가 기록이 삭제되었습니다');
-     },
+  queryClient.invalidateQueries({ queryKey: ['leave_records', currentOrganization?.id] });
+  queryClient.invalidateQueries({ queryKey: ['attendance'] });
+  queryClient.invalidateQueries({ queryKey: ['attendance_records'] });
+  toast.success('휴가 기록이 삭제되었습니다');
+},
      onError: (error) => {
        console.error('Error deleting leave record:', error);
        toast.error('휴가 기록 삭제 중 오류가 발생했습니다');
