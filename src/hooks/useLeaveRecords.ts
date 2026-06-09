@@ -94,23 +94,55 @@ async function syncApprovedLeaveToAttendance(record: LeaveRecord) {
 async function removeLeaveFromAttendance(record: LeaveRecord) {
   const dates = getDatesBetween(record.start_date, record.end_date);
 
-  const { error } = await (supabase as any)
-    .from('attendance_records')
-    .update({
-      status: 'absent',
-      check_in: null,
-      check_out: null,
-      break_minutes: 0,
-      work_type: 'day',
-    })
-    .eq('organization_id', record.organization_id)
-    .eq('employee_id', record.employee_id)
-    .in('date', dates)
-    .in('status', LEAVE_ATTENDANCE_STATUSES)
-    .is('check_in', null)
-    .is('check_out', null);
+  for (const date of dates) {
+    const { data: existing, error: selectError } = await (supabase as any)
+      .from('attendance_records')
+      .select('id, status, check_in, check_out')
+      .eq('organization_id', record.organization_id)
+      .eq('employee_id', record.employee_id)
+      .eq('date', date)
+      .maybeSingle();
 
-  if (error) throw error;
+    if (selectError) throw selectError;
+
+    if (existing?.id) {
+      if (
+        LEAVE_ATTENDANCE_STATUSES.includes(existing.status) &&
+        !existing.check_in &&
+        !existing.check_out
+      ) {
+        const { error: updateError } = await (supabase as any)
+          .from('attendance_records')
+          .update({
+            status: 'absent',
+            check_in: null,
+            check_out: null,
+            break_minutes: 0,
+            work_type: 'day',
+          })
+          .eq('id', existing.id);
+
+        if (updateError) throw updateError;
+      }
+
+      continue;
+    }
+
+    const { error: insertError } = await (supabase as any)
+      .from('attendance_records')
+      .insert({
+        organization_id: record.organization_id,
+        employee_id: record.employee_id,
+        date,
+        status: 'absent',
+        check_in: null,
+        check_out: null,
+        break_minutes: 0,
+        work_type: 'day',
+      });
+
+    if (insertError) throw insertError;
+  }
 }
  
 export function useLeaveRecords() {
