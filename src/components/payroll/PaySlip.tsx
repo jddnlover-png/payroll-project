@@ -50,12 +50,53 @@ export function PaySlip({
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
 const [emailAddress, setEmailAddress] = useState(employee?.email || "");
 const [isSending, setIsSending] = useState(false);
+const [approvedLeaveDays, setApprovedLeaveDays] = useState<number | null>(null);
 
 useEffect(() => {
-  if (emailDialogOpen) {
-    setEmailAddress(employee?.email || "");
-  }
-}, [emailDialogOpen, employee?.email]);
+  const fetchApprovedLeaveDays = async () => {
+    if (!record?.employeeId || !record?.month || !open) {
+      setApprovedLeaveDays(null);
+      return;
+    }
+
+    const monthPrefix = record.month; // 예: 2026-03
+
+    const { data, error } = await (supabase as any)
+      .from("leave_records")
+      .select("*")
+      .eq("employee_id", record.employeeId)
+      .eq("status", "approved");
+
+    if (error) {
+      console.error("휴가일수 조회 실패:", error);
+      setApprovedLeaveDays(null);
+      return;
+    }
+
+    const count = (data ?? []).reduce((sum: number, row: any) => {
+      const leaveDate =
+        row.leave_date ??
+        row.date ??
+        row.start_date ??
+        row.request_date ??
+        "";
+
+      if (!String(leaveDate).startsWith(monthPrefix)) return sum;
+
+      const leaveType = row.leave_type ?? row.type ?? row.leaveType;
+
+      if (leaveType === "half_day" || row.status === "half_day") {
+        return sum + 0.5;
+      }
+
+      return sum + 1;
+    }, 0);
+
+    setApprovedLeaveDays(count);
+  };
+
+  fetchApprovedLeaveDays();
+}, [record?.employeeId, record?.month, open]);
 
 const { currentOrganization } = useOrganization();
 const companySettings = useEmployeeStore((state) => state.companySettings);
@@ -199,7 +240,8 @@ const displayPaidLeaveMinutes =
     ? Math.round((paidLeavePayItem.amount / appliedHourlyRate) * 60)
     : 0);
 
-const displayLeaveDays = record.leaveDays || 0;
+const displayLeaveDays =
+  approvedLeaveDays !== null ? approvedLeaveDays : record.leaveDays || 0;
 
   // 계산방법 생성 함수
   const getPaymentFormula = (item: { itemId: string; name: string; amount: number }): string => {
@@ -352,9 +394,14 @@ const displayLeaveDays = record.leaveDays || 0;
     return item.amount > 0 ? "월정액 공제" : "해당 없음";
   };
 
-  const getPayslipHtml = () =>
-    generatePayslipHtml({
-      record,
+  const displayRecord = {
+  ...record,
+  leaveDays: displayLeaveDays,
+};
+
+const getPayslipHtml = () =>
+  generatePayslipHtml({
+    record: displayRecord,
       employee,
       companyName: currentOrganization?.name || companySettings.companyName || "회사명",
       paymentItems,

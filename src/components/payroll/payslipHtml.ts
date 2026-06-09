@@ -221,14 +221,22 @@ export function generatePayslipHtml({
     }
 
     if (item.itemId === "public-holiday-pay" || item.name.includes("공휴일 유급")) {
-      if (appliedHourlyRate > 0 && item.amount > 0) {
-        const hours = item.amount / appliedHourlyRate;
-        return `${fmtNum(appliedHourlyRate)}원 × ${hours.toFixed(1)}시간`;
-      }
-      return "해당 없음";
-    }
+  if (appliedHourlyRate > 0 && item.amount > 0) {
+    const hours = item.amount / appliedHourlyRate;
+    return `${fmtNum(appliedHourlyRate)}원 × ${hours.toFixed(1)}시간`;
+  }
+  return "해당 없음";
+}
 
-    if (item.itemId === "public-holiday-work-pay" || item.name.includes("공휴일 근로")) {
+if (item.itemId === "paid-leave-pay" || item.name.includes("휴가 유급")) {
+  if (appliedHourlyRate > 0 && item.amount > 0) {
+    const hours = item.amount / appliedHourlyRate;
+    return `${fmtNum(appliedHourlyRate)}원 × ${hours.toFixed(1)}시간`;
+  }
+  return "해당 없음";
+}
+
+if (item.itemId === "public-holiday-work-pay" || item.name.includes("공휴일 근로")) {
   if (appliedHourlyRate > 0 && item.amount > 0) {
     const publicHolidayWorkMultiplier = 1.5;
     const hours = item.amount / (appliedHourlyRate * publicHolidayWorkMultiplier);
@@ -262,17 +270,32 @@ export function generatePayslipHtml({
   const insuranceBase = totalPayments;
 
   const publicHolidayPaidMinutesForDisplay = (() => {
-    const publicHolidayItem = displayPaymentItems.find(
-      (item) => item.itemId === "public-holiday-pay" || item.name.includes("공휴일 유급"),
-    );
+  const publicHolidayItem = displayPaymentItems.find(
+    (item) => item.itemId === "public-holiday-pay" || item.name.includes("공휴일 유급"),
+  );
 
-    if (!publicHolidayItem || appliedHourlyRate <= 0) return 0;
+  if (!publicHolidayItem || appliedHourlyRate <= 0) return 0;
 
-    return Math.round((publicHolidayItem.amount / appliedHourlyRate) * 60);
-  })();
+  return (
+    (publicHolidayItem as any).publicHolidayMinutes ??
+    Math.round((publicHolidayItem.amount / appliedHourlyRate) * 60)
+  );
+})();
 
-  const displayTotalWorkMinutes =
-    (record.totalWorkMinutes || 0) + publicHolidayPaidMinutesForDisplay;
+const paidLeaveMinutesForDisplay = (() => {
+  const paidLeaveItem = displayPaymentItems.find(
+    (item) => item.itemId === "paid-leave-pay" || item.name.includes("휴가 유급"),
+  );
+
+  if (!paidLeaveItem || appliedHourlyRate <= 0) return 0;
+
+  return (
+    (paidLeaveItem as any).paidLeaveMinutes ??
+    Math.round((paidLeaveItem.amount / appliedHourlyRate) * 60)
+  );
+})();
+
+const displayTotalWorkMinutes = record.totalWorkMinutes || 0;
 
   const getDeductionFormula = (item: { itemId: string; name: string; amount: number }): string => {
     const si = deductionItems.find((di) => di.id === item.itemId);
@@ -529,20 +552,30 @@ export function generatePayslipHtml({
                 </td>
               </tr>
               <tr>
-                <td style="border-right:1px solid #e2e8f0;white-space:nowrap;">야간교대</td>
-                <td colspan="3" style="border-right:1px solid #e2e8f0;white-space:nowrap;">
-                  ${formatMinutesToTime(displayTotalNightShiftMinutes)}
-                  ${
-                    holidayNightShiftMinutes > 0
-                      ? `(비휴일 ${formatMinutesToTime(nonHolidayNightShiftMinutes)} / 휴일 ${formatMinutesToTime(holidayNightShiftMinutes)})`
-                      : ""
-                  }
-                </td>
-                <td style="border-right:1px solid #e2e8f0;white-space:nowrap;">휴일근로</td>
-                <td style="white-space:nowrap;">
-                  ${formatMinutesToTime(displayHolidayWorkMinutes)}
-                </td>
-              </tr>
+  <td style="border-right:1px solid #e2e8f0;white-space:nowrap;">공휴일 유급</td>
+  <td style="border-right:1px solid #e2e8f0;white-space:nowrap;">
+    ${formatMinutesToTime(publicHolidayPaidMinutesForDisplay)}
+  </td>
+  <td style="border-right:1px solid #e2e8f0;white-space:nowrap;">휴가 유급</td>
+  <td style="border-right:1px solid #e2e8f0;white-space:nowrap;">
+    ${formatMinutesToTime(paidLeaveMinutesForDisplay)}
+  </td>
+  <td style="border-right:1px solid #e2e8f0;white-space:nowrap;">휴일근로</td>
+  <td style="white-space:nowrap;">
+    ${formatMinutesToTime(displayHolidayWorkMinutes)}
+  </td>
+</tr>
+<tr>
+  <td style="border-right:1px solid #e2e8f0;white-space:nowrap;">야간교대</td>
+  <td colspan="5" style="white-space:nowrap;">
+    ${formatMinutesToTime(displayTotalNightShiftMinutes)}
+    ${
+      holidayNightShiftMinutes > 0
+        ? `(비휴일 ${formatMinutesToTime(nonHolidayNightShiftMinutes)} / 휴일 ${formatMinutesToTime(holidayNightShiftMinutes)})`
+        : ""
+    }
+  </td>
+</tr>
             </table>
           </div>
 
