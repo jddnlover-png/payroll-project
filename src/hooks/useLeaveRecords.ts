@@ -42,7 +42,7 @@ function getAttendanceStatusFromLeaveType(leaveType: string | null | undefined):
   return 'leave';
 }
 
-const LEAVE_ATTENDANCE_STATUSES = ['leave', 'annual', 'half_day'];
+const LEAVE_ATTENDANCE_STATUSES = ['leave', 'half_day'];
 
 async function syncApprovedLeaveToAttendance(record: LeaveRecord) {
   const dates = getDatesBetween(record.start_date, record.end_date);
