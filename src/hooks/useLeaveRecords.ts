@@ -96,7 +96,13 @@ async function removeLeaveFromAttendance(record: LeaveRecord) {
 
   const { error } = await (supabase as any)
     .from('attendance_records')
-    .delete()
+    .update({
+      status: 'absent',
+      check_in: null,
+      check_out: null,
+      break_minutes: 0,
+      work_type: 'day',
+    })
     .eq('organization_id', record.organization_id)
     .eq('employee_id', record.employee_id)
     .in('date', dates)
