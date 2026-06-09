@@ -58,9 +58,11 @@ export function LeaveManagement() {
   const BALANCE_PAGE_SIZE = 20;
 
   const [isOpen, setIsOpen] = useState(false);
-  const [processedPage, setProcessedPage] = useState(1);
-  const PROCESSED_PAGE_SIZE = 20;
-  const [formData, setFormData] = useState({
+const [editingRecordId, setEditingRecordId] = useState<string | null>(null);
+const [isEditOpen, setIsEditOpen] = useState(false);
+const [processedPage, setProcessedPage] = useState(1);
+const PROCESSED_PAGE_SIZE = 20;
+const [formData, setFormData] = useState({
     employeeId: '',
     leaveType: 'annual' as 'annual' | 'half_day' | 'sick' | 'personal' | 'other',
     startDate: undefined as Date | undefined,
@@ -95,10 +97,63 @@ export function LeaveManagement() {
       },
       { onSuccess: () => { resetForm(); setIsOpen(false); } }
     );
+    };
+
+  const handleApprove = (id: string) => {
+    updateLeaveRecord.mutate({ id, status: 'approved' });
   };
 
-  const handleApprove = (id: string) => updateLeaveRecord.mutate({ id, status: 'approved' });
-  const handleReject = (id: string) => updateLeaveRecord.mutate({ id, status: 'rejected' });
+  const handleReject = (id: string) => {
+    updateLeaveRecord.mutate({ id, status: 'rejected' });
+  };
+
+  const openEditDialog = (record: any) => {
+  setEditingRecordId(record.id);
+  setFormData({
+    employeeId: record.employee_id,
+    leaveType: record.leave_type,
+    startDate: parseISO(record.start_date),
+    endDate: parseISO(record.end_date),
+    reason: record.reason || '',
+  });
+  setIsEditOpen(true);
+};
+
+const handleUpdate = () => {
+  if (!editingRecordId || !formData.employeeId || !formData.startDate || !formData.endDate) {
+    toast.error('필수 항목을 입력해주세요.');
+    return;
+  }
+
+  const days = calculateDays(formData.startDate, formData.endDate);
+
+  updateLeaveRecord.mutate(
+    {
+      id: editingRecordId,
+      leave_type: formData.leaveType,
+      start_date: format(formData.startDate, 'yyyy-MM-dd'),
+      end_date: format(formData.endDate, 'yyyy-MM-dd'),
+      days: formData.leaveType === 'half_day' ? 0.5 : days,
+      reason: formData.reason,
+      status: 'approved',
+    },
+    {
+      onSuccess: () => {
+        setIsEditOpen(false);
+        setEditingRecordId(null);
+        resetForm();
+      },
+    }
+  );
+};
+
+const handleDelete = (id: string) => {
+  if (!window.confirm('이 휴가 기록을 삭제하시겠습니까? 삭제 시 해당 휴가 근태도 함께 삭제됩니다.')) {
+    return;
+  }
+
+  deleteLeaveRecord.mutate(id);
+};
 
   const getEmployeeInfo = (employeeId: string) => {
     const emp = employees.find(e => e.id === employeeId);
@@ -392,6 +447,144 @@ export function LeaveManagement() {
                   </div>
                 </DialogContent>
               </Dialog>
+              <Dialog
+  open={isEditOpen}
+  onOpenChange={(open) => {
+    setIsEditOpen(open);
+    if (!open) {
+      setEditingRecordId(null);
+      resetForm();
+    }
+  }}
+>
+  <DialogContent className="max-w-md">
+    <DialogHeader>
+      <DialogTitle>휴가 수정</DialogTitle>
+    </DialogHeader>
+
+    <div className="space-y-4 pt-4">
+      <div className="space-y-2">
+        <Label>직원 선택 *</Label>
+        <EmployeeCombobox
+  employees={activeEmployees}
+  value={formData.employeeId}
+  onValueChange={() => {}}
+/>
+<p className="text-xs text-muted-foreground">
+  직원 변경은 지원하지 않습니다. 직원이 잘못된 경우 삭제 후 다시 신청하세요.
+</p>
+      </div>
+
+      <div className="space-y-2">
+        <Label>휴가 유형 *</Label>
+        <Select
+          value={formData.leaveType}
+          onValueChange={(v: any) => setFormData({ ...formData, leaveType: v })}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="선택" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="annual">연차</SelectItem>
+            <SelectItem value="half_day">반차</SelectItem>
+            <SelectItem value="sick">병가</SelectItem>
+            <SelectItem value="personal">경조사</SelectItem>
+            <SelectItem value="other">기타</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>시작일 *</Label>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className={cn(
+                  'w-full justify-start text-left font-normal',
+                  !formData.startDate && 'text-muted-foreground'
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {formData.startDate ? format(formData.startDate, 'yyyy-MM-dd') : '날짜 선택'}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={formData.startDate}
+                onSelect={(d) => setFormData({ ...formData, startDate: d })}
+                locale={ko}
+                className="pointer-events-auto"
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
+
+        <div className="space-y-2">
+          <Label>종료일 *</Label>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className={cn(
+                  'w-full justify-start text-left font-normal',
+                  !formData.endDate && 'text-muted-foreground'
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {formData.endDate ? format(formData.endDate, 'yyyy-MM-dd') : '날짜 선택'}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={formData.endDate}
+                onSelect={(d) => setFormData({ ...formData, endDate: d })}
+                disabled={(d) => formData.startDate ? d < formData.startDate : false}
+                locale={ko}
+                className="pointer-events-auto"
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
+      </div>
+
+      {formData.startDate && formData.endDate && (
+        <p className="text-sm text-muted-foreground">
+          총 {formData.leaveType === 'half_day' ? 0.5 : calculateDays(formData.startDate, formData.endDate)}일
+        </p>
+      )}
+
+      <div className="space-y-2">
+        <Label>사유</Label>
+        <Textarea
+          value={formData.reason}
+          onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
+          placeholder="휴가 사유를 입력해주세요"
+          rows={3}
+        />
+      </div>
+
+      <div className="flex justify-end gap-2 pt-4">
+        <Button
+          variant="outline"
+          onClick={() => {
+            setIsEditOpen(false);
+            setEditingRecordId(null);
+            resetForm();
+          }}
+        >
+          취소
+        </Button>
+        <Button onClick={handleUpdate}>
+          수정 저장
+        </Button>
+      </div>
+    </div>
+  </DialogContent>
+</Dialog>
             </div>
           </div>
 
@@ -440,8 +633,16 @@ export function LeaveManagement() {
                               <Check className="w-4 h-4 mr-1" />승인
                             </Button>
                             <Button size="sm" variant="outline" className="text-red-600" onClick={() => handleReject(request.id)}>
-                              <X className="w-4 h-4 mr-1" />반려
-                            </Button>
+  <X className="w-4 h-4 mr-1" />반려
+</Button>
+
+<Button size="sm" variant="outline" onClick={() => openEditDialog(request)}>
+  <Pencil className="w-4 h-4 mr-1" />수정
+</Button>
+
+<Button size="sm" variant="outline" className="text-red-600" onClick={() => handleDelete(request.id)}>
+  <Trash2 className="w-4 h-4 mr-1" />삭제
+</Button>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -479,7 +680,8 @@ export function LeaveManagement() {
                           <TableHead>기간</TableHead>
                           <TableHead>일수</TableHead>
                           <TableHead>상태</TableHead>
-                          <TableHead>처리일</TableHead>
+<TableHead>처리일</TableHead>
+<TableHead className="text-right">액션</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -500,6 +702,27 @@ export function LeaveManagement() {
                               </Badge>
                             </TableCell>
                             <TableCell>{request.updated_at ? format(parseISO(request.updated_at), 'yyyy-MM-dd') : '-'}</TableCell>
+<TableCell className="text-right">
+  <div className="flex justify-end gap-1">
+    <Button
+      size="sm"
+      variant="outline"
+      onClick={() => openEditDialog(request)}
+    >
+      <Pencil className="w-4 h-4 mr-1" />
+      수정
+    </Button>
+    <Button
+      size="sm"
+      variant="outline"
+      className="text-red-600"
+      onClick={() => handleDelete(request.id)}
+    >
+      <Trash2 className="w-4 h-4 mr-1" />
+      삭제
+    </Button>
+  </div>
+</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
