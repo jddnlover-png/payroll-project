@@ -295,7 +295,15 @@ const paidLeaveMinutesForDisplay = (() => {
   );
 })();
 
-const displayTotalWorkMinutes = record.totalWorkMinutes || 0;
+const calculatedTotalWorkMinutes =
+  (record.regularWorkMinutes || 0) +
+  publicHolidayPaidMinutesForDisplay +
+  paidLeaveMinutesForDisplay;
+
+const displayTotalWorkMinutes = Math.max(
+  record.totalWorkMinutes || 0,
+  calculatedTotalWorkMinutes,
+);
 
   const getDeductionFormula = (item: { itemId: string; name: string; amount: number }): string => {
     const si = deductionItems.find((di) => di.id === item.itemId);
