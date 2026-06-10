@@ -996,7 +996,7 @@ health_insurance_monthly_income: empAny.health_insurance_monthly_income?.toStrin
                       신규 직원 등록
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+                  <DialogContent className="sm:max-w-5xl max-h-[92vh] overflow-y-auto">
                     <DialogHeader>
                       <DialogTitle>{editingEmployeeId ? "직원 정보 수정" : "신규 직원 등록"}</DialogTitle>
                     </DialogHeader>
@@ -1325,7 +1325,7 @@ health_insurance_monthly_income: empAny.health_insurance_monthly_income?.toStrin
                           </div>
                         )}
                       </div>
-                                            <div className="space-y-3 rounded-lg border bg-muted/30 p-3">
+                      <div className="space-y-3 rounded-lg border bg-muted/30 p-3">
                         <div>
                           <p className="text-sm font-semibold">4대보험 산정 기준금액</p>
                           <p className="text-xs text-muted-foreground">
