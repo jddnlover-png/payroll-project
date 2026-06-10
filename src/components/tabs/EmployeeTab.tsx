@@ -1329,8 +1329,11 @@ health_insurance_monthly_income: empAny.health_insurance_monthly_income?.toStrin
                         <div>
                           <p className="text-sm font-semibold">4대보험 산정 기준금액</p>
                           <p className="text-xs text-muted-foreground">
-                            공단 고지 기준금액이 변경된 경우에만 수정합니다. 매월 급여 변동 시 수정하는 항목이 아닙니다.
-                          </p>
+  공단 고지 기준금액이 변경된 경우에만 수정합니다. 매월 급여 변동 시 수정하는 항목이 아닙니다.
+</p>
+<p className="text-xs text-muted-foreground">
+  ※ 국민연금 기준소득월액은 2025.07~2026.06 기준 400,000원 ~ 6,370,000원 범위로 입력합니다.
+</p>
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
