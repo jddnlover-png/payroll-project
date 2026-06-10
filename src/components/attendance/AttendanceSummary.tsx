@@ -767,10 +767,52 @@ fmtMin(emp.displayNightShiftWorkMinutes ?? emp.totalNightShiftWorkMinutes ?? 0),
 
       const fmtMinutes = (m: number) => `${Math.floor(m / 60)}시간 ${m % 60}분`;
 
-      for (const emp of targetEmployees) {
-        const empRecords = attendance
-          .filter((att) => att.employeeId === emp.id)
-          .sort((a, b) => b.date.localeCompare(a.date));
+      const getDatesInRange = (start: string, end: string) => {
+  const result: string[] = [];
+  const s = new Date(`${start}T00:00:00`);
+  const e = new Date(`${end}T00:00:00`);
+
+  for (let d = new Date(s); d <= e; d.setDate(d.getDate() + 1)) {
+    result.push(
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`,
+    );
+  }
+
+  return result;
+};
+
+const allDates = getDatesInRange(dateRange.start, dateRange.end);
+
+for (const emp of targetEmployees) {
+  const empAttendanceMap = new Map(
+    attendance
+      .filter((att) => att.employeeId === emp.id)
+      .map((att) => [att.date, att]),
+  );
+
+  const empRecords = allDates
+    .map((date) => {
+      const existing = empAttendanceMap.get(date) as any;
+
+      if (existing) return existing;
+
+      return {
+        id: `${emp.id}-${date}-empty`,
+        employeeId: emp.id,
+        employeeNumber: emp.employeeNumber,
+        employeeName: emp.name,
+        department: emp.department,
+        date,
+        checkIn: null,
+        checkOut: null,
+        rawCheckIn: null,
+        rawCheckOut: null,
+        breakMinutes: 0,
+        workType: "day",
+        status: "absent",
+      };
+    })
+    .sort((a, b) => b.date.localeCompare(a.date));
 
         const sheetName = `${emp.name}(${emp.employeeNumber})`.slice(0, 31);
         const sheet = workbook.addWorksheet(sheetName);
