@@ -439,7 +439,6 @@ const remainingMinutes = displayTotalMinutes % 60;
         return checkOutMin < endMin;
       }).length;
 
-      const payrollTime = payrollTimeMap.get(emp.id);
 
       return {
         ...emp,
@@ -469,9 +468,9 @@ const remainingMinutes = displayTotalMinutes % 60;
         totalHolidayNightMinutes,
 
         displayRegularMinutes: totalRegularMinutes,
-displayOvertimeMinutes: payrollTime?.overtimeMinutes ?? totalOvertimeWorkMinutes,
-displayNightWorkMinutes: payrollTime?.nightWorkMinutes ?? totalNightWorkMinutes,
-        displayNightShiftWorkMinutes: totalNightShiftWorkMinutes,
+displayOvertimeMinutes: totalOvertimeWorkMinutes,
+displayNightWorkMinutes: totalNightWorkMinutes,
+displayNightShiftWorkMinutes: totalNightShiftWorkMinutes,
 
         holidayNightShiftMinutes,
         nonHolidayNightShiftMinutes,
