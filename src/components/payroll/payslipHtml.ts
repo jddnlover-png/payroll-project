@@ -269,6 +269,17 @@ if (item.itemId === "public-holiday-work-pay" || item.name.includes("공휴일 �
     const taxBase = Math.max(0, totalPayments - thisMonthExemptForCalc - staticExemptDisplay);
   const insuranceBase = totalPayments;
 
+const nationalPensionBaseRaw =
+  Number((employee as any)?.national_pension_monthly_income) || totalPayments;
+
+const nationalPensionBase = Math.min(
+  6_370_000,
+  Math.max(400_000, nationalPensionBaseRaw),
+);
+
+const healthInsuranceBase =
+  Number((employee as any)?.health_insurance_monthly_income) || totalPayments;
+
   const publicHolidayPaidMinutesForDisplay = (() => {
   const publicHolidayItem = displayPaymentItems.find(
     (item) => item.itemId === "public-holiday-pay" || item.name.includes("공휴일 유급"),
@@ -308,8 +319,8 @@ const displayTotalWorkMinutes = Math.max(
   const getDeductionFormula = (item: { itemId: string; name: string; amount: number }): string => {
     const si = deductionItems.find((di) => di.id === item.itemId);
 
-    if (item.itemId === "national-pension") return `${fmtNum(insuranceBase)}원 × ${si?.defaultValue ?? 4.5}%`;
-    if (item.itemId === "health-insurance") return `${fmtNum(insuranceBase)}원 × ${si?.defaultValue ?? 3.545}%`;
+    if (item.itemId === "national-pension") return `${fmtNum(nationalPensionBase)}원 × ${si?.defaultValue ?? 4.75}%`;
+if (item.itemId === "health-insurance") return `${fmtNum(healthInsuranceBase)}원 × ${si?.defaultValue ?? 3.595}%`;
     if (item.itemId === "employment-insurance") return `${fmtNum(insuranceBase)}원 × ${si?.defaultValue ?? 0.9}%`;
     if (item.itemId === "long-term-care") return `건강보험료 × ${si?.defaultValue ?? 12.81}%`;
     if (item.itemId === "income-tax") return `${fmtNum(taxBase)}원 기준 간이세액표 적용`;

@@ -513,7 +513,7 @@ const healthInsuranceAmount = healthInsuranceItem?.defaultValue
                   const rate = item.defaultValue || 12.81;
                   amount = Math.floor((healthInsuranceAmount * rate) / 100 / 10) * 10;
                 } else if (item.id === "health-insurance") {
-                  // 건강보험: insuranceBase 기준
+                  // 건강보험: 직원등록의 건강보험 보수월액 기준
                   amount = healthInsuranceAmount;
                                 } else if (item.id === "national-pension") {
                   // 국민연금: 직원등록의 기준소득월액 기준
@@ -728,7 +728,7 @@ const healthInsuranceAmount = healthInsuranceItem?.defaultValue
                 const rate = item.defaultValue || 12.81;
                 amount = Math.floor((healthInsuranceAmount * rate) / 100 / 10) * 10;
               } else if (item.id === "health-insurance") {
-                // 건강보험: insuranceBaseM 기준
+                // 건강보험: 직원등록의 건강보험 보수월액 기준
                 amount = healthInsuranceAmount;
                             } else if (item.id === "national-pension") {
                 // 국민연금: 직원등록의 기준소득월액 기준

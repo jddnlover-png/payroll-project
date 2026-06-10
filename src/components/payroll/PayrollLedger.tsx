@@ -385,14 +385,26 @@ const { currentOrganization } = useOrganization();
 
     // 공제항목 계산방법 생성
     const taxableAmount = paymentTotal; // 과세대상 급여액
-    const calcDedRows = dedItems.map((item) => {
+
+const nationalPensionBaseRaw =
+  Number((emp as any)?.national_pension_monthly_income) || paymentTotal;
+
+const nationalPensionBase = Math.min(
+  6_370_000,
+  Math.max(400_000, nationalPensionBaseRaw),
+);
+
+const healthInsuranceBase =
+  Number((emp as any)?.health_insurance_monthly_income) || paymentTotal;
+
+const calcDedRows = dedItems.map((item) => {
       let formula = "";
       const settingsItem = deductionItems.find((di) => di.id === item.id);
       // 4대 보험 및 소득세 항목
       if (item.id === "national-pension") {
-        formula = `${fmtNum(taxableAmount)}원 × ${settingsItem?.defaultValue ?? 4.5}%`;
-      } else if (item.id === "health-insurance") {
-        formula = `${fmtNum(taxableAmount)}원 × ${settingsItem?.defaultValue ?? 3.545}%`;
+  formula = `${fmtNum(nationalPensionBase)}원 × ${settingsItem?.defaultValue ?? 4.75}%`;
+} else if (item.id === "health-insurance") {
+  formula = `${fmtNum(healthInsuranceBase)}원 × ${settingsItem?.defaultValue ?? 3.595}%`;
       } else if (item.id === "employment-insurance") {
         formula = `${fmtNum(taxableAmount)}원 × ${settingsItem?.defaultValue ?? 0.9}%`;
       } else if (item.id === "long-term-care") {

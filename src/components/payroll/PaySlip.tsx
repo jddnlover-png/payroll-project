@@ -365,6 +365,17 @@ const displayLeaveDays =
 
   // 4대보험 기준: 비과세 제외 안 함 (법적 기준)
   const insuranceBase = totalPayments;
+
+const nationalPensionBaseRaw =
+  Number((employee as any)?.national_pension_monthly_income) || totalPayments;
+
+const nationalPensionBase = Math.min(
+  6_370_000,
+  Math.max(400_000, nationalPensionBaseRaw),
+);
+
+const healthInsuranceBase =
+  Number((employee as any)?.health_insurance_monthly_income) || totalPayments;
   const publicHolidayPaidMinutesForDisplay = (() => {
     const publicHolidayItem = displayPaymentItems.find(
       (item) => item.itemId === "public-holiday-pay" || item.name.includes("공휴일 유급"),
@@ -382,8 +393,8 @@ const displayLeaveDays =
   const getDeductionFormula = (item: { itemId: string; name: string; amount: number }): string => {
     const si = deductionItems.find((di) => di.id === item.itemId);
     // 4대보험: insuranceBase 기준 (비과세 제외 안 함)
-    if (item.itemId === "national-pension") return `${fmtNum(insuranceBase)}원 × ${si?.defaultValue ?? 4.5}%`;
-    if (item.itemId === "health-insurance") return `${fmtNum(insuranceBase)}원 × ${si?.defaultValue ?? 3.545}%`;
+    if (item.itemId === "national-pension") return `${fmtNum(nationalPensionBase)}원 × ${si?.defaultValue ?? 4.75}%`;
+if (item.itemId === "health-insurance") return `${fmtNum(healthInsuranceBase)}원 × ${si?.defaultValue ?? 3.595}%`;
     if (item.itemId === "employment-insurance") return `${fmtNum(insuranceBase)}원 × ${si?.defaultValue ?? 0.9}%`;
     if (item.itemId === "long-term-care") return `건강보험료 × ${si?.defaultValue ?? 12.81}%`;
     // 소득세: taxBase 기준 (모든 비과세 제외)
