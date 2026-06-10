@@ -438,6 +438,16 @@ export function calculateSingleAttendance(
     nightShiftTier4Minutes,
   };
 }
+/** 월요일 시작 기준 주차 키 */
+function getWeekStartKey(dateStr: string): string {
+  const d = new Date(`${dateStr}T00:00:00`);
+  const day = d.getDay(); // 0=일, 1=월
+  const diffToMonday = day === 0 ? -6 : 1 - day;
+
+  d.setDate(d.getDate() + diffToMonday);
+
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 export function calculateAttendanceTotals(
   records: AttendanceRecord[],
   settings: OrganizationSettings,
@@ -476,11 +486,15 @@ export function calculateAttendanceTotals(
   let totalNightShiftTier2Minutes = 0;
   let totalNightShiftTier3Minutes = 0;
   let totalNightShiftTier4Minutes = 0;
-  let totalHoliday8hMinutes = 0;
+    let totalHoliday8hMinutes = 0;
   let totalHolidayOver8hMinutes = 0;
   let totalHolidayNightMinutes = 0;
 
-  records.forEach((att) => {
+  const weeklyActualWorkMinutesMap = new Map<string, number>();
+
+  const sortedRecords = [...records].sort((a, b) => a.date.localeCompare(b.date));
+
+  sortedRecords.forEach((att) => {
     if (att.rawCheckIn && att.rawCheckOut) {
       const isNight = att.workType === "night";
 
@@ -524,26 +538,50 @@ export function calculateAttendanceTotals(
         totalHolidayOver8hMinutes += breakdown.holidayMinutesOver8h;
         totalHolidayNightMinutes += breakdown.holidayNightMinutes;
         totalNightWorkMinutes += breakdown.nightWorkMinutes;
-      } else if (!isScheduled) {
-        // 비소정근로일 (토요일 등): 설정값 기반 휴무일/휴일 분기
+            } else if (!isScheduled) {
+        // 비소정근로일/휴무일 처리
+        // HOLIDAY 설정이면 휴일근로 버킷으로 처리
+        // REST_DAY 설정이면 주40시간 기준으로 정규/연장 분리
         const nonWorkDayType = (settings as any).non_work_day_default_type ?? "REST_DAY";
+
         if (nonWorkDayType === "HOLIDAY") {
-          // 휴일 처리: 휴일 버킷으로
           totalHoliday8hMinutes += breakdown.holidayMinutesWithin8h;
           totalHolidayOver8hMinutes += breakdown.holidayMinutesOver8h;
           totalHolidayNightMinutes += breakdown.holidayNightMinutes;
           totalNightWorkMinutes += breakdown.nightWorkMinutes;
         } else {
-          // 휴무일 처리 (REST_DAY): 연장근로로
-          const nonNightMinutes = breakdown.recognizedMinutes - breakdown.nightWorkMinutes;
-          totalOvertimeWorkMinutes += nonNightMinutes;
+          const weekKey = getWeekStartKey(att.date);
+          const weeklyLimitMinutes = Math.round(((settings as any).weekly_work_hours ?? 40) * 60);
+          const usedThisWeek = weeklyActualWorkMinutesMap.get(weekKey) ?? 0;
+
+          const nonNightMinutes = Math.max(0, breakdown.recognizedMinutes - breakdown.nightWorkMinutes);
+          const remainingRegularCapacity = Math.max(0, weeklyLimitMinutes - usedThisWeek);
+
+          const regularPart = Math.min(nonNightMinutes, remainingRegularCapacity);
+          const overtimePart = Math.max(0, nonNightMinutes - regularPart);
+
+          totalRegularMinutes += regularPart;
+          totalOvertimeWorkMinutes += overtimePart;
           totalNightWorkMinutes += breakdown.nightWorkMinutes;
+
+          weeklyActualWorkMinutesMap.set(
+            weekKey,
+            usedThisWeek + breakdown.recognizedMinutes,
+          );
         }
-      } else {
-        // 소정근로일 (평일): 정규/연장/야간 정상 분류
+            } else {
+        // 소정근로일: 정규/연장/야간 정상 분류
         totalRegularMinutes += breakdown.regularMinutes;
         totalOvertimeWorkMinutes += breakdown.overtimeWorkMinutes;
         totalNightWorkMinutes += breakdown.nightWorkMinutes;
+
+        const weekKey = getWeekStartKey(att.date);
+        const usedThisWeek = weeklyActualWorkMinutesMap.get(weekKey) ?? 0;
+
+        weeklyActualWorkMinutesMap.set(
+          weekKey,
+          usedThisWeek + breakdown.recognizedMinutes,
+        );
       }
     }
   });
