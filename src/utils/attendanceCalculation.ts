@@ -227,24 +227,52 @@ export function calculateSingleAttendance(
         if (clampDiff > 0) earlyLeaveTruncation += clampDiff;
         effectiveCheckOut = clampedDate;
       }
-    } else if (zone === "overtime") {
-      // 연장수당 구간: 연장종료시간 근처 또는 매시 정각 기준 보정
+        } else if (zone === "overtime") {
+      // 연장수당 구간:
+      // 1) 연장수당 종료시간(overtime_end_time) 이후 보정범위 이내 → 연장종료시간으로 보정
+      // 2) 연장 구간 중간 → 정규퇴근시간(work_end_time) + N시간 기준으로 보정
+      //
+      // 예:
+      // work_end_time = 17:30, 보정값 10분
+      // 기준시각: 17:30, 18:30, 19:30, 20:30 ...
+      // 18:38 → 18:30
+      //
+      // work_end_time = 18:15, 보정값 10분
+      // 기준시각: 18:15, 19:15, 20:15 ...
+      // 19:20 → 19:15
+
       const minutesPastOtEnd = coMin - overtimeEndMinute;
+
       if (minutesPastOtEnd >= 0 && minutesPastOtEnd <= settings.overtime_checkout_threshold) {
-        // 연장종료시간 이후 보정범위 이내 → 연장종료시간으로 절사
+        // 연장종료시간 이후 보정범위 이내 → 연장종료시간으로 보정
         const clampedDate = setKSTHours(coDate, otEndH, otEndM);
         const clampDiff = Math.round((coDate.getTime() - clampedDate.getTime()) / 60000);
         if (clampDiff > 0) overtimeTruncation += clampDiff;
         effectiveCheckOut = clampedDate;
       } else if (minutesPastOtEnd < 0) {
-        // 연장 구간 중간: 매시 정각 기준 보정 (예: 21:10 → 21:00)
-        const minutesPastHour = coMin % 60;
-        if (minutesPastHour > 0 && minutesPastHour <= settings.overtime_checkout_threshold) {
-          const flooredHour = Math.floor(coMin / 60);
-          const clampedDate = setKSTHours(coDate, flooredHour, 0);
-          const clampDiff = Math.round((coDate.getTime() - clampedDate.getTime()) / 60000);
-          if (clampDiff > 0) overtimeTruncation += clampDiff;
-          effectiveCheckOut = clampedDate;
+        // 연장 구간 중간:
+        // 기존: 매시 정각 기준(coMin % 60)
+        // 변경: 정규퇴근시간(workEndMinute) + N시간 기준
+
+        const minutesAfterWorkEnd = coMin - workEndMinute;
+
+        if (minutesAfterWorkEnd > 0) {
+          const anchorCount = Math.floor(minutesAfterWorkEnd / 60);
+          const anchorMinute = workEndMinute + anchorCount * 60;
+          const minutesPastAnchor = coMin - anchorMinute;
+
+          if (
+            minutesPastAnchor > 0 &&
+            minutesPastAnchor <= settings.overtime_checkout_threshold
+          ) {
+            const anchorHour = Math.floor(anchorMinute / 60);
+            const anchorMin = anchorMinute % 60;
+            const clampedDate = setKSTHours(coDate, anchorHour, anchorMin);
+
+            const clampDiff = Math.round((coDate.getTime() - clampedDate.getTime()) / 60000);
+            if (clampDiff > 0) overtimeTruncation += clampDiff;
+            effectiveCheckOut = clampedDate;
+          }
         }
       }
     } else if (zone === "night") {
