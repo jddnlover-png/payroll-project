@@ -468,8 +468,8 @@ const remainingMinutes = displayTotalMinutes % 60;
         totalHolidayNightMinutes,
 
         displayRegularMinutes: totalRegularMinutes,
-displayOvertimeMinutes: totalOvertimeWorkMinutes,
-displayNightWorkMinutes: totalNightWorkMinutes,
+displayOvertimeMinutes: payrollTime?.overtimeMinutes ?? totalOvertimeWorkMinutes,
+displayNightWorkMinutes: payrollTime?.nightWorkMinutes ?? totalNightWorkMinutes,
 displayNightShiftWorkMinutes: totalNightShiftWorkMinutes,
 
         holidayNightShiftMinutes,
