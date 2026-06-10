@@ -470,13 +470,28 @@ if (paidLeavePay > 0) {
               // 소득세 기준: 생산직비과세 + 모든 비과세한도 항목 제외
               const taxBase = Math.max(0, totalPayments - exemptAmount - staticExemptAmount);
 
-              // 4대보험 기준: 비과세 제외 안 함 (법적 기준)
-              const insuranceBase = totalPayments;
+              // 4대보험 산정 기준
+// 국민연금/건강보험은 직원등록의 공단 고지 기준금액을 우선 사용
+// 미입력 시 기존 방식(totalPayments)으로 fallback
+const insuranceBase = totalPayments;
 
-              const healthInsuranceItem = activeDeductionItems.find((i) => i.id === "health-insurance");
-              const healthInsuranceAmount = healthInsuranceItem?.defaultValue
-                ? Math.floor((insuranceBase * healthInsuranceItem.defaultValue) / 100 / 10) * 10
-                : 0;
+const nationalPensionBaseRaw =
+  Number((emp as any).national_pension_monthly_income) || insuranceBase;
+
+const healthInsuranceBase =
+  Number((emp as any).health_insurance_monthly_income) || insuranceBase;
+
+// 국민연금 기준소득월액 상·하한
+// 2025.07~2026.06 기준: 400,000원 ~ 6,370,000원
+const nationalPensionBase = Math.min(
+  6_370_000,
+  Math.max(400_000, nationalPensionBaseRaw),
+);
+
+const healthInsuranceItem = activeDeductionItems.find((i) => i.id === "health-insurance");
+const healthInsuranceAmount = healthInsuranceItem?.defaultValue
+  ? Math.floor((healthInsuranceBase * healthInsuranceItem.defaultValue) / 100 / 10) * 10
+  : 0;
               // 간이세액표 소득세 계산
               const taxResult = await calculateIncomeTax({
                 taxBase,
@@ -500,9 +515,16 @@ if (paidLeavePay > 0) {
                 } else if (item.id === "health-insurance") {
                   // 건강보험: insuranceBase 기준
                   amount = healthInsuranceAmount;
-                } else if (item.id === "national-pension" || item.id === "employment-insurance") {
-                  // 국민연금/고용보험: insuranceBase 기준
-                  amount = item.defaultValue ? Math.floor((insuranceBase * item.defaultValue) / 100 / 10) * 10 : 0;
+                                } else if (item.id === "national-pension") {
+                  // 국민연금: 직원등록의 기준소득월액 기준
+                  amount = item.defaultValue
+                    ? Math.floor((nationalPensionBase * item.defaultValue) / 100 / 10) * 10
+                    : 0;
+                } else if (item.id === "employment-insurance") {
+                  // 고용보험: 기존처럼 지급총액 기준 유지
+                  amount = item.defaultValue
+                    ? Math.floor((insuranceBase * item.defaultValue) / 100 / 10) * 10
+                    : 0;
                 } else if (item.calculationType === "percentage" && item.defaultValue) {
                   // 기타 비율 항목: insuranceBase 기준
                   amount = Math.floor((insuranceBase * item.defaultValue) / 100 / 10) * 10;
@@ -661,14 +683,29 @@ if (paidLeavePay > 0) {
             // 소득세 기준: 모든 비과세한도 항목 제외
             const taxBaseM = Math.max(0, totalPaymentsForDeduction - staticExemptAmountM);
 
-            // 4대보험 기준: 비과세 제외 안 함 (법적 기준)
-            const insuranceBaseM = totalPaymentsForDeduction;
+            // 4대보험 산정 기준
+// 국민연금/건강보험은 직원등록의 공단 고지 기준금액을 우선 사용
+// 미입력 시 기존 방식(totalPaymentsForDeduction)으로 fallback
+const insuranceBaseM = totalPaymentsForDeduction;
 
-            // 건강보험료 먼저 계산 (장기요양보험 산출 기준)
-            const healthInsuranceItem = activeDeductionItems.find((i) => i.id === "health-insurance");
-            const healthInsuranceAmount = healthInsuranceItem?.defaultValue
-              ? Math.floor((insuranceBaseM * healthInsuranceItem.defaultValue) / 100 / 10) * 10
-              : 0;
+const nationalPensionBaseRawM =
+  Number((emp as any).national_pension_monthly_income) || insuranceBaseM;
+
+const healthInsuranceBaseM =
+  Number((emp as any).health_insurance_monthly_income) || insuranceBaseM;
+
+// 국민연금 기준소득월액 상·하한
+// 2025.07~2026.06 기준: 400,000원 ~ 6,370,000원
+const nationalPensionBaseM = Math.min(
+  6_370_000,
+  Math.max(400_000, nationalPensionBaseRawM),
+);
+
+// 건강보험료 먼저 계산 (장기요양보험 산출 기준)
+const healthInsuranceItem = activeDeductionItems.find((i) => i.id === "health-insurance");
+const healthInsuranceAmount = healthInsuranceItem?.defaultValue
+  ? Math.floor((healthInsuranceBaseM * healthInsuranceItem.defaultValue) / 100 / 10) * 10
+  : 0;
 
             // 간이세액표 소득세 계산
             const taxResultM = await calculateIncomeTax({
@@ -693,9 +730,16 @@ if (paidLeavePay > 0) {
               } else if (item.id === "health-insurance") {
                 // 건강보험: insuranceBaseM 기준
                 amount = healthInsuranceAmount;
-              } else if (item.id === "national-pension" || item.id === "employment-insurance") {
-                // 국민연금/고용보험: insuranceBaseM 기준
-                amount = item.defaultValue ? Math.floor((insuranceBaseM * item.defaultValue) / 100 / 10) * 10 : 0;
+                            } else if (item.id === "national-pension") {
+                // 국민연금: 직원등록의 기준소득월액 기준
+                amount = item.defaultValue
+                  ? Math.floor((nationalPensionBaseM * item.defaultValue) / 100 / 10) * 10
+                  : 0;
+              } else if (item.id === "employment-insurance") {
+                // 고용보험: 기존처럼 지급총액 기준 유지
+                amount = item.defaultValue
+                  ? Math.floor((insuranceBaseM * item.defaultValue) / 100 / 10) * 10
+                  : 0;
               } else if (item.calculationType === "percentage" && item.defaultValue) {
                 // 기타 비율 항목: insuranceBaseM 기준
                 amount = Math.floor((insuranceBaseM * item.defaultValue) / 100 / 10) * 10;
