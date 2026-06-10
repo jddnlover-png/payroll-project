@@ -1334,6 +1334,9 @@ health_insurance_monthly_income: empAny.health_insurance_monthly_income?.toStrin
 <p className="text-xs text-muted-foreground">
   ※ 국민연금 기준소득월액은 2025.07~2026.06 기준 400,000원 ~ 6,370,000원 범위로 입력합니다.
 </p>
+<p className="text-xs text-muted-foreground">
+  ※ 건강보험료는 2026년 기준 근로자 본인 부담 월 20,160원 ~ 4,591,740원 범위의 상·하한이 적용됩니다.
+</p>
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
