@@ -1060,9 +1060,9 @@ const displayHolidayOver8h = actualHolidayOver8Minutes;
             ["  외출 절사", totalOuting > 0 ? `-${totalOuting}분` : "0분"],
 
             ["인정근무", fmtMinutes(correctedRecognized)],
-["  정규근무시간", fmtMinutes(totalRegular)],
-["  연장근무시간", fmtMinutes(totalOvertime)],
-["  야간근무시간", fmtMinutes(totalNight)],
+["  정규근무시간", fmtMinutes((emp as any).displayRegularMinutes ?? totalRegular)],
+["  연장근무시간", fmtMinutes((emp as any).displayOvertimeMinutes ?? totalOvertime)],
+["  야간근무시간", fmtMinutes((emp as any).displayNightWorkMinutes ?? totalNight)],
 ["  공휴일 유급인정시간", fmtMinutes(totalPaidPublicHolidayMinutes)],
 ["  휴가 유급인정시간", fmtMinutes(totalPaidLeaveMinutes)],
 ["  휴일근로(8h이내)", fmtMinutes(displayHoliday8h)],

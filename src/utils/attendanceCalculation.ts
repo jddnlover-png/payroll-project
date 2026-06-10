@@ -532,12 +532,20 @@ export function calculateAttendanceTotals(
         totalNightShiftTier2Minutes += breakdown.nightShiftTier2Minutes;
         totalNightShiftTier3Minutes += breakdown.nightShiftTier3Minutes;
         totalNightShiftTier4Minutes += breakdown.nightShiftTier4Minutes;
-      } else if (isHolidayDay) {
-        // 주간조 휴일근무: 휴일 버킷으로 분리 (연장에 합산 금지)
+            } else if (isHolidayDay) {
+        // 주간조 휴일근무: 휴일 버킷으로 분리
         totalHoliday8hMinutes += breakdown.holidayMinutesWithin8h;
         totalHolidayOver8hMinutes += breakdown.holidayMinutesOver8h;
         totalHolidayNightMinutes += breakdown.holidayNightMinutes;
         totalNightWorkMinutes += breakdown.nightWorkMinutes;
+
+        // 휴일에 실제 근로한 시간은 주40 판정용 실근로 누적에는 포함한다.
+        const weekKey = getWeekStartKey(att.date);
+        const usedThisWeek = weeklyActualWorkMinutesMap.get(weekKey) ?? 0;
+        weeklyActualWorkMinutesMap.set(
+          weekKey,
+          usedThisWeek + breakdown.recognizedMinutes,
+        );
             } else if (!isScheduled) {
         // 비소정근로일/휴무일 처리
         // HOLIDAY 설정이면 휴일근로 버킷으로 처리
@@ -569,18 +577,21 @@ export function calculateAttendanceTotals(
             usedThisWeek + breakdown.recognizedMinutes,
           );
         }
-            } else {
+                 } else {
         // 소정근로일: 정규/연장/야간 정상 분류
         totalRegularMinutes += breakdown.regularMinutes;
         totalOvertimeWorkMinutes += breakdown.overtimeWorkMinutes;
         totalNightWorkMinutes += breakdown.nightWorkMinutes;
 
+        // 주40 판정용 누적에는 소정근로일의 정규분만 넣는다.
+        // 평일 연장분은 이미 overtimeWorkMinutes에 들어가므로,
+        // 여기서 recognizedMinutes 전체를 넣으면 토요일 정규분이 1시간 줄어드는 문제가 생긴다.
         const weekKey = getWeekStartKey(att.date);
         const usedThisWeek = weeklyActualWorkMinutesMap.get(weekKey) ?? 0;
 
         weeklyActualWorkMinutesMap.set(
           weekKey,
-          usedThisWeek + breakdown.recognizedMinutes,
+          usedThisWeek + breakdown.regularMinutes,
         );
       }
     }
