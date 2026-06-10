@@ -228,8 +228,9 @@ useEffect(() => {
       });
     }
 
-    return filteredEmps.map((emp) => {
+        return filteredEmps.map((emp) => {
       const payrollTime = payrollTimeMap.get(emp.id);
+
       const empAttendance = attendance.filter((att) => {
         if (att.employeeId !== emp.id) return false;
         return att.date >= dateRange.start && att.date <= dateRange.end;
