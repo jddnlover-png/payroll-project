@@ -335,7 +335,9 @@ export function EmployeeTab({ activeTab: controlledTab }: EmployeeTabProps) {
     bank_name: "",
     account_number: "",
     dependents: 1,
-    children_aged_8_to_20: 0,
+children_aged_8_to_20: 0,
+national_pension_monthly_income: "",
+health_insurance_monthly_income: "",
   });
 
   // 주민등록번호 포맷팅 (자동 하이픈 추가)
@@ -430,7 +432,9 @@ export function EmployeeTab({ activeTab: controlledTab }: EmployeeTabProps) {
       bank_name: "",
       account_number: "",
       dependents: 1,
-      children_aged_8_to_20: 0,
+children_aged_8_to_20: 0,
+national_pension_monthly_income: "",
+health_insurance_monthly_income: "",
     });
     setEditingEmployeeId(null);
     setResidentNumberError("");
@@ -472,7 +476,9 @@ export function EmployeeTab({ activeTab: controlledTab }: EmployeeTabProps) {
         bank_name: formData.bank_name || null,
         account_number: formData.account_number || null,
         dependents: formData.dependents,
-        children_aged_8_to_20: formData.children_aged_8_to_20,
+children_aged_8_to_20: formData.children_aged_8_to_20,
+national_pension_monthly_income: Number(formData.national_pension_monthly_income) || 0,
+health_insurance_monthly_income: Number(formData.health_insurance_monthly_income) || 0,
       };
 
       updateEmployee.mutate({ id: editingEmployeeId, ...updates });
@@ -498,7 +504,9 @@ export function EmployeeTab({ activeTab: controlledTab }: EmployeeTabProps) {
         bank_name: formData.bank_name || null,
         account_number: formData.account_number || null,
         dependents: formData.dependents,
-        children_aged_8_to_20: formData.children_aged_8_to_20,
+children_aged_8_to_20: formData.children_aged_8_to_20,
+national_pension_monthly_income: Number(formData.national_pension_monthly_income) || 0,
+health_insurance_monthly_income: Number(formData.health_insurance_monthly_income) || 0,
       };
 
       addEmployee.mutate(newEmployee);
@@ -531,7 +539,9 @@ export function EmployeeTab({ activeTab: controlledTab }: EmployeeTabProps) {
       bank_name: employee.bank_name || "",
       account_number: employee.account_number || "",
       dependents: empAny.dependents ?? 1,
-      children_aged_8_to_20: empAny.children_aged_8_to_20 ?? 0,
+children_aged_8_to_20: empAny.children_aged_8_to_20 ?? 0,
+national_pension_monthly_income: empAny.national_pension_monthly_income?.toString() || "",
+health_insurance_monthly_income: empAny.health_insurance_monthly_income?.toString() || "",
     });
     setIsOpen(true);
   };
@@ -1315,6 +1325,52 @@ export function EmployeeTab({ activeTab: controlledTab }: EmployeeTabProps) {
                           </div>
                         )}
                       </div>
+                                            <div className="space-y-3 rounded-lg border bg-muted/30 p-3">
+                        <div>
+                          <p className="text-sm font-semibold">4대보험 산정 기준금액</p>
+                          <p className="text-xs text-muted-foreground">
+                            공단 고지 기준금액이 변경된 경우에만 수정합니다. 매월 급여 변동 시 수정하는 항목이 아닙니다.
+                          </p>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>국민연금 기준소득월액</Label>
+                            <Input
+                              type="number"
+                              value={formData.national_pension_monthly_income}
+                              onChange={(e) =>
+                                setFormData({
+                                  ...formData,
+                                  national_pension_monthly_income: e.target.value,
+                                })
+                              }
+                              placeholder="예: 3000000"
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              국민연금공단 기준소득월액 변경 시 수정
+                            </p>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label>건강보험 보수월액</Label>
+                            <Input
+                              type="number"
+                              value={formData.health_insurance_monthly_income}
+                              onChange={(e) =>
+                                setFormData({
+                                  ...formData,
+                                  health_insurance_monthly_income: e.target.value,
+                                })
+                              }
+                              placeholder="예: 3000000"
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              건강보험공단 보수월액 변경 시 수정
+                            </p>
+                          </div>
+                        </div>
+                      </div>
 
                       <div className="flex justify-end gap-2 pt-4">
                         <Button
@@ -1609,6 +1665,18 @@ export function EmployeeTab({ activeTab: controlledTab }: EmployeeTabProps) {
                       : detailEmployee.pay_type === "daily"
                         ? `${(detailEmployee.daily_rate || 0).toLocaleString()}원`
                         : `${(detailEmployee.hourly_rate || 0).toLocaleString()}원`}
+                  </p>
+                </div>
+                                <div>
+                  <p className="text-muted-foreground">국민연금 기준소득월액</p>
+                  <p className="font-medium">
+                    {((detailEmployee as any).national_pension_monthly_income || 0).toLocaleString()}원
+                  </p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">건강보험 보수월액</p>
+                  <p className="font-medium">
+                    {((detailEmployee as any).health_insurance_monthly_income || 0).toLocaleString()}원
                   </p>
                 </div>
                 <div>
