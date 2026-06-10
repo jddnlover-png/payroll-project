@@ -1000,7 +1000,7 @@ health_insurance_monthly_income: empAny.health_insurance_monthly_income?.toStrin
                     <DialogHeader>
                       <DialogTitle>{editingEmployeeId ? "직원 정보 수정" : "신규 직원 등록"}</DialogTitle>
                     </DialogHeader>
-                    <div className="space-y-4 pt-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
                       <div className="space-y-2">
                         <Label>사원번호</Label>
                         <Input
@@ -1018,8 +1018,8 @@ health_insurance_monthly_income: empAny.health_insurance_monthly_income?.toStrin
                           placeholder=""
                         />
                       </div>
-                      <div className="space-y-2">
-                        <Label>주민등록번호</Label>
+                      <div className="md:col-span-2 space-y-2">
+  <Label>주민등록번호</Label>
                         <Input
                           value={formData.resident_number}
                           onChange={handleResidentNumberChange}
@@ -1077,7 +1077,7 @@ health_insurance_monthly_income: empAny.health_insurance_monthly_income?.toStrin
                         </p>
                       </div>
                       {/* 소득세 공제대상 가족 수 */}
-                      <div className="grid grid-cols-2 gap-4">
+<div className="md:col-span-2 grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                           <div className="flex items-center gap-1">
                             <Label>공제대상 가족 수</Label>
@@ -1325,7 +1325,7 @@ health_insurance_monthly_income: empAny.health_insurance_monthly_income?.toStrin
                           </div>
                         )}
                       </div>
-                      <div className="space-y-3 rounded-lg border bg-muted/30 p-3">
+                      <div className="md:col-span-2 space-y-3 rounded-lg border bg-muted/30 p-3">
                         <div>
                           <p className="text-sm font-semibold">4대보험 산정 기준금액</p>
                           <p className="text-xs text-muted-foreground">
@@ -1378,7 +1378,7 @@ health_insurance_monthly_income: empAny.health_insurance_monthly_income?.toStrin
                         </div>
                       </div>
 
-                      <div className="flex justify-end gap-2 pt-4">
+                      <div className="md:col-span-2 flex justify-end gap-2 pt-4">
                         <Button
                           variant="outline"
                           onClick={() => {
