@@ -410,17 +410,29 @@ if (item.itemId === "health-insurance") return `${fmtNum(healthInsuranceBase)}�
   leaveDays: displayLeaveDays,
 };
 
+const employeeForPayslipHtml = {
+  ...(employee as any),
+  national_pension_monthly_income:
+    Number((employee as any)?.national_pension_monthly_income) ||
+    Number((record as any)?.national_pension_monthly_income) ||
+    0,
+  health_insurance_monthly_income:
+    Number((employee as any)?.health_insurance_monthly_income) ||
+    Number((record as any)?.health_insurance_monthly_income) ||
+    0,
+};
+
 const getPayslipHtml = () =>
   generatePayslipHtml({
     record: displayRecord,
-      employee,
-      companyName: currentOrganization?.name || companySettings.companyName || "회사명",
-      paymentItems,
-      deductionItems,
-      orgSettings,
-      yearlyExempt,
-      accumulatedBeforeThisMonth,
-    });
+    employee: employeeForPayslipHtml,
+    companyName: currentOrganization?.name || companySettings.companyName || "회사명",
+    paymentItems,
+    deductionItems,
+    orgSettings,
+    yearlyExempt,
+    accumulatedBeforeThisMonth,
+  });
 
   const handlePrint = () => {
     const printWindow = window.open("", "_blank");
