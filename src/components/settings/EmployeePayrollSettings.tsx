@@ -97,17 +97,18 @@ export const EmployeePayrollSettings = () => {
         };
       });
 
-    const initialDeductionItems: EmployeePayrollOverride[] = deductionItems
-      .filter(item => item.isActive)
-      .map(item => {
-        const override = existingSettings?.deduction_items?.find(o => o.itemId === item.id);
-        return {
-          itemId: item.id,
-          name: item.name,
-          isActive: override ? override.isActive : true,
-          value: override?.value ?? item.defaultValue,
-        };
-      });
+
+const initialDeductionItems: EmployeePayrollOverride[] = deductionItems
+  .filter(item => item.isActive)
+  .map(item => {
+    const override = existingSettings?.deduction_items?.find(o => o.itemId === item.id);
+    return {
+      itemId: item.id,
+      name: item.name,
+      isActive: override ? override.isActive : true,
+      value: override?.value ?? item.defaultValue,
+    };
+  });
 
     setCurrentPaymentItems(initialPaymentItems);
     setCurrentDeductionItems(initialDeductionItems);
@@ -359,18 +360,13 @@ export const EmployeePayrollSettings = () => {
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Input
-                          type="number"
-                          value={item.value ?? ''}
-                          onChange={(e) => updatePaymentItem(item.itemId, { 
-                            value: e.target.value ? Number(e.target.value) : undefined 
-                          })}
-                          className="w-32 text-right"
-                          placeholder="기본값"
-                          disabled={!item.isActive}
-                        />
-                        <span className="text-sm text-muted-foreground w-8">원</span>
-                      </div>
+  <Input
+    value="기본값"
+    className="w-32 text-right text-muted-foreground"
+    disabled
+  />
+  <span className="text-sm text-muted-foreground w-8">%</span>
+</div>
                     </div>
                   ))}
                 </TabsContent>
