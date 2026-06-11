@@ -202,17 +202,23 @@ export const PayrollItemsSettings = () => {
                   </TableCell>
                   <TableCell>{getCalculationTypeLabel(item.calculationType)}</TableCell>
                   <TableCell>
-                    {item.defaultValue !== undefined
-                      ? item.calculationType === "percentage"
-                        ? `${item.defaultValue}%`
-                        : `${item.defaultValue.toLocaleString()}원`
-                      : "-"}
-                    {item.exemptLimit && (
-                      <span className="text-xs text-green-600 ml-1">
-                        (한도 {(item.exemptLimit / 10000).toFixed(0)}만원)
-                      </span>
-                    )}
-                  </TableCell>
+  {type === "deduction" ? (
+    "-"
+  ) : (
+    <>
+      {item.defaultValue !== undefined
+        ? item.calculationType === "percentage"
+          ? `${item.defaultValue}%`
+          : `${item.defaultValue.toLocaleString()}원`
+        : "-"}
+      {item.exemptLimit && (
+        <span className="text-xs text-green-600 ml-1">
+          (한도 {(item.exemptLimit / 10000).toFixed(0)}만원)
+        </span>
+      )}
+    </>
+  )}
+</TableCell>
                   <TableCell className="text-muted-foreground text-sm">{item.description || "-"}</TableCell>
                   <TableCell className="text-center">
                     <Switch
