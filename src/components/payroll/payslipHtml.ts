@@ -319,10 +319,10 @@ const displayTotalWorkMinutes = Math.max(
   const getDeductionFormula = (item: { itemId: string; name: string; amount: number }): string => {
     const si = deductionItems.find((di) => di.id === item.itemId);
 
-    if (item.itemId === "national-pension") return `${fmtNum(nationalPensionBase)}원 × ${si?.defaultValue ?? 4.75}%`;
-if (item.itemId === "health-insurance") return `${fmtNum(healthInsuranceBase)}원 × ${si?.defaultValue ?? 3.595}%`;
-    if (item.itemId === "employment-insurance") return `${fmtNum(insuranceBase)}원 × ${si?.defaultValue ?? 0.9}%`;
-    if (item.itemId === "long-term-care") return `건강보험료 × ${si?.defaultValue ?? 12.81}%`;
+    if (item.itemId === "national-pension") return `${fmtNum(nationalPensionBase)}원 × 4.75%`;
+if (item.itemId === "health-insurance") return `${fmtNum(healthInsuranceBase)}원 × 3.595%`;
+    if (item.itemId === "employment-insurance") return `${fmtNum(insuranceBase)}원 × 0.9%`;
+if (item.itemId === "long-term-care") return `건강보험료 × 12.81%`;
     if (item.itemId === "income-tax") return `${fmtNum(taxBase)}원 기준 간이세액표 적용`;
     if (item.itemId === "local-income-tax" || item.name.includes("지방소득세")) return "소득세 × 10%";
     if (si?.calculationType === "percentage" && si.defaultValue)
