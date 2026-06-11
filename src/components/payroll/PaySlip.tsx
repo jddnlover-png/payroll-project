@@ -366,8 +366,19 @@ const displayLeaveDays =
   // 4대보험 기준: 비과세 제외 안 함 (법적 기준)
   const insuranceBase = totalPayments;
 
+const getDeductionAmount = (itemId: string) => {
+  const found = sortedDeductionItems?.find((item: any) => item.itemId === itemId);
+  return Math.abs(Number(found?.amount) || 0);
+};
+
+const nationalPensionAmount = getDeductionAmount("national-pension");
+const healthInsuranceAmount = getDeductionAmount("health-insurance");
+
 const nationalPensionBaseRaw =
-  Number((employee as any)?.national_pension_monthly_income) || totalPayments;
+  Number((employee as any)?.national_pension_monthly_income) ||
+  Number((record as any)?.national_pension_monthly_income) ||
+  (nationalPensionAmount > 0 ? Math.round(nationalPensionAmount / 0.0475) : 0) ||
+  totalPayments;
 
 const nationalPensionBase = Math.min(
   6_370_000,
@@ -375,7 +386,10 @@ const nationalPensionBase = Math.min(
 );
 
 const healthInsuranceBase =
-  Number((employee as any)?.health_insurance_monthly_income) || totalPayments;
+  Number((employee as any)?.health_insurance_monthly_income) ||
+  Number((record as any)?.health_insurance_monthly_income) ||
+  (healthInsuranceAmount > 0 ? Math.round(healthInsuranceAmount / 0.03595) : 0) ||
+  totalPayments;
   const publicHolidayPaidMinutesForDisplay = (() => {
     const publicHolidayItem = displayPaymentItems.find(
       (item) => item.itemId === "public-holiday-pay" || item.name.includes("공휴일 유급"),
@@ -427,14 +441,8 @@ if (item.itemId === "health-insurance") {
 
 const employeeForPayslipHtml = {
   ...(employee as any),
-  national_pension_monthly_income:
-    Number((employee as any)?.national_pension_monthly_income) ||
-    Number((record as any)?.national_pension_monthly_income) ||
-    0,
-  health_insurance_monthly_income:
-    Number((employee as any)?.health_insurance_monthly_income) ||
-    Number((record as any)?.health_insurance_monthly_income) ||
-    0,
+  national_pension_monthly_income: nationalPensionBase,
+  health_insurance_monthly_income: healthInsuranceBase,
 };
 
 const getPayslipHtml = () =>
