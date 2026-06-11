@@ -410,9 +410,13 @@ const calcDedRows = dedItems.map((item) => {
       const settingsItem = deductionItems.find((di) => di.id === item.id);
       // 4대 보험 및 소득세 항목
       if (item.id === "national-pension") {
-  formula = `${fmtNum(nationalPensionBase)}원 × ${settingsItem?.defaultValue ?? 4.75}%`;
+  const rate = 4.75;
+  const base = item.amount > 0 ? Math.round(item.amount / (rate / 100)) : nationalPensionBase;
+  formula = `${fmtNum(base)}원 × ${rate}%`;
 } else if (item.id === "health-insurance") {
-  formula = `${fmtNum(healthInsuranceBase)}원 × ${settingsItem?.defaultValue ?? 3.595}%`;
+  const rate = 3.595;
+  const base = item.amount > 0 ? Math.round(item.amount / (rate / 100)) : healthInsuranceBase;
+  formula = `${fmtNum(base)}원 × ${rate}%`;
       } else if (item.id === "employment-insurance") {
         formula = `${fmtNum(taxableAmount)}원 × ${settingsItem?.defaultValue ?? 0.9}%`;
       } else if (item.id === "long-term-care") {
