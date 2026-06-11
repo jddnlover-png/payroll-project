@@ -386,8 +386,13 @@ const { currentOrganization } = useOrganization();
     // 공제항목 계산방법 생성
     const taxableAmount = paymentTotal; // 과세대상 급여액
 
+const payrollEmployee = (record as any).employee;
+
 const nationalPensionBaseRaw =
-  Number((emp as any)?.national_pension_monthly_income) || paymentTotal;
+  Number((emp as any)?.national_pension_monthly_income) ||
+  Number(payrollEmployee?.national_pension_monthly_income) ||
+  Number((record as any).national_pension_monthly_income) ||
+  paymentTotal;
 
 const nationalPensionBase = Math.min(
   6_370_000,
@@ -395,7 +400,10 @@ const nationalPensionBase = Math.min(
 );
 
 const healthInsuranceBase =
-  Number((emp as any)?.health_insurance_monthly_income) || paymentTotal;
+  Number((emp as any)?.health_insurance_monthly_income) ||
+  Number(payrollEmployee?.health_insurance_monthly_income) ||
+  Number((record as any).health_insurance_monthly_income) ||
+  paymentTotal;
 
 const calcDedRows = dedItems.map((item) => {
       let formula = "";
