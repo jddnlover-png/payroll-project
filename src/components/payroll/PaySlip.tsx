@@ -393,8 +393,23 @@ const healthInsuranceBase =
   const getDeductionFormula = (item: { itemId: string; name: string; amount: number }): string => {
     const si = deductionItems.find((di) => di.id === item.itemId);
     // 4대보험: insuranceBase 기준 (비과세 제외 안 함)
-    if (item.itemId === "national-pension") return `${fmtNum(nationalPensionBase)}원 × ${si?.defaultValue ?? 4.75}%`;
-if (item.itemId === "health-insurance") return `${fmtNum(healthInsuranceBase)}원 × ${si?.defaultValue ?? 3.595}%`;
+    if (item.itemId === "national-pension") {
+  const rate = 4.75;
+  const base = item.amount > 0
+    ? Math.round(Math.abs(item.amount) / (rate / 100))
+    : nationalPensionBase;
+
+  return `${fmtNum(base)}원 × ${rate}%`;
+}
+
+if (item.itemId === "health-insurance") {
+  const rate = 3.595;
+  const base = item.amount > 0
+    ? Math.round(Math.abs(item.amount) / (rate / 100))
+    : healthInsuranceBase;
+
+  return `${fmtNum(base)}원 × ${rate}%`;
+}
     if (item.itemId === "employment-insurance") return `${fmtNum(insuranceBase)}원 × ${si?.defaultValue ?? 0.9}%`;
     if (item.itemId === "long-term-care") return `건강보험료 × ${si?.defaultValue ?? 12.81}%`;
     // 소득세: taxBase 기준 (모든 비과세 제외)

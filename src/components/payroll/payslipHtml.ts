@@ -319,8 +319,25 @@ const displayTotalWorkMinutes = Math.max(
   const getDeductionFormula = (item: { itemId: string; name: string; amount: number }): string => {
     const si = deductionItems.find((di) => di.id === item.itemId);
 
-    if (item.itemId === "national-pension") return `${fmtNum(nationalPensionBase)}원 × 4.75%`;
-if (item.itemId === "health-insurance") return `${fmtNum(healthInsuranceBase)}원 × 3.595%`;
+    if (item.itemId === "national-pension") {
+  const rate = 4.75;
+  const base =
+    item.amount > 0
+      ? Math.round(Math.abs(item.amount) / (rate / 100))
+      : nationalPensionBase;
+
+  return `${fmtNum(base)}원 × ${rate}%`;
+}
+
+if (item.itemId === "health-insurance") {
+  const rate = 3.595;
+  const base =
+    item.amount > 0
+      ? Math.round(Math.abs(item.amount) / (rate / 100))
+      : healthInsuranceBase;
+
+  return `${fmtNum(base)}원 × ${rate}%`;
+}
     if (item.itemId === "employment-insurance") return `${fmtNum(insuranceBase)}원 × 0.9%`;
 if (item.itemId === "long-term-care") return `건강보험료 × 12.81%`;
     if (item.itemId === "income-tax") return `${fmtNum(taxBase)}원 기준 간이세액표 적용`;
