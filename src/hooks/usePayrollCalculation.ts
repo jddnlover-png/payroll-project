@@ -476,10 +476,16 @@ if (paidLeavePay > 0) {
 const insuranceBase = totalPayments;
 
 const nationalPensionBaseRaw =
-  Number((emp as any).national_pension_monthly_income) || insuranceBase;
+  Number((emp as any).national_pension_monthly_income) ||
+  Number((emp as any).nationalPensionMonthlyIncome) ||
+  Number((emp as any).nationalPensionBase) ||
+  insuranceBase;
 
 const healthInsuranceBase =
-  Number((emp as any).health_insurance_monthly_income) || insuranceBase;
+  Number((emp as any).health_insurance_monthly_income) ||
+  Number((emp as any).healthInsuranceMonthlyIncome) ||
+  Number((emp as any).healthInsuranceBase) ||
+  insuranceBase;
 
 // 국민연금 기준소득월액 상·하한
 // 2025.07~2026.06 기준: 400,000원 ~ 6,370,000원
