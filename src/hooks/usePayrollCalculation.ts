@@ -138,11 +138,49 @@ export function usePayrollCalculation(year: number, month: number) {
         const tier3End = t3eH * 60 + t3eM;
 
         // 선택된 직원 필터링
-        const targetEmployees = employees.filter(
-          (emp) => emp.is_active && employeeIds.includes(emp.id) && emp.employment_type !== "daily",
-        );
+// 중요: useEmployees()의 employees 객체에는 일부 필드가 누락될 수 있으므로
+// 급여 계산 직전 employees 원본 테이블을 다시 조회해서 직원등록 보험 기준금액을 반드시 사용한다.
+const selectedEmployees = employees.filter(
+  (emp) => emp.is_active && employeeIds.includes(emp.id) && emp.employment_type !== "daily",
+);
 
-        const targetEmployeeIds = targetEmployees.map((emp) => emp.id);
+const { data: fullEmployeeRows, error: fullEmployeeError } = await supabase
+  .from("employees")
+  .select("*")
+  .eq("organization_id", currentOrganization.id)
+  .in(
+    "id",
+    selectedEmployees.map((emp) => emp.id),
+  );
+
+if (fullEmployeeError) {
+  console.error("급여계산 직원 원본 조회 실패:", fullEmployeeError);
+  throw fullEmployeeError;
+}
+
+const fullEmployeeMap = new Map(
+  (fullEmployeeRows ?? []).map((emp: any) => [emp.id, emp]),
+);
+
+const targetEmployees = selectedEmployees.map((emp) => {
+  const fullEmp = fullEmployeeMap.get(emp.id);
+
+  return {
+    ...emp,
+    ...fullEmp,
+
+    // 직원등록 화면의 4대보험 산정 기준금액을 최우선 사용
+    national_pension_monthly_income:
+      fullEmp?.national_pension_monthly_income ??
+      (emp as any).national_pension_monthly_income,
+
+    health_insurance_monthly_income:
+      fullEmp?.health_insurance_monthly_income ??
+      (emp as any).health_insurance_monthly_income,
+  };
+});
+
+const targetEmployeeIds = targetEmployees.map((emp) => emp.id);
 
         // 이번 급여계산에서 제외된 직원의 해당 월 생산직 비과세 records 삭제
         // 급여계산 버튼이 해당 월의 최신 계산 상태를 의미하므로,
@@ -475,17 +513,28 @@ if (paidLeavePay > 0) {
 // 미입력 시 기존 방식(totalPayments)으로 fallback
 const insuranceBase = totalPayments;
 
+const nationalPensionMonthlyIncome = Number((emp as any).national_pension_monthly_income);
+const healthInsuranceMonthlyIncome = Number((emp as any).health_insurance_monthly_income);
+
 const nationalPensionBaseRaw =
-  Number((emp as any).national_pension_monthly_income) ||
-  Number((emp as any).nationalPensionMonthlyIncome) ||
-  Number((emp as any).nationalPensionBase) ||
-  insuranceBase;
+  Number.isFinite(nationalPensionMonthlyIncome) && nationalPensionMonthlyIncome > 0
+    ? nationalPensionMonthlyIncome
+    : insuranceBase;
 
 const healthInsuranceBase =
-  Number((emp as any).health_insurance_monthly_income) ||
-  Number((emp as any).healthInsuranceMonthlyIncome) ||
-  Number((emp as any).healthInsuranceBase) ||
-  insuranceBase;
+  Number.isFinite(healthInsuranceMonthlyIncome) && healthInsuranceMonthlyIncome > 0
+    ? healthInsuranceMonthlyIncome
+    : insuranceBase;
+
+console.log("4대보험 기준금액 확인(시급/일급제)", {
+  employeeName: emp.name,
+  employeeId: emp.id,
+  national_pension_monthly_income: (emp as any).national_pension_monthly_income,
+  health_insurance_monthly_income: (emp as any).health_insurance_monthly_income,
+  insuranceBase,
+  nationalPensionBaseRaw,
+  healthInsuranceBase,
+});
 
 // 국민연금 기준소득월액 상·하한
 // 2025.07~2026.06 기준: 400,000원 ~ 6,370,000원
@@ -694,11 +743,28 @@ const healthInsuranceAmount = healthInsuranceItem?.defaultValue
 // 미입력 시 기존 방식(totalPaymentsForDeduction)으로 fallback
 const insuranceBaseM = totalPaymentsForDeduction;
 
+const nationalPensionMonthlyIncomeM = Number((emp as any).national_pension_monthly_income);
+const healthInsuranceMonthlyIncomeM = Number((emp as any).health_insurance_monthly_income);
+
 const nationalPensionBaseRawM =
-  Number((emp as any).national_pension_monthly_income) || insuranceBaseM;
+  Number.isFinite(nationalPensionMonthlyIncomeM) && nationalPensionMonthlyIncomeM > 0
+    ? nationalPensionMonthlyIncomeM
+    : insuranceBaseM;
 
 const healthInsuranceBaseM =
-  Number((emp as any).health_insurance_monthly_income) || insuranceBaseM;
+  Number.isFinite(healthInsuranceMonthlyIncomeM) && healthInsuranceMonthlyIncomeM > 0
+    ? healthInsuranceMonthlyIncomeM
+    : insuranceBaseM;
+
+console.log("4대보험 기준금액 확인(월급제)", {
+  employeeName: emp.name,
+  employeeId: emp.id,
+  national_pension_monthly_income: (emp as any).national_pension_monthly_income,
+  health_insurance_monthly_income: (emp as any).health_insurance_monthly_income,
+  insuranceBaseM,
+  nationalPensionBaseRawM,
+  healthInsuranceBaseM,
+});
 
 // 국민연금 기준소득월액 상·하한
 // 2025.07~2026.06 기준: 400,000원 ~ 6,370,000원
