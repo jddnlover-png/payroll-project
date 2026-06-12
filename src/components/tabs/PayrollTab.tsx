@@ -301,11 +301,13 @@ function RegularPayrollContent() {
       payType: emp.pay_type,
       dailyRate: emp.daily_rate || undefined,
       hourlyRate: emp.hourly_rate || undefined,
-      employmentType: emp.employment_type,
-      status: emp.is_active ? "active" : "inactive",
-      bankName: emp.bank_name || undefined,
-      accountNumber: emp.account_number || undefined,
-      jobCategory: emp.job_category || "office",
+employmentType: emp.employment_type,
+status: emp.is_active ? "active" : "inactive",
+bankName: emp.bank_name || undefined,
+accountNumber: emp.account_number || undefined,
+jobCategory: emp.job_category || "office",
+national_pension_monthly_income: emp.national_pension_monthly_income,
+health_insurance_monthly_income: emp.health_insurance_monthly_income,
     }));
   }, [dbEmployees]);
 

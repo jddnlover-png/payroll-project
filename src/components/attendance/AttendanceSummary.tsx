@@ -88,8 +88,10 @@ export function AttendanceSummary() {
       payType: emp.pay_type,
       dailyRate: emp.daily_rate || undefined,
       hourlyRate: emp.hourly_rate || undefined,
-      employmentType: emp.employment_type,
-      status: emp.is_active ? "active" : "inactive",
+employmentType: emp.employment_type,
+status: emp.is_active ? "active" : "inactive",
+national_pension_monthly_income: emp.national_pension_monthly_income,
+health_insurance_monthly_income: emp.health_insurance_monthly_income,
     }));
   }, [dbEmployees]);
 
