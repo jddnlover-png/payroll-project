@@ -55,7 +55,7 @@ export function AttendanceSummary() {
   const [highlightedEmployeeId, setHighlightedEmployeeId] = useState<string | null>(null);
   const [payTypeFilter, setPayTypeFilter] = useState<"all" | "monthly" | "daily" | "hourly">("all");
   const [isCalculating, setIsCalculating] = useState(false);
-  const { employees: storeEmployees, attendance: storeAttendance, calculatePayrollFromAttendance } = useEmployeeStore();
+  const { employees: storeEmployees, attendance: storeAttendance } = useEmployeeStore();
   const { employees: dbEmployees } = useEmployees();
 
   const today = new Date();
@@ -1146,11 +1146,7 @@ const displayHolidayOver8h = actualHolidayOver8Minutes;
 
     setIsCalculating(true);
     try {
-      if (dbEmployees.length > 0) {
-        await calculatePayroll(selectedEmployeeIds);
-      } else {
-        calculatePayrollFromAttendance(month, selectedEmployeeIds, employees);
-      }
+      await calculatePayroll(selectedEmployeeIds);
 
       setPayrollDialogOpen(false);
       toast.success(`${month} 급여계산이 완료되었습니다`, {

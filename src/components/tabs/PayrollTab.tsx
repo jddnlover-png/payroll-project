@@ -97,7 +97,7 @@ export function PayrollTab({ activeTab = "regular" }: PayrollTabProps) {
 
 function RegularPayrollContent() {
   const { currentOrganization } = useOrganization();
-  const { employees: storeEmployees, payroll: storePayroll, calculatePayrollFromAttendance } = useEmployeeStore();
+  const { employees: storeEmployees, payroll: storePayroll } = useEmployeeStore();
   const { employees: dbEmployees } = useEmployees();
 
   const today = new Date();
@@ -721,14 +721,10 @@ const filteredEmployees = calculableEmployees.filter(
 
   setIsCalculating(true);
     try {
-      if (dbEmployees.length > 0) {
-        await Promise.all([
-          calculatePayroll(selectedEmployeeIds),
-          calculateSalaryDetails.mutateAsync(selectedEmployeeIds),
-        ]);
-      } else {
-        calculatePayrollFromAttendance(selectedMonth, selectedEmployeeIds, convertedEmployees);
-      }
+      await Promise.all([
+  calculatePayroll(selectedEmployeeIds),
+  calculateSalaryDetails.mutateAsync(selectedEmployeeIds),
+]);
       setPayrollDialogOpen(false);
       toast.success(`${selectedMonth} 급여계산이 완료되었습니다`, {
         description: `${selectedEmployeeIds.length}명의 급여가 계산되었습니다.`,
