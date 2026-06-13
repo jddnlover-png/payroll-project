@@ -103,17 +103,31 @@ export function usePayrollCalculation(year: number, month: number) {
         const priorStartDate = `${priorStart.getFullYear()}-${String(priorStart.getMonth() + 1).padStart(2, "0")}-${String(priorStart.getDate()).padStart(2, "0")}`;
 
         // Supabase에서 해당 월 + 직전 4주의 근태 데이터 조회
-        const { data: allAttendanceData, error: attendanceError } = await supabase
-          .from("attendance_records")
-          .select("*")
-          .eq("organization_id", currentOrganization.id)
-          .gte("date", priorStartDate)
-          .lte("date", endDate);
+const { data: allAttendanceData, error: attendanceError } = await supabase
+  .from("attendance_records")
+  .select("*")
+  .eq("organization_id", currentOrganization.id)
+  .gte("date", priorStartDate)
+  .lte("date", endDate);
 
-        if (attendanceError) throw attendanceError;
+if (attendanceError) throw attendanceError;
 
-        // 해당 월 근태만 필터
-        const attendanceData = allAttendanceData?.filter((a) => a.date >= startDate && a.date <= endDate) || [];
+// DB에 등록된 공휴일/대체공휴일 조회
+const { data: holidayRows, error: holidayError } = await (supabase as any)
+  .from("public_holidays")
+  .select("holiday_date")
+  .eq("is_holiday", true)
+  .gte("holiday_date", priorStartDate)
+  .lte("holiday_date", endDate);
+
+if (holidayError) throw holidayError;
+
+const publicHolidayDates = new Set<string>(
+  ((holidayRows || []) as { holiday_date: string }[]).map((h) => h.holiday_date),
+);
+
+// 해당 월 근태만 필터
+const attendanceData = allAttendanceData?.filter((a) => a.date >= startDate && a.date <= endDate) || [];
 
         // 조직 설정에서 급여 계산 관련 값 사용 (하드코딩 제거)
         const overtimeRate = orgSettings.overtime_rate;
@@ -242,13 +256,14 @@ const targetEmployeeIds = targetEmployees.map((emp) => emp.id);
 
               const prevCarryDays = carryMap.get(emp.id) || 0;
               const sdResult = calculateSalaryDetail(
-                emp,
-                empMonthAtt,
-                allAttRaw,
-                orgSettings,
-                yearMonth,
-                prevCarryDays,
-              );
+  emp,
+  empMonthAtt,
+  allAttRaw,
+  orgSettings,
+  yearMonth,
+  prevCarryDays,
+  publicHolidayDates,
+);
 
               const baseSalary = sdResult.regular_pay;
               const overtime = sdResult.overtime_pay;
