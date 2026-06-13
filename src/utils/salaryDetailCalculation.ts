@@ -29,12 +29,11 @@ const FIXED_PUBLIC_HOLIDAYS: Array<[number, number]> = [
 // 음력 기반 공휴일 (매년 다르므로 2025~2027 하드코딩, 이후 확장)
 const LUNAR_HOLIDAYS: Record<number, string[]> = {
   2025: ["2025-01-28", "2025-01-29", "2025-01-30", "2025-05-05", "2025-10-05", "2025-10-06", "2025-10-07"],
-  2026: [
+    2026: [
     "2026-02-16",
     "2026-02-17",
     "2026-02-18",
     "2026-03-02",
-    "2026-05-06",
     "2026-05-24",
     "2026-09-24",
     "2026-09-25",
@@ -126,18 +125,21 @@ function floor1(n: number): number {
 export function isPublicHoliday(dateStr: string, publicHolidayDates?: Set<string>): boolean {
   const normalizedDate = normalizeDateStr(dateStr);
 
-  if (publicHolidayDates?.has(normalizedDate)) {
-    return true;
-  }
-
   const [y, m, d] = normalizedDate.split("-").map(Number);
 
-  // 고정 공휴일
+  // 고정 양력 공휴일은 코드 기준 유지
   for (const [hm, hd] of FIXED_PUBLIC_HOLIDAYS) {
     if (m === hm && d === hd) return true;
   }
 
-  // 음력 기반 공휴일
+  // DB 공휴일 정보가 넘어온 경우,
+  // 음력 공휴일/대체공휴일은 public_holidays 테이블을 기준으로 판단한다.
+  // 이유: 대체공휴일은 매년/수시로 달라질 수 있고 사용자가 SQL로 직접 관리하기 때문.
+  if (publicHolidayDates) {
+    return publicHolidayDates.has(normalizedDate);
+  }
+
+  // DB 정보가 없는 예외 경로에서만 하드코딩 음력 공휴일을 fallback으로 사용한다.
   const lunarDates = LUNAR_HOLIDAYS[y] || [];
   return lunarDates.includes(normalizedDate);
 }
