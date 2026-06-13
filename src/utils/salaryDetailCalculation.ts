@@ -784,32 +784,45 @@ const weekScheduledMinutes = weekDates
       );
 
       // 전월 근태가 allAttendance에 없고 prevCarryDays만 넘어온 경우를 위한 보정.
-      // 기본은 실제 전월 근태기록 우선, 없을 때만 prevCarryDays를 보조로 사용한다.
-      const prevScheduledDates = scheduledFullWeek.filter(
-        (d) => d < monthStart
-      );
+// 기본은 실제 전월 근태기록 우선, 없을 때만 prevCarryDays를 보조로 사용한다.
+// 추가: 첫 달 전월 마지막주차 연결 보정월(payroll_start_month)에 해당하는
+// 전월 소정근로일은 실제 근태가 없을 때 정상근무로 인정한다.
+const correctionMonth = (settings as any).payroll_start_month || null;
 
-      const prevAttendanceDates = new Set(
-        empAllAtt
-          .filter((a) => prevScheduledDates.includes(a.date))
-          .map((a) => a.date)
-      );
+const prevScheduledDates = scheduledFullWeek.filter(
+  (d) => d < monthStart
+);
 
-      const missingPrevScheduledDays = Math.max(
-        0,
-        prevScheduledDates.length - prevAttendanceDates.size
-      );
+const prevAttendanceDates = new Set(
+  empAllAtt
+    .filter((a) => prevScheduledDates.includes(a.date))
+    .map((a) => a.date)
+);
 
-      const carryDaysToApply =
-        hasPrevMonthScheduledDay && missingPrevScheduledDays > 0
-          ? Math.min(prevCarryDays, missingPrevScheduledDays)
-          : 0;
+const correctionScheduledDates = prevScheduledDates.filter(
+  (d) =>
+    correctionMonth &&
+    d.startsWith(correctionMonth) &&
+    !prevAttendanceDates.has(d)
+);
 
-      const adjustedScheduledDaysWorked =
-        stats.scheduledDaysWorked + carryDaysToApply;
+const correctionDaysToApply = correctionScheduledDates.length;
 
-      const adjustedTotalMinutes =
-        stats.totalMinutes + carryDaysToApply * standardMinutes;
+const missingPrevScheduledDays = Math.max(
+  0,
+  prevScheduledDates.length - prevAttendanceDates.size - correctionDaysToApply
+);
+
+const carryDaysToApply =
+  hasPrevMonthScheduledDay && missingPrevScheduledDays > 0
+    ? Math.min(prevCarryDays, missingPrevScheduledDays)
+    : 0;
+
+const adjustedScheduledDaysWorked =
+  stats.scheduledDaysWorked + correctionDaysToApply + carryDaysToApply;
+
+const adjustedTotalMinutes =
+  stats.totalMinutes + (correctionDaysToApply + carryDaysToApply) * standardMinutes;
 
       if (
         adjustedTotalMinutes >= 15 * 60 &&
