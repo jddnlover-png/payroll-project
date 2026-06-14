@@ -409,20 +409,12 @@ const healthInsuranceBase =
     // 4대보험: insuranceBase 기준 (비과세 제외 안 함)
     if (item.itemId === "national-pension") {
   const rate = 4.75;
-  const base = item.amount > 0
-    ? Math.round(Math.abs(item.amount) / (rate / 100))
-    : nationalPensionBase;
-
-  return `${fmtNum(base)}원 × ${rate}%`;
+  return `${fmtNum(nationalPensionBase)}원 × ${rate}%`;
 }
 
 if (item.itemId === "health-insurance") {
   const rate = 3.595;
-  const base = item.amount > 0
-    ? Math.round(Math.abs(item.amount) / (rate / 100))
-    : healthInsuranceBase;
-
-  return `${fmtNum(base)}원 × ${rate}%`;
+  return `${fmtNum(healthInsuranceBase)}원 × ${rate}%`;
 }
     if (item.itemId === "employment-insurance") return `${fmtNum(insuranceBase)}원 × ${si?.defaultValue ?? 0.9}%`;
     if (item.itemId === "long-term-care") return `건강보험료 × ${si?.defaultValue ?? 12.81}%`;
