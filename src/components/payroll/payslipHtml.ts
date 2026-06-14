@@ -280,7 +280,6 @@ const healthInsuranceAmount = getDeductionAmount("health-insurance");
 const nationalPensionBaseRaw =
   Number((employee as any)?.national_pension_monthly_income) ||
   Number((record as any)?.national_pension_monthly_income) ||
-  (nationalPensionAmount > 0 ? Math.round(nationalPensionAmount / 0.0475) : 0) ||
   totalPayments;
 
 const nationalPensionBase = Math.min(
@@ -291,7 +290,6 @@ const nationalPensionBase = Math.min(
 const healthInsuranceBase =
   Number((employee as any)?.health_insurance_monthly_income) ||
   Number((record as any)?.health_insurance_monthly_income) ||
-  (healthInsuranceAmount > 0 ? Math.round(healthInsuranceAmount / 0.03595) : 0) ||
   totalPayments;
 
   const publicHolidayPaidMinutesForDisplay = (() => {
@@ -335,22 +333,12 @@ const displayTotalWorkMinutes = Math.max(
 
     if (item.itemId === "national-pension") {
   const rate = 4.75;
-  const base =
-    item.amount > 0
-      ? Math.round(Math.abs(item.amount) / (rate / 100))
-      : nationalPensionBase;
-
-  return `${fmtNum(base)}원 × ${rate}%`;
+  return `${fmtNum(nationalPensionBase)}원 × ${rate}%`;
 }
 
 if (item.itemId === "health-insurance") {
   const rate = 3.595;
-  const base =
-    item.amount > 0
-      ? Math.round(Math.abs(item.amount) / (rate / 100))
-      : healthInsuranceBase;
-
-  return `${fmtNum(base)}원 × ${rate}%`;
+  return `${fmtNum(healthInsuranceBase)}원 × ${rate}%`;
 }
     if (item.itemId === "employment-insurance") return `${fmtNum(insuranceBase)}원 × 0.9%`;
 if (item.itemId === "long-term-care") return `건강보험료 × 12.81%`;
