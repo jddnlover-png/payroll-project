@@ -13,34 +13,7 @@ import { OrganizationSettings } from "@/hooks/useOrganizationSettings";
 import { calculateSingleAttendance, WorkHoursBreakdown, getKSTMinutes } from "@/utils/attendanceCalculation";
 import { calculateNightTierMinutes } from "@/hooks/useDailyWageSnapshots";
 
-// 대한민국 법정 공휴일 (매년 고정 날짜)
-const FIXED_PUBLIC_HOLIDAYS: Array<[number, number]> = [
-  [1, 1], // 신정
-  [3, 1], // 삼일절
-  [5, 1], // 근로자의 날
-  [5, 5], // 어린이날
-  [6, 6], // 현충일
-  [8, 15], // 광복절
-  [10, 3], // 개천절
-  [10, 9], // 한글날
-  [12, 25], // 크리스마스
-];
 
-// 음력 기반 공휴일 (매년 다르므로 2025~2027 하드코딩, 이후 확장)
-const LUNAR_HOLIDAYS: Record<number, string[]> = {
-  2025: ["2025-01-28", "2025-01-29", "2025-01-30", "2025-05-05", "2025-10-05", "2025-10-06", "2025-10-07"],
-    2026: [
-    "2026-02-16",
-    "2026-02-17",
-    "2026-02-18",
-    "2026-03-02",
-    "2026-05-24",
-    "2026-09-24",
-    "2026-09-25",
-    "2026-09-26",
-  ],
-  2027: ["2027-02-06", "2027-02-07", "2027-02-08", "2027-05-13", "2027-10-14", "2027-10-15", "2027-10-16"],
-};
 
 export interface AttendanceRawRecord {
   id: string;
@@ -125,23 +98,10 @@ function floor1(n: number): number {
 export function isPublicHoliday(dateStr: string, publicHolidayDates?: Set<string>): boolean {
   const normalizedDate = normalizeDateStr(dateStr);
 
-  const [y, m, d] = normalizedDate.split("-").map(Number);
-
-  // 고정 양력 공휴일은 코드 기준 유지
-  for (const [hm, hd] of FIXED_PUBLIC_HOLIDAYS) {
-    if (m === hm && d === hd) return true;
-  }
-
-  // DB 공휴일 정보가 넘어온 경우,
-  // 음력 공휴일/대체공휴일은 public_holidays 테이블을 기준으로 판단한다.
-  // 이유: 대체공휴일은 매년/수시로 달라질 수 있고 사용자가 SQL로 직접 관리하기 때문.
-  if (publicHolidayDates) {
-    return publicHolidayDates.has(normalizedDate);
-  }
-
-  // DB 정보가 없는 예외 경로에서만 하드코딩 음력 공휴일을 fallback으로 사용한다.
-  const lunarDates = LUNAR_HOLIDAYS[y] || [];
-  return lunarDates.includes(normalizedDate);
+  // 공휴일은 public_holidays DB 기준으로만 판단한다.
+  // 설날/추석/부처님오신날/대체공휴일/임시공휴일은 매년 달라질 수 있으므로
+  // 코드 하드코딩하지 않고 DB에 등록된 holiday_date만 사용한다.
+  return publicHolidayDates?.has(normalizedDate) ?? false;
 }
 
 /** 근로자의 날인지 판별 */
