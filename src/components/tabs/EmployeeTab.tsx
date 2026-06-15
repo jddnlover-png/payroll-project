@@ -358,7 +358,7 @@ annual_leave_daily_amount: "",
     return `${numbers.slice(0, 6)}-${numbers.charAt(6)}******`;
   };
 
-  // 주민등록번호 유효성 검증
+    // 주민등록번호 유효성 검증
   const validateResidentNumber = (value: string): string => {
     if (!value) return "";
 
@@ -387,6 +387,11 @@ annual_leave_daily_amount: "",
     }
 
     return "";
+  };
+
+  // 기존 저장된 마스킹 주민번호 여부 확인
+  const isMaskedResidentNumber = (value: string): boolean => {
+    return value.includes("*");
   };
 
   const handleResidentNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -448,15 +453,22 @@ annual_leave_daily_amount: "",
       return;
     }
 
-    if (formData.resident_number) {
-      const error = validateResidentNumber(formData.resident_number);
-      if (error) {
-        toast.error(error);
-        return;
-      }
-    }
+    const shouldValidateResidentNumber =
+  !!formData.resident_number && !isMaskedResidentNumber(formData.resident_number);
 
-    const maskedResidentNumber = formData.resident_number ? maskResidentNumber(formData.resident_number) : null;
+if (shouldValidateResidentNumber) {
+  const error = validateResidentNumber(formData.resident_number);
+  if (error) {
+    toast.error(error);
+    return;
+  }
+}
+
+const maskedResidentNumber = formData.resident_number
+  ? isMaskedResidentNumber(formData.resident_number)
+    ? formData.resident_number
+    : maskResidentNumber(formData.resident_number)
+  : null;
 
     if (editingEmployeeId) {
       const updates: EmployeeUpdate & { resignation_date?: string | null } = {
