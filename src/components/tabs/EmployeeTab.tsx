@@ -338,6 +338,7 @@ export function EmployeeTab({ activeTab: controlledTab }: EmployeeTabProps) {
 children_aged_8_to_20: 0,
 national_pension_monthly_income: "",
 health_insurance_monthly_income: "",
+annual_leave_daily_amount: "",
   });
 
   // 주민등록번호 포맷팅 (자동 하이픈 추가)
@@ -435,6 +436,7 @@ health_insurance_monthly_income: "",
 children_aged_8_to_20: 0,
 national_pension_monthly_income: "",
 health_insurance_monthly_income: "",
+annual_leave_daily_amount: "",
     });
     setEditingEmployeeId(null);
     setResidentNumberError("");
@@ -479,6 +481,7 @@ health_insurance_monthly_income: "",
 children_aged_8_to_20: formData.children_aged_8_to_20,
 national_pension_monthly_income: Number(formData.national_pension_monthly_income) || 0,
 health_insurance_monthly_income: Number(formData.health_insurance_monthly_income) || 0,
+annual_leave_daily_amount: Number(formData.annual_leave_daily_amount) || 0,
       };
 
       updateEmployee.mutate({ id: editingEmployeeId, ...updates });
@@ -507,6 +510,7 @@ health_insurance_monthly_income: Number(formData.health_insurance_monthly_income
 children_aged_8_to_20: formData.children_aged_8_to_20,
 national_pension_monthly_income: Number(formData.national_pension_monthly_income) || 0,
 health_insurance_monthly_income: Number(formData.health_insurance_monthly_income) || 0,
+annual_leave_daily_amount: Number(formData.annual_leave_daily_amount) || 0,
       };
 
       addEmployee.mutate(newEmployee);
@@ -542,6 +546,7 @@ health_insurance_monthly_income: Number(formData.health_insurance_monthly_income
 children_aged_8_to_20: empAny.children_aged_8_to_20 ?? 0,
 national_pension_monthly_income: empAny.national_pension_monthly_income?.toString() || "",
 health_insurance_monthly_income: empAny.health_insurance_monthly_income?.toString() || "",
+annual_leave_daily_amount: empAny.annual_leave_daily_amount?.toString() || "",
     });
     setIsOpen(true);
   };
@@ -1292,16 +1297,31 @@ health_insurance_monthly_income: empAny.health_insurance_monthly_income?.toStrin
                       </div>
                       <div className="grid grid-cols-2 gap-4">
                         {formData.pay_type === "monthly" && (
-                          <div className="space-y-2">
-                            <Label>기본급 (월)</Label>
-                            <Input
-                              type="number"
-                              value={formData.base_salary}
-                              onChange={(e) => setFormData({ ...formData, base_salary: e.target.value })}
-                              placeholder=""
-                            />
-                          </div>
-                        )}
+  <>
+    <div className="space-y-2">
+      <Label>기본급 (월)</Label>
+      <Input
+        type="number"
+        value={formData.base_salary}
+        onChange={(e) => setFormData({ ...formData, base_salary: e.target.value })}
+        placeholder=""
+      />
+    </div>
+
+    <div className="space-y-2">
+      <Label>연차수당 1일 금액</Label>
+      <Input
+        type="number"
+        value={formData.annual_leave_daily_amount}
+        onChange={(e) => setFormData({ ...formData, annual_leave_daily_amount: e.target.value })}
+        placeholder="예: 120000"
+      />
+      <p className="text-xs text-muted-foreground">
+        월급제 직원의 미사용 연차수당 지급 시 1일 기준금액으로 사용됩니다.
+      </p>
+    </div>
+  </>
+)}
                         {formData.pay_type === "hourly" && (
                           <div className="space-y-2">
                             <Label>시급 (원)</Label>
@@ -1673,6 +1693,14 @@ health_insurance_monthly_income: empAny.health_insurance_monthly_income?.toStrin
                         : `${(detailEmployee.hourly_rate || 0).toLocaleString()}원`}
                   </p>
                 </div>
+                {detailEmployee.pay_type === "monthly" && (
+  <div>
+    <p className="text-muted-foreground">연차수당 1일 금액</p>
+    <p className="font-medium">
+      {((detailEmployee as any).annual_leave_daily_amount || 0).toLocaleString()}원
+    </p>
+  </div>
+)}
                                 <div>
                   <p className="text-muted-foreground">국민연금 기준소득월액</p>
                   <p className="font-medium">

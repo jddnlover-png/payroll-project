@@ -194,8 +194,12 @@ const targetEmployees = selectedEmployees.map((emp) => {
       (emp as any).national_pension_monthly_income,
 
     health_insurance_monthly_income:
-      fullEmp?.health_insurance_monthly_income ??
-      (emp as any).health_insurance_monthly_income,
+  fullEmp?.health_insurance_monthly_income ??
+  (emp as any).health_insurance_monthly_income,
+
+annual_leave_daily_amount:
+  fullEmp?.annual_leave_daily_amount ??
+  (emp as any).annual_leave_daily_amount,
   };
 });
 
@@ -231,6 +235,27 @@ const targetEmployeeIds = targetEmployees.map((emp) => emp.id);
         }));
 
         const yearMonth = `${year}-${String(month).padStart(2, "0")}`;
+        let annualLeavePayoutRows: any[] = [];
+
+if (targetEmployeeIds.length > 0) {
+  const { data: payoutRows, error: payoutError } = await (supabase as any)
+    .from("annual_leave_payouts")
+    .select("*")
+    .eq("organization_id", currentOrganization.id)
+    .eq("settlement_month", yearMonth)
+    .in("employee_id", targetEmployeeIds);
+
+  if (payoutError) throw payoutError;
+
+  annualLeavePayoutRows = payoutRows || [];
+}
+
+const annualLeavePayoutMap = new Map<string, number>();
+
+annualLeavePayoutRows.forEach((row) => {
+  const current = annualLeavePayoutMap.get(row.employee_id) || 0;
+  annualLeavePayoutMap.set(row.employee_id, current + Number(row.days || 0));
+});
 
         // 이월 데이터 일괄 조회
         const nonMonthlyIds = targetEmployees.filter((e) => e.pay_type !== "monthly").map((e) => e.id);
@@ -247,7 +272,16 @@ const targetEmployeeIds = targetEmployees.map((emp) => emp.id);
             const workedDays = presentDays + lateDays;
 
             const { actualLateMinutes, actualEarlyLeaveMinutes } = getActualAttendanceMinutes(empAttendance);
+const annualLeavePayoutDays = annualLeavePayoutMap.get(emp.id) || 0;
 
+const annualLeaveDailyAmount =
+  emp.pay_type === "monthly"
+    ? Number((emp as any).annual_leave_daily_amount || 0)
+    : emp.pay_type === "hourly"
+      ? Math.round(Number(emp.hourly_rate || 0) * Number(standardWorkHours || 7))
+      : 0;
+
+const annualLeavePayoutAmount = Math.round(annualLeaveDailyAmount * annualLeavePayoutDays);
             // ========== 시급/일급제: 검증 완료된 salary_details 엔진 사용 ==========
             if (emp.pay_type !== "monthly") {
               const empMonthAtt = allAttRaw.filter(
@@ -436,16 +470,28 @@ if (paidLeavePay > 0) {
               }
 
               // 주휴수당 추가
-              if (weeklyHolidayPay > 0) {
-                paymentItemsValues.push({
-                  itemId: "weekly-holiday-allowance",
-                  name: "주휴수당",
-                  amount: weeklyHolidayPay,
-                  type: "payment",
-                });
-              }
+if (weeklyHolidayPay > 0) {
+  paymentItemsValues.push({
+    itemId: "weekly-holiday-allowance",
+    name: "주휴수당",
+    amount: weeklyHolidayPay,
+    type: "payment",
+  });
+}
 
-              const totalPayments = paymentItemsValues.reduce((sum, item) => sum + item.amount, 0);
+// 휴가 미사용수당 추가
+if (annualLeavePayoutAmount > 0) {
+  paymentItemsValues.push({
+    itemId: "annual-leave-payout",
+    name: "휴가 미사용수당",
+    amount: annualLeavePayoutAmount,
+    type: "payment",
+    annualLeavePayoutDays,
+    annualLeaveDailyAmount,
+  } as any);
+}
+
+const totalPayments = paymentItemsValues.reduce((sum, item) => sum + item.amount, 0);
 
               // ── 생산직 비과세 계산 ──
               // 직전연도 총급여는 production_tax_exempt_settings 에서 조회
@@ -716,25 +762,37 @@ const healthInsuranceAmount =
 
             // 동적 지급 항목 계산
             const paymentItemsValues = activePaymentItems.map((item) => {
-              let amount = 0;
-              if (item.id === "base-salary") {
-                amount = baseSalary;
-              } else if (item.id === "overtime") {
-                amount = (item as any).overrideValue ?? (item as any).defaultValue ?? 0;
-              } else if (item.id === "night-shift-allowance") {
-                amount = (item as any).overrideValue ?? (item as any).defaultValue ?? 0;
-              } else if (item.calculationType === "fixed" && item.defaultValue) {
-                amount = item.defaultValue;
-              } else if (item.calculationType === "percentage" && item.defaultValue) {
-                amount = Math.round((baseSalary * item.defaultValue) / 100);
-              } else if (item.calculationType === "manual") {
-                // 수동입력 항목: overrideValue 우선, 없으면 defaultValue
-                amount = (item as any).overrideValue ?? item.defaultValue ?? 0;
-              }
-              return { itemId: item.id, name: item.name, amount, type: "payment" as const };
-            });
+  let amount = 0;
+  if (item.id === "base-salary") {
+    amount = baseSalary;
+  } else if (item.id === "overtime") {
+    amount = (item as any).overrideValue ?? (item as any).defaultValue ?? 0;
+  } else if (item.id === "night-shift-allowance") {
+    amount = (item as any).overrideValue ?? (item as any).defaultValue ?? 0;
+  } else if (item.calculationType === "fixed" && item.defaultValue) {
+    amount = item.defaultValue;
+  } else if (item.calculationType === "percentage" && item.defaultValue) {
+    amount = Math.round((baseSalary * item.defaultValue) / 100);
+  } else if (item.calculationType === "manual") {
+    // 수동입력 항목: overrideValue 우선, 없으면 defaultValue
+    amount = (item as any).overrideValue ?? item.defaultValue ?? 0;
+  }
+  return { itemId: item.id, name: item.name, amount, type: "payment" as const };
+});
 
-            const totalPayments = paymentItemsValues.reduce((sum, item) => sum + item.amount, 0);
+// 휴가 미사용수당 추가
+if (annualLeavePayoutAmount > 0) {
+  paymentItemsValues.push({
+    itemId: "annual-leave-payout",
+    name: "휴가 미사용수당",
+    amount: annualLeavePayoutAmount,
+    type: "payment",
+    annualLeavePayoutDays,
+    annualLeaveDailyAmount,
+  } as any);
+}
+
+const totalPayments = paymentItemsValues.reduce((sum, item) => sum + item.amount, 0);
 
             // ── 공제 기준 분리 (법적 기준) ──
             const totalPaymentsForDeduction = paymentItemsValues.reduce((sum, item) => sum + item.amount, 0);

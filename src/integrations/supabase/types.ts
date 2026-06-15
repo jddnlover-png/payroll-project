@@ -14,6 +14,54 @@ export type Database = {
   }
   public: {
     Tables: {
+      annual_leave_payouts: {
+  Row: {
+    created_at: string
+    days: number
+    employee_id: string
+    id: string
+    note: string | null
+    organization_id: string
+    settlement_month: string
+    updated_at: string
+  }
+  Insert: {
+    created_at?: string
+    days?: number
+    employee_id: string
+    id?: string
+    note?: string | null
+    organization_id: string
+    settlement_month: string
+    updated_at?: string
+  }
+  Update: {
+    created_at?: string
+    days?: number
+    employee_id?: string
+    id?: string
+    note?: string | null
+    organization_id?: string
+    settlement_month?: string
+    updated_at?: string
+  }
+  Relationships: [
+    {
+      foreignKeyName: "annual_leave_payouts_employee_id_fkey"
+      columns: ["employee_id"]
+      isOneToOne: false
+      referencedRelation: "employees"
+      referencedColumns: ["id"]
+    },
+    {
+      foreignKeyName: "annual_leave_payouts_organization_id_fkey"
+      columns: ["organization_id"]
+      isOneToOne: false
+      referencedRelation: "organizations"
+      referencedColumns: ["id"]
+    },
+  ]
+}
       attendance_edit_logs: {
         Row: {
           attendance_record_id: string
@@ -852,10 +900,11 @@ export type Database = {
         ]
       }
       employees: {
-        Row: {
-          account_number: string | null
-          bank_name: string | null
-          base_salary: number
+  Row: {
+    account_number: string | null
+    annual_leave_daily_amount: number
+    bank_name: string | null
+    base_salary: number
           children_aged_8_to_20: number | null
           created_at: string
           daily_rate: number | null
@@ -882,9 +931,10 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          account_number?: string | null
-          bank_name?: string | null
-          base_salary?: number
+  account_number?: string | null
+  annual_leave_daily_amount?: number
+  bank_name?: string | null
+  base_salary?: number
           children_aged_8_to_20?: number | null
           created_at?: string
           daily_rate?: number | null
@@ -911,9 +961,10 @@ export type Database = {
           updated_at?: string
         }
         Update: {
-          account_number?: string | null
-          bank_name?: string | null
-          base_salary?: number
+  account_number?: string | null
+  annual_leave_daily_amount?: number
+  bank_name?: string | null
+  base_salary?: number
           children_aged_8_to_20?: number | null
           created_at?: string
           daily_rate?: number | null

@@ -1,8 +1,10 @@
 import { useState, useMemo } from 'react';
 import { useEmployees } from '@/hooks/useEmployees';
 import { useLeaveRecords } from '@/hooks/useLeaveRecords';
+import { useAnnualLeavePayouts } from '@/hooks/useAnnualLeavePayouts';
 import { useOrganizationSettings } from '@/hooks/useOrganizationSettings';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -46,13 +48,20 @@ const statusConfig = {
 
 export function LeaveManagement() {
   const { employees, activeEmployees, isLoading: employeesLoading } = useEmployees();
-  const { leaveRecords, isLoading: leaveLoading, addLeaveRecord, updateLeaveRecord, deleteLeaveRecord } = useLeaveRecords();
-  const { settings } = useOrganizationSettings();
+const { leaveRecords, isLoading: leaveLoading, addLeaveRecord, updateLeaveRecord, deleteLeaveRecord } = useLeaveRecords();
+const {
+  annualLeavePayouts,
+  isLoading: payoutLoading,
+  addAnnualLeavePayout,
+  deleteAnnualLeavePayout,
+} = useAnnualLeavePayouts();
+const { settings } = useOrganizationSettings();
 
   const currentYear = new Date().getFullYear();
   const [requestYear, setRequestYear] = useState(currentYear);
   const [balanceYear, setBalanceYear] = useState(currentYear);
-  const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<string[]>([]);
+const [payoutYear, setPayoutYear] = useState(currentYear);
+const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<string[]>([]);
   const [balanceSelectedIds, setBalanceSelectedIds] = useState<string[]>([]);
   const [balancePage, setBalancePage] = useState(1);
   const BALANCE_PAGE_SIZE = 20;
@@ -63,12 +72,19 @@ const [isEditOpen, setIsEditOpen] = useState(false);
 const [processedPage, setProcessedPage] = useState(1);
 const PROCESSED_PAGE_SIZE = 20;
 const [formData, setFormData] = useState({
-    employeeId: '',
-    leaveType: 'annual' as 'annual' | 'half_day' | 'sick' | 'personal' | 'other',
-    startDate: undefined as Date | undefined,
-    endDate: undefined as Date | undefined,
-    reason: '',
-  });
+  employeeId: '',
+  leaveType: 'annual' as 'annual' | 'half_day' | 'sick' | 'personal' | 'other',
+  startDate: undefined as Date | undefined,
+  endDate: undefined as Date | undefined,
+  reason: '',
+});
+
+const [payoutFormData, setPayoutFormData] = useState({
+  employeeId: '',
+  settlementMonth: `${currentYear}-${String(new Date().getMonth() + 1).padStart(2, '0')}`,
+  days: '',
+  note: '',
+});
 
   const resetForm = () => {
     setFormData({ employeeId: '', leaveType: 'annual', startDate: undefined, endDate: undefined, reason: '' });
@@ -179,7 +195,7 @@ const handleDelete = (id: string) => {
     });
   }, [leaveRecords, balanceYear]);
 
-  const isLoading = employeesLoading || leaveLoading;
+  const isLoading = employeesLoading || leaveLoading || payoutLoading;
 
   // 입사일 기준 근로기준법 연차 자동 계산
   const calculateAnnualLeave = (hireDate: string, targetYear: number): number => {
@@ -204,13 +220,85 @@ const handleDelete = (id: string) => {
     }
 
     // 최대 25일
-    return Math.min(total, 25);
-  };
+return Math.min(total, 25);
+};
 
+const getAnnualLeavePayoutDays = (employeeId: string, targetYear: number) => {
+  return annualLeavePayouts
+    .filter(
+      (p) =>
+        p.employee_id === employeeId &&
+        p.settlement_month.startsWith(`${targetYear}-`),
+    )
+    .reduce((sum, p) => sum + Number(p.days || 0), 0);
+};
 
+const getAnnualLeaveDailyAmount = (employee: (typeof employees)[0]) => {
+  if (employee.pay_type === 'monthly') {
+    return Number((employee as any).annual_leave_daily_amount || 0);
+  }
 
+  if (employee.pay_type === 'hourly') {
+    return Math.round(Number(employee.hourly_rate || 0) * Number(settings?.standard_work_hours || 7));
+  }
 
-  // Export leave requests to Excel
+  return 0;
+};
+
+const getAnnualLeavePayoutAmount = (employee: (typeof employees)[0], days: number) => {
+  return Math.round(getAnnualLeaveDailyAmount(employee) * days);
+};
+
+const resetPayoutForm = () => {
+  setPayoutFormData({
+    employeeId: '',
+    settlementMonth: `${currentYear}-${String(new Date().getMonth() + 1).padStart(2, '0')}`,
+    days: '',
+    note: '',
+  });
+};
+
+const handleAddPayout = () => {
+  if (!payoutFormData.employeeId || !payoutFormData.settlementMonth || !payoutFormData.days) {
+    toast.error('직원, 정산연월, 지급일수를 입력해주세요.');
+    return;
+  }
+
+  const days = Number(payoutFormData.days);
+
+  if (!Number.isFinite(days) || days <= 0) {
+    toast.error('지급일수는 0보다 큰 숫자로 입력해주세요.');
+    return;
+  }
+
+  addAnnualLeavePayout.mutate(
+    {
+      employee_id: payoutFormData.employeeId,
+      settlement_month: payoutFormData.settlementMonth,
+      days,
+      note: payoutFormData.note || null,
+    },
+    {
+      onSuccess: () => {
+        resetPayoutForm();
+      },
+    },
+  );
+};
+
+const handleDeletePayout = (id: string) => {
+  if (!window.confirm('이 연차수당 지급 기록을 삭제하시겠습니까?')) {
+    return;
+  }
+
+  deleteAnnualLeavePayout.mutate(id);
+};
+
+const payoutYearRecords = annualLeavePayouts.filter((p) =>
+  p.settlement_month.startsWith(`${payoutYear}-`),
+);
+
+// Export leave requests to Excel
   const exportRequestsToExcel = async () => {
     const recordsToExport = selectedEmployeeIds.length > 0
       ? filteredByYear.filter(r => selectedEmployeeIds.includes(r.employee_id))
@@ -295,11 +383,13 @@ const handleDelete = (id: string) => {
       : activeEmployees;
     empsToExport.forEach(emp => {
       const totalLeave = calculateAnnualLeave(emp.hire_date, balanceYear);
-      const usedLeave = balanceYearRecords
-        .filter(r => r.employee_id === emp.id && r.status === 'approved')
-        .reduce((sum, r) => sum + Number(r.days), 0);
-      const remaining = totalLeave - usedLeave;
-      const rate = totalLeave > 0 ? Math.round((usedLeave / totalLeave) * 100) : 0;
+      const leaveUsedDays = balanceYearRecords
+  .filter(r => r.employee_id === emp.id && r.status === 'approved')
+  .reduce((sum, r) => sum + Number(r.days), 0);
+const payoutUsedDays = getAnnualLeavePayoutDays(emp.id, balanceYear);
+const usedLeave = leaveUsedDays + payoutUsedDays;
+const remaining = totalLeave - usedLeave;
+const rate = totalLeave > 0 ? Math.round((usedLeave / totalLeave) * 100) : 0;
 
       ws.addRow({
         empNo: emp.employee_number,
@@ -345,15 +435,19 @@ const handleDelete = (id: string) => {
       )}
       <Tabs defaultValue="requests" className="w-full">
         <TabsList>
-          <TabsTrigger value="requests" className="flex items-center gap-2">
-            <CalendarIcon className="w-4 h-4" />
-            휴가 신청/승인
-          </TabsTrigger>
-          <TabsTrigger value="balance" className="flex items-center gap-2">
-            <Users className="w-4 h-4" />
-            잔여 휴가 현황
-          </TabsTrigger>
-        </TabsList>
+  <TabsTrigger value="requests" className="flex items-center gap-2">
+    <CalendarIcon className="w-4 h-4" />
+    휴가 신청/승인
+  </TabsTrigger>
+  <TabsTrigger value="balance" className="flex items-center gap-2">
+    <Users className="w-4 h-4" />
+    잔여 휴가 현황
+  </TabsTrigger>
+  <TabsTrigger value="payouts" className="flex items-center gap-2">
+    <Download className="w-4 h-4" />
+    연차수당 관리
+  </TabsTrigger>
+</TabsList>
 
         {/* ===== 휴가 신청/승인 탭 ===== */}
         <TabsContent value="requests" className="space-y-4">
@@ -833,11 +927,13 @@ const handleDelete = (id: string) => {
                     <TableBody>
                       {paginatedEmployees.map(employee => {
                         const totalAnnualLeave = calculateAnnualLeave(employee.hire_date, balanceYear);
-                        const usedLeave = balanceYearRecords
-                          .filter(r => r.employee_id === employee.id && r.status === 'approved')
-                          .reduce((sum, r) => sum + Number(r.days), 0);
-                        const remainingLeave = totalAnnualLeave - usedLeave;
-                        const usageRate = totalAnnualLeave > 0 ? Math.round((usedLeave / totalAnnualLeave) * 100) : 0;
+                        const leaveUsedDays = balanceYearRecords
+  .filter(r => r.employee_id === employee.id && r.status === 'approved')
+  .reduce((sum, r) => sum + Number(r.days), 0);
+const payoutUsedDays = getAnnualLeavePayoutDays(employee.id, balanceYear);
+const usedLeave = leaveUsedDays + payoutUsedDays;
+const remainingLeave = totalAnnualLeave - usedLeave;
+const usageRate = totalAnnualLeave > 0 ? Math.round((usedLeave / totalAnnualLeave) * 100) : 0;
 
                         return (
                           <TableRow key={employee.id}>
@@ -918,6 +1014,158 @@ const handleDelete = (id: string) => {
               </>
             );
           })()}
+                </TabsContent>
+
+        <TabsContent value="payouts" className="space-y-4">
+          {/* 여기에 연차수당 관리 탭 코드 */}
+        </TabsContent>
+                <TabsContent value="payouts" className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-semibold">연차수당 관리</h3>
+              <p className="text-sm text-muted-foreground">
+                미사용 연차를 급여로 지급할 정산월과 지급일수를 등록합니다. 등록된 지급일수는 잔여연차에서 차감됩니다.
+              </p>
+            </div>
+            <YearSelector year={payoutYear} onChange={setPayoutYear} />
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">연차수당 지급 등록</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="space-y-2">
+                  <Label>직원 *</Label>
+                  <EmployeeCombobox
+                    employees={activeEmployees}
+                    value={payoutFormData.employeeId}
+                    onValueChange={(employeeId) =>
+                      setPayoutFormData((prev) => ({ ...prev, employeeId }))
+                    }
+                    placeholder="직원 선택"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>정산연월 *</Label>
+                  <Input
+                    type="month"
+                    value={payoutFormData.settlementMonth}
+                    onChange={(e) =>
+                      setPayoutFormData((prev) => ({ ...prev, settlementMonth: e.target.value }))
+                    }
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>지급일수 *</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.5"
+                    value={payoutFormData.days}
+                    onChange={(e) =>
+                      setPayoutFormData((prev) => ({ ...prev, days: e.target.value }))
+                    }
+                    placeholder="예: 1"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>예상 지급액</Label>
+                  <div className="h-10 flex items-center rounded-md border bg-muted/30 px-3 text-sm font-medium">
+                    {(() => {
+                      const employee = employees.find((e) => e.id === payoutFormData.employeeId);
+                      const days = Number(payoutFormData.days || 0);
+                      if (!employee || !days) return '0원';
+                      return `${getAnnualLeavePayoutAmount(employee, days).toLocaleString()}원`;
+                    })()}
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>비고</Label>
+                <Textarea
+                  value={payoutFormData.note}
+                  onChange={(e) =>
+                    setPayoutFormData((prev) => ({ ...prev, note: e.target.value }))
+                  }
+                  placeholder="예: 4월 미사용 연차 1일 지급"
+                  rows={2}
+                />
+              </div>
+
+              <div className="flex justify-end">
+                <Button onClick={handleAddPayout} disabled={addAnnualLeavePayout.isPending}>
+                  {addAnnualLeavePayout.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  <Plus className="w-4 h-4 mr-2" />
+                  등록
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">
+                {payoutYear}년 연차수당 지급 내역 {payoutYearRecords.length > 0 && `(${payoutYearRecords.length}건)`}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>정산연월</TableHead>
+                    <TableHead>직원</TableHead>
+                    <TableHead>부서</TableHead>
+                    <TableHead className="text-center">지급일수</TableHead>
+                    <TableHead className="text-right">예상 지급액</TableHead>
+                    <TableHead>비고</TableHead>
+                    <TableHead className="text-right">관리</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {payoutYearRecords.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                        등록된 연차수당 지급 내역이 없습니다.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    payoutYearRecords.map((record) => {
+                      const employee = employees.find((e) => e.id === record.employee_id);
+                      const amount = employee ? getAnnualLeavePayoutAmount(employee, Number(record.days)) : 0;
+
+                      return (
+                        <TableRow key={record.id}>
+                          <TableCell>{record.settlement_month}</TableCell>
+                          <TableCell className="font-medium">{employee?.name || '알 수 없음'}</TableCell>
+                          <TableCell>{employee?.department || '-'}</TableCell>
+                          <TableCell className="text-center">{Number(record.days)}일</TableCell>
+                          <TableCell className="text-right font-medium">{amount.toLocaleString()}원</TableCell>
+                          <TableCell className="max-w-[220px] truncate">{record.note || '-'}</TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-red-600"
+                              onClick={() => handleDeletePayout(record.id)}
+                            >
+                              <Trash2 className="w-4 h-4 mr-1" />
+                              삭제
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>

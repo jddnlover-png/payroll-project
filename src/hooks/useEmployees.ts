@@ -28,10 +28,14 @@ export interface Employee {
     dependents: number;
   children_aged_8_to_20: number;
 
-  // 4대보험 산정 기준금액
+    // 4대보험 산정 기준금액
   // 공단 고지 기준금액이 변경된 경우에만 수정
   national_pension_monthly_income: number;
   health_insurance_monthly_income: number;
+
+  // 월급제 연차수당 1일 금액
+  // 시급제는 hourly_rate × 1일 정규시간으로 자동 계산
+  annual_leave_daily_amount: number;
 
   created_at: string;
   updated_at: string;
