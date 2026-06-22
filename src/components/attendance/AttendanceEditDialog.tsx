@@ -49,11 +49,9 @@ const statusOptions = [
   { value: 'present', label: '출근' },
   { value: 'late', label: '지각' },
   { value: 'absent', label: '결근' },
-  { value: 'leave', label: '휴가' },
-  { value: 'half_day', label: '반차' },
 ];
 
-const NON_WORK_STATUSES = ['absent', 'leave', 'half_day'];
+const NON_WORK_STATUSES = ['absent'];
 
 export function AttendanceEditDialog({ open, onOpenChange, record }: AttendanceEditDialogProps) {
   const { currentOrganization } = useOrganization();
