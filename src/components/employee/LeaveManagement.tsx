@@ -70,7 +70,7 @@ const {
   addLedgerEntry,
   updateLedgerEntry,
   deleteLedgerEntry,
-} = useAnnualLeaveLedger(accountYear);
+} = useAnnualLeaveLedger();
 
 const [ledgerFormData, setLedgerFormData] = useState({
   employee_id: '',
@@ -623,13 +623,45 @@ const handleDeleteLedgerEntry = (id: string) => {
       ? activeEmployees.filter(e => balanceSelectedIds.includes(e.id))
       : activeEmployees;
     empsToExport.forEach(emp => {
-      const totalLeave = calculateAnnualLeave(emp.hire_date, balanceYear);
-      const leaveUsedDays = balanceYearRecords
-  .filter(r => r.employee_id === emp.id && r.status === 'approved')
-  .reduce((sum, r) => sum + Number(r.days), 0);
-const payoutUsedDays = getAnnualLeavePayoutDays(emp.id, balanceYear);
-const usedLeave = leaveUsedDays + payoutUsedDays;
-const remaining = totalLeave - usedLeave;
+      const leaveUsages = leaveRecords
+  .filter((r) => {
+    const startYear = parseISO(r.start_date).getFullYear();
+    return r.employee_id === emp.id && r.status === 'approved' && startYear === balanceYear;
+  })
+  .map((r) => ({
+    employee_id: r.employee_id,
+    days: Number(r.days || 0),
+  }));
+
+const payouts = annualLeavePayouts
+  .filter(
+    (p) =>
+      p.employee_id === emp.id &&
+      p.settlement_month.startsWith(`${balanceYear}-`),
+  )
+  .map((p) => ({
+    employee_id: p.employee_id,
+    days: Number(p.days || 0),
+  }));
+
+const balance = calculateAnnualLeaveBalance({
+  employee: {
+    id: emp.id,
+    hire_date: emp.hire_date,
+  },
+  year: balanceYear,
+  policy: {
+    policyMode: 'legal',
+    carryOverMode: 'unlimited',
+  },
+  ledgerEntries,
+  leaveUsages,
+  payouts,
+});
+
+const totalLeave = balance.totalAvailableDays;
+const usedLeave = balance.usedLeaveDays + balance.payoutDays;
+const remaining = balance.remainingDays;
 const rate = totalLeave > 0 ? Math.round((usedLeave / totalLeave) * 100) : 0;
 
       ws.addRow({
@@ -1171,13 +1203,45 @@ const rate = totalLeave > 0 ? Math.round((usedLeave / totalLeave) * 100) : 0;
                     </TableHeader>
                     <TableBody>
                       {paginatedEmployees.map(employee => {
-                        const totalAnnualLeave = calculateAnnualLeave(employee.hire_date, balanceYear);
-                        const leaveUsedDays = balanceYearRecords
-  .filter(r => r.employee_id === employee.id && r.status === 'approved')
-  .reduce((sum, r) => sum + Number(r.days), 0);
-const payoutUsedDays = getAnnualLeavePayoutDays(employee.id, balanceYear);
-const usedLeave = leaveUsedDays + payoutUsedDays;
-const remainingLeave = totalAnnualLeave - usedLeave;
+                        const leaveUsages = leaveRecords
+  .filter((r) => {
+    const startYear = parseISO(r.start_date).getFullYear();
+    return r.employee_id === employee.id && r.status === 'approved' && startYear === balanceYear;
+  })
+  .map((r) => ({
+    employee_id: r.employee_id,
+    days: Number(r.days || 0),
+  }));
+
+const payouts = annualLeavePayouts
+  .filter(
+    (p) =>
+      p.employee_id === employee.id &&
+      p.settlement_month.startsWith(`${balanceYear}-`),
+  )
+  .map((p) => ({
+    employee_id: p.employee_id,
+    days: Number(p.days || 0),
+  }));
+
+const balance = calculateAnnualLeaveBalance({
+  employee: {
+    id: employee.id,
+    hire_date: employee.hire_date,
+  },
+  year: balanceYear,
+  policy: {
+    policyMode: 'legal',
+    carryOverMode: 'unlimited',
+  },
+  ledgerEntries,
+  leaveUsages,
+  payouts,
+});
+
+const totalAnnualLeave = balance.totalAvailableDays;
+const usedLeave = balance.usedLeaveDays + balance.payoutDays;
+const remainingLeave = balance.remainingDays;
 const usageRate = totalAnnualLeave > 0 ? Math.round((usedLeave / totalAnnualLeave) * 100) : 0;
 
                         return (
