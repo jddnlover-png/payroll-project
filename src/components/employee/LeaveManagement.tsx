@@ -64,10 +64,24 @@ const { settings } = useOrganizationSettings();
   const [balanceYear, setBalanceYear] = useState(currentYear);
 const [payoutYear, setPayoutYear] = useState(currentYear);
 const [accountYear, setAccountYear] = useState(currentYear);
-const { ledgerEntries, isLoading: ledgerLoading, addLedgerEntry } = useAnnualLeaveLedger(accountYear);
+const {
+  ledgerEntries,
+  isLoading: ledgerLoading,
+  addLedgerEntry,
+  updateLedgerEntry,
+  deleteLedgerEntry,
+} = useAnnualLeaveLedger(accountYear);
 
 const [ledgerFormData, setLedgerFormData] = useState({
   employee_id: '',
+  entry_type: 'adjustment',
+  days: '',
+  reason: '',
+});
+
+const [selectedAccountEmployeeId, setSelectedAccountEmployeeId] = useState<string | null>(null);
+const [editingLedgerEntryId, setEditingLedgerEntryId] = useState<string | null>(null);
+const [ledgerEditFormData, setLedgerEditFormData] = useState({
   entry_type: 'adjustment',
   days: '',
   reason: '',
@@ -383,6 +397,146 @@ const handleAddLedgerEntry = async () => {
     days: '',
     reason: '',
   });
+};
+const getLedgerTypeLabel = (type: string) => {
+  const labels: Record<string, string> = {
+    grant: '자동발생',
+    initial_adjustment: '최초도입 조정',
+    adjustment: '관리자 조정',
+    extra_grant: '회사 추가부여',
+    carryover: '이월',
+    advance_use: '선사용',
+    leave_use: '휴가사용',
+    payout: '연차수당',
+  };
+
+  return labels[type] || type;
+};
+
+const selectedAccountRow = annualLeaveAccountRows.find(
+  (row) => row.employee.id === selectedAccountEmployeeId,
+);
+
+const selectedAccountDetailRows = selectedAccountRow
+  ? [
+      {
+        id: 'system-grant',
+        date: `${accountYear}-01-01`,
+        type: 'grant',
+        label: '자동발생',
+        days: selectedAccountRow.balance.baseGrantedDays,
+        reason: '입사일 기준 자동 발생',
+        source: '시스템',
+        editable: false,
+      },
+      ...ledgerEntries
+        .filter(
+          (entry) =>
+            entry.employee_id === selectedAccountRow.employee.id &&
+            entry.ledger_year === accountYear,
+        )
+        .map((entry) => ({
+          id: entry.id,
+          date: entry.ledger_date,
+          type: entry.entry_type,
+          label: getLedgerTypeLabel(entry.entry_type),
+          days:
+            entry.entry_type === 'advance_use'
+              ? -Math.abs(Number(entry.days || 0))
+              : Number(entry.days || 0),
+          reason: entry.reason,
+          source: '관리자',
+          editable: true,
+          raw: entry,
+        })),
+      ...leaveRecords
+        .filter((record) => {
+          const startYear = parseISO(record.start_date).getFullYear();
+          return (
+            record.employee_id === selectedAccountRow.employee.id &&
+            record.status === 'approved' &&
+            startYear === accountYear
+          );
+        })
+        .map((record) => ({
+          id: `leave-${record.id}`,
+          date: record.start_date,
+          type: 'leave_use',
+          label: '휴가사용',
+          days: -Math.abs(Number(record.days || 0)),
+          reason: record.reason || '휴가 신청 승인',
+          source: '휴가신청',
+          editable: false,
+        })),
+      ...annualLeavePayouts
+        .filter(
+          (payout) =>
+            payout.employee_id === selectedAccountRow.employee.id &&
+            payout.settlement_month.startsWith(`${accountYear}-`),
+        )
+        .map((payout) => ({
+          id: `payout-${payout.id}`,
+          date: `${payout.settlement_month}-01`,
+          type: 'payout',
+          label: '연차수당',
+          days: -Math.abs(Number(payout.days || 0)),
+          reason: payout.note || '연차수당 지급',
+          source: '연차수당관리',
+          editable: false,
+        })),
+    ]
+      .filter((row) => Number(row.days || 0) !== 0)
+      .sort((a, b) => b.date.localeCompare(a.date))
+  : [];
+
+const handleEditLedgerEntry = (entry: any) => {
+  setEditingLedgerEntryId(entry.id);
+  setLedgerEditFormData({
+    entry_type: entry.raw.entry_type,
+    days: String(entry.raw.days),
+    reason: entry.raw.reason || '',
+  });
+};
+
+const handleUpdateLedgerEntry = () => {
+  if (!editingLedgerEntryId) return;
+
+  if (!ledgerEditFormData.days || Number(ledgerEditFormData.days) === 0) {
+    toast.error('일수를 입력해주세요.');
+    return;
+  }
+
+  if (!ledgerEditFormData.reason.trim()) {
+    toast.error('사유를 입력해주세요.');
+    return;
+  }
+
+  updateLedgerEntry.mutate(
+    {
+      id: editingLedgerEntryId,
+      entry_type: ledgerEditFormData.entry_type as any,
+      days: Number(ledgerEditFormData.days),
+      reason: ledgerEditFormData.reason.trim(),
+    },
+    {
+      onSuccess: () => {
+        setEditingLedgerEntryId(null);
+        setLedgerEditFormData({
+          entry_type: 'adjustment',
+          days: '',
+          reason: '',
+        });
+      },
+    },
+  );
+};
+
+const handleDeleteLedgerEntry = (id: string) => {
+  if (!window.confirm('이 연차계좌 내역을 삭제하시겠습니까?')) {
+    return;
+  }
+
+  deleteLedgerEntry.mutate(id);
 };
 
 // Export leave requests to Excel
@@ -1229,7 +1383,11 @@ const usageRate = totalAnnualLeave > 0 ? Math.round((usedLeave / totalAnnualLeav
           </TableRow>
         ) : (
           annualLeaveAccountRows.map(({ employee, balance }) => (
-            <TableRow key={employee.id}>
+  <TableRow
+    key={employee.id}
+    className="cursor-pointer hover:bg-muted/50"
+    onClick={() => setSelectedAccountEmployeeId(employee.id)}
+  >
               <TableCell className="font-medium">{employee.employee_number}</TableCell>
               <TableCell>{employee.name}</TableCell>
               <TableCell>{employee.department || '-'}</TableCell>
@@ -1237,7 +1395,9 @@ const usageRate = totalAnnualLeave > 0 ? Math.round((usedLeave / totalAnnualLeav
               <TableCell className="text-center">{balance.initialAdjustmentDays}일</TableCell>
               <TableCell className="text-center">{balance.extraGrantDays}일</TableCell>
               <TableCell className="text-center">{balance.carryOverDays}일</TableCell>
-              <TableCell className="text-center">{balance.advanceUseDays}일</TableCell>
+              <TableCell className="text-center text-red-600">
+  {balance.advanceUseDays > 0 ? `-${balance.advanceUseDays}` : balance.advanceUseDays}일
+</TableCell>
               <TableCell className="text-center">{balance.usedLeaveDays}일</TableCell>
               <TableCell className="text-center">{balance.payoutDays}일</TableCell>
               <TableCell className="text-center font-semibold">
@@ -1250,6 +1410,172 @@ const usageRate = totalAnnualLeave > 0 ? Math.round((usedLeave / totalAnnualLeav
     </Table>
   </div>
 </TabsContent>
+<Dialog
+  open={!!selectedAccountEmployeeId}
+  onOpenChange={(open) => {
+    if (!open) {
+      setSelectedAccountEmployeeId(null);
+      setEditingLedgerEntryId(null);
+    }
+  }}
+>
+  <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+    <DialogHeader>
+      <DialogTitle>연차계좌 상세</DialogTitle>
+    </DialogHeader>
+
+    {selectedAccountRow && (
+      <div className="space-y-4">
+        <div className="rounded-lg border bg-muted/30 p-4">
+          <p className="font-semibold">
+            {selectedAccountRow.employee.name} ({selectedAccountRow.employee.employee_number})
+          </p>
+          <p className="text-sm text-muted-foreground">
+            {selectedAccountRow.employee.department || '-'} · {accountYear}년
+          </p>
+          <p className="mt-2 text-lg font-bold">
+            현재잔여 {selectedAccountRow.balance.remainingDays}일
+          </p>
+        </div>
+
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>날짜</TableHead>
+              <TableHead>구분</TableHead>
+              <TableHead className="text-center">일수</TableHead>
+              <TableHead>사유</TableHead>
+              <TableHead>출처</TableHead>
+              <TableHead className="text-right">액션</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {selectedAccountDetailRows.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                  원장 내역이 없습니다.
+                </TableCell>
+              </TableRow>
+            ) : (
+              selectedAccountDetailRows.map((row) => (
+                <TableRow key={row.id}>
+                  <TableCell>{row.date}</TableCell>
+                  <TableCell>{row.label}</TableCell>
+                  <TableCell
+                    className={cn(
+                      'text-center font-medium',
+                      row.days > 0 ? 'text-green-600' : 'text-red-600',
+                    )}
+                  >
+                    {row.days > 0 ? `+${row.days}` : row.days}일
+                  </TableCell>
+                  <TableCell>{row.reason}</TableCell>
+                  <TableCell>{row.source}</TableCell>
+                  <TableCell className="text-right">
+                    {row.editable ? (
+                      <div className="flex justify-end gap-1">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleEditLedgerEntry(row)}
+                        >
+                          <Pencil className="w-4 h-4 mr-1" />
+                          수정
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-red-600"
+                          onClick={() => handleDeleteLedgerEntry(row.id)}
+                        >
+                          <Trash2 className="w-4 h-4 mr-1" />
+                          삭제
+                        </Button>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">자동</span>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+
+        {editingLedgerEntryId && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">연차계좌 내역 수정</CardTitle>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="space-y-2">
+                <Label>구분</Label>
+                <Select
+                  value={ledgerEditFormData.entry_type}
+                  onValueChange={(value) =>
+                    setLedgerEditFormData((prev) => ({ ...prev, entry_type: value }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="initial_adjustment">최초도입 조정</SelectItem>
+                    <SelectItem value="adjustment">관리자 조정</SelectItem>
+                    <SelectItem value="extra_grant">회사 추가부여</SelectItem>
+                    <SelectItem value="carryover">이월</SelectItem>
+                    <SelectItem value="advance_use">선사용</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>일수</Label>
+                <Input
+                  type="number"
+                  step="0.5"
+                  value={ledgerEditFormData.days}
+                  onChange={(e) =>
+                    setLedgerEditFormData((prev) => ({ ...prev, days: e.target.value }))
+                  }
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>사유</Label>
+                <Input
+                  value={ledgerEditFormData.reason}
+                  onChange={(e) =>
+                    setLedgerEditFormData((prev) => ({ ...prev, reason: e.target.value }))
+                  }
+                />
+              </div>
+
+              <div className="flex items-end gap-2">
+                <Button
+                  onClick={handleUpdateLedgerEntry}
+                  disabled={updateLedgerEntry.isPending}
+                  className="flex-1"
+                >
+                  {updateLedgerEntry.isPending && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
+                  저장
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setEditingLedgerEntryId(null)}
+                >
+                  취소
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    )}
+  </DialogContent>
+</Dialog>
 
 <TabsContent value="payouts" className="space-y-4">
   <div className="flex items-center justify-between">
