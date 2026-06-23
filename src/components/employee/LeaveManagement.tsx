@@ -539,6 +539,80 @@ const handleDeleteLedgerEntry = (id: string) => {
   deleteLedgerEntry.mutate(id);
 };
 
+const handleBulkCarryOver = async () => {
+  const nextYear = accountYear + 1;
+
+  const carryOverTargets = annualLeaveAccountRows
+    .filter(({ balance }) => Number(balance.remainingDays || 0) > 0)
+    .filter(({ employee }) => {
+      return !ledgerEntries.some(
+        (entry) =>
+          entry.employee_id === employee.id &&
+          entry.ledger_year === nextYear &&
+          entry.entry_type === 'carryover',
+      );
+    });
+
+  const skippedCount = annualLeaveAccountRows.filter(({ employee, balance }) => {
+    return (
+      Number(balance.remainingDays || 0) > 0 &&
+      ledgerEntries.some(
+        (entry) =>
+          entry.employee_id === employee.id &&
+          entry.ledger_year === nextYear &&
+          entry.entry_type === 'carryover',
+      )
+    );
+  }).length;
+
+  if (carryOverTargets.length === 0) {
+    toast.error(
+      skippedCount > 0
+        ? `이미 ${nextYear}년 이월 내역이 등록되어 있습니다.`
+        : '이월할 잔여연차가 없습니다.',
+    );
+    return;
+  }
+
+  const totalDays = carryOverTargets.reduce(
+    (sum, { balance }) => sum + Number(balance.remainingDays || 0),
+    0,
+  );
+
+  const confirmed = window.confirm(
+    `${accountYear}년 잔여연차를 ${nextYear}년으로 일괄 이월하시겠습니까?\n\n` +
+      `이월 대상: ${carryOverTargets.length}명\n` +
+      `총 이월일수: ${totalDays}일\n` +
+      `중복 제외: ${skippedCount}명`,
+  );
+
+  if (!confirmed) return;
+
+  try {
+    await Promise.all(
+      carryOverTargets.map(({ employee, balance }) =>
+        addLedgerEntry.mutateAsync({
+          employee_id: employee.id,
+          ledger_year: nextYear,
+          ledger_date: `${nextYear}-01-01`,
+          entry_type: 'carryover' as any,
+          days: Number(balance.remainingDays || 0),
+          reason: `${accountYear}년 잔여연차 이월`,
+        }),
+      ),
+    );
+
+    toast.success(
+      `${carryOverTargets.length}명의 잔여연차를 ${nextYear}년으로 이월했습니다.` +
+        (skippedCount > 0 ? ` 중복 ${skippedCount}명은 제외했습니다.` : ''),
+    );
+
+    setAccountYear(nextYear);
+  } catch (error: any) {
+    toast.error('연차 일괄 이월 중 오류가 발생했습니다: ' + (error.message || ''));
+  }
+};
+
 // Export leave requests to Excel
   const exportRequestsToExcel = async () => {
     const recordsToExport = selectedEmployeeIds.length > 0
@@ -1415,11 +1489,21 @@ const usageRate = totalAnnualLeave > 0 ? Math.round((usedLeave / totalAnnualLeav
   </Card>
 
   <div className="flex flex-wrap justify-between items-center gap-2">
-    <div className="flex items-center gap-4">
-      <h3 className="text-lg font-semibold">직원별 연차계좌</h3>
-      <YearSelector year={accountYear} onChange={setAccountYear} />
-    </div>
+  <div className="flex items-center gap-4">
+    <h3 className="text-lg font-semibold">직원별 연차계좌</h3>
+    <YearSelector year={accountYear} onChange={setAccountYear} />
   </div>
+
+  <Button
+    variant="outline"
+    size="sm"
+    onClick={handleBulkCarryOver}
+    disabled={addLedgerEntry.isPending}
+  >
+    {addLedgerEntry.isPending && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}
+    {accountYear + 1}년으로 일괄 이월
+  </Button>
+</div>
 
   <div className="rounded-lg border bg-card">
     <Table>
