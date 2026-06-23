@@ -2,6 +2,8 @@ import { useState, useMemo } from 'react';
 import { useEmployees } from '@/hooks/useEmployees';
 import { useLeaveRecords } from '@/hooks/useLeaveRecords';
 import { useAnnualLeavePayouts } from '@/hooks/useAnnualLeavePayouts';
+import { useAnnualLeaveLedger } from '@/hooks/useAnnualLeaveLedger';
+import { calculateAnnualLeaveBalance } from '@/utils/annualLeaveEngine';
 import { useOrganizationSettings } from '@/hooks/useOrganizationSettings';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,9 +23,9 @@ import {
 } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Check, X, Calendar as CalendarIcon, Users, ChevronLeft, ChevronRight, Download, Loader2, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Check, X, Calendar as CalendarIcon, Users, ChevronLeft, ChevronRight, Download, Loader2, Pencil, Trash2, History } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { EmployeePicker } from '@/components/employee/EmployeePicker';
 import { EmployeeCombobox } from '@/components/employee/EmployeeCombobox';
@@ -61,6 +63,16 @@ const { settings } = useOrganizationSettings();
   const [requestYear, setRequestYear] = useState(currentYear);
   const [balanceYear, setBalanceYear] = useState(currentYear);
 const [payoutYear, setPayoutYear] = useState(currentYear);
+const [accountYear, setAccountYear] = useState(currentYear);
+const { ledgerEntries, isLoading: ledgerLoading, addLedgerEntry } = useAnnualLeaveLedger(accountYear);
+
+const [ledgerFormData, setLedgerFormData] = useState({
+  employee_id: '',
+  entry_type: 'adjustment',
+  days: '',
+  reason: '',
+});
+
 const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<string[]>([]);
   const [balanceSelectedIds, setBalanceSelectedIds] = useState<string[]>([]);
   const [balancePage, setBalancePage] = useState(1);
@@ -195,7 +207,7 @@ const handleDelete = (id: string) => {
     });
   }, [leaveRecords, balanceYear]);
 
-  const isLoading = employeesLoading || leaveLoading || payoutLoading;
+  const isLoading = employeesLoading || leaveLoading || payoutLoading || ledgerLoading;
 
   // 입사일 기준 근로기준법 연차 자동 계산
   const calculateAnnualLeave = (hireDate: string, targetYear: number): number => {
@@ -297,6 +309,81 @@ const handleDeletePayout = (id: string) => {
 const payoutYearRecords = annualLeavePayouts.filter((p) =>
   p.settlement_month.startsWith(`${payoutYear}-`),
 );
+
+const annualLeaveAccountRows = activeEmployees.map((emp) => {
+  const leaveUsages = leaveRecords
+    .filter((r) => {
+      const startYear = parseISO(r.start_date).getFullYear();
+      return r.employee_id === emp.id && r.status === 'approved' && startYear === accountYear;
+    })
+    .map((r) => ({
+      employee_id: r.employee_id,
+      days: Number(r.days || 0),
+    }));
+
+  const payouts = annualLeavePayouts
+    .filter(
+      (p) =>
+        p.employee_id === emp.id &&
+        p.settlement_month.startsWith(`${accountYear}-`),
+    )
+    .map((p) => ({
+      employee_id: p.employee_id,
+      days: Number(p.days || 0),
+    }));
+
+  const balance = calculateAnnualLeaveBalance({
+    employee: {
+      id: emp.id,
+      hire_date: emp.hire_date,
+    },
+    year: accountYear,
+    policy: {
+      policyMode: 'legal',
+      carryOverMode: 'unlimited',
+    },
+    ledgerEntries,
+    leaveUsages,
+    payouts,
+  });
+
+  return {
+    employee: emp,
+    balance,
+  };
+});
+const handleAddLedgerEntry = async () => {
+  if (!ledgerFormData.employee_id) {
+    toast.error('직원을 선택해주세요.');
+    return;
+  }
+
+  if (!ledgerFormData.days || Number(ledgerFormData.days) === 0) {
+    toast.error('일수를 입력해주세요.');
+    return;
+  }
+
+  if (!ledgerFormData.reason.trim()) {
+    toast.error('사유를 입력해주세요.');
+    return;
+  }
+
+  addLedgerEntry.mutate({
+    employee_id: ledgerFormData.employee_id,
+    ledger_year: accountYear,
+    ledger_date: new Date().toISOString().split('T')[0],
+    entry_type: ledgerFormData.entry_type as any,
+    days: Number(ledgerFormData.days),
+    reason: ledgerFormData.reason.trim(),
+  });
+
+  setLedgerFormData({
+    employee_id: '',
+    entry_type: 'adjustment',
+    days: '',
+    reason: '',
+  });
+};
 
 // Export leave requests to Excel
   const exportRequestsToExcel = async () => {
@@ -440,13 +527,17 @@ const rate = totalLeave > 0 ? Math.round((usedLeave / totalLeave) * 100) : 0;
     휴가 신청/승인
   </TabsTrigger>
   <TabsTrigger value="balance" className="flex items-center gap-2">
-    <Users className="w-4 h-4" />
-    잔여 휴가 현황
-  </TabsTrigger>
-  <TabsTrigger value="payouts" className="flex items-center gap-2">
-    <Download className="w-4 h-4" />
-    연차수당 관리
-  </TabsTrigger>
+  <Users className="w-4 h-4" />
+  잔여 휴가 현황
+</TabsTrigger>
+<TabsTrigger value="account" className="flex items-center gap-2">
+  <History className="w-4 h-4" />
+  연차계좌
+</TabsTrigger>
+<TabsTrigger value="payouts" className="flex items-center gap-2">
+  <Download className="w-4 h-4" />
+  연차수당 관리
+</TabsTrigger>
 </TabsList>
 
         {/* ===== 휴가 신청/승인 탭 ===== */}
@@ -1016,11 +1107,152 @@ const usageRate = totalAnnualLeave > 0 ? Math.round((usedLeave / totalAnnualLeav
           })()}
                 </TabsContent>
 
-        <TabsContent value="payouts" className="space-y-4">
-          {/* 여기에 연차수당 관리 탭 코드 */}
-        </TabsContent>
-                <TabsContent value="payouts" className="space-y-4">
-          <div className="flex items-center justify-between">
+{/* ===== 연차계좌 탭 ===== */}
+<TabsContent value="account" className="space-y-4">
+  <Card>
+    <CardHeader>
+      <CardTitle className="text-base">연차계좌 조정 등록</CardTitle>
+      <CardDescription>
+        최초 도입, 회사 추가부여, 이월, 선사용, 관리자 조정 내역을 등록합니다.
+      </CardDescription>
+    </CardHeader>
+    <CardContent className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div className="space-y-2">
+        <Label>직원</Label>
+        <Select
+          value={ledgerFormData.employee_id}
+          onValueChange={(value) =>
+            setLedgerFormData((prev) => ({ ...prev, employee_id: value }))
+          }
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="직원 선택" />
+          </SelectTrigger>
+          <SelectContent>
+            {activeEmployees.map((emp) => (
+              <SelectItem key={emp.id} value={emp.id}>
+                {emp.name} ({emp.employee_number})
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-2">
+        <Label>구분</Label>
+        <Select
+          value={ledgerFormData.entry_type}
+          onValueChange={(value) =>
+            setLedgerFormData((prev) => ({ ...prev, entry_type: value }))
+          }
+        >
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="initial_adjustment">최초도입 조정</SelectItem>
+            <SelectItem value="adjustment">관리자 조정</SelectItem>
+            <SelectItem value="extra_grant">회사 추가부여</SelectItem>
+            <SelectItem value="carryover">이월</SelectItem>
+            <SelectItem value="advance_use">선사용</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-2">
+        <Label>일수</Label>
+        <Input
+          type="number"
+          step="0.5"
+          value={ledgerFormData.days}
+          onChange={(e) =>
+            setLedgerFormData((prev) => ({ ...prev, days: e.target.value }))
+          }
+          placeholder="예: 3 또는 -2"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label>사유</Label>
+        <Input
+          value={ledgerFormData.reason}
+          onChange={(e) =>
+            setLedgerFormData((prev) => ({ ...prev, reason: e.target.value }))
+          }
+          placeholder="예: 프로그램 최초 도입"
+        />
+      </div>
+
+      <div className="flex items-end">
+        <Button
+          onClick={handleAddLedgerEntry}
+          disabled={addLedgerEntry.isPending}
+          className="w-full"
+        >
+          {addLedgerEntry.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          등록
+        </Button>
+      </div>
+    </CardContent>
+  </Card>
+
+  <div className="flex flex-wrap justify-between items-center gap-2">
+    <div className="flex items-center gap-4">
+      <h3 className="text-lg font-semibold">직원별 연차계좌</h3>
+      <YearSelector year={accountYear} onChange={setAccountYear} />
+    </div>
+  </div>
+
+  <div className="rounded-lg border bg-card">
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>사원번호</TableHead>
+          <TableHead>이름</TableHead>
+          <TableHead>부서</TableHead>
+          <TableHead className="text-center">자동발생</TableHead>
+          <TableHead className="text-center">최초조정</TableHead>
+          <TableHead className="text-center">회사추가</TableHead>
+          <TableHead className="text-center">이월</TableHead>
+          <TableHead className="text-center">선사용</TableHead>
+          <TableHead className="text-center">휴가사용</TableHead>
+          <TableHead className="text-center">연차수당</TableHead>
+          <TableHead className="text-center">현재잔여</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {annualLeaveAccountRows.length === 0 ? (
+          <TableRow>
+            <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
+              조회할 직원이 없습니다.
+            </TableCell>
+          </TableRow>
+        ) : (
+          annualLeaveAccountRows.map(({ employee, balance }) => (
+            <TableRow key={employee.id}>
+              <TableCell className="font-medium">{employee.employee_number}</TableCell>
+              <TableCell>{employee.name}</TableCell>
+              <TableCell>{employee.department || '-'}</TableCell>
+              <TableCell className="text-center">{balance.baseGrantedDays}일</TableCell>
+              <TableCell className="text-center">{balance.initialAdjustmentDays}일</TableCell>
+              <TableCell className="text-center">{balance.extraGrantDays}일</TableCell>
+              <TableCell className="text-center">{balance.carryOverDays}일</TableCell>
+              <TableCell className="text-center">{balance.advanceUseDays}일</TableCell>
+              <TableCell className="text-center">{balance.usedLeaveDays}일</TableCell>
+              <TableCell className="text-center">{balance.payoutDays}일</TableCell>
+              <TableCell className="text-center font-semibold">
+                {balance.remainingDays}일
+              </TableCell>
+            </TableRow>
+          ))
+        )}
+      </TableBody>
+    </Table>
+  </div>
+</TabsContent>
+
+<TabsContent value="payouts" className="space-y-4">
+  <div className="flex items-center justify-between">
             <div>
               <h3 className="text-lg font-semibold">연차수당 관리</h3>
               <p className="text-sm text-muted-foreground">
