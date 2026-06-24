@@ -392,9 +392,26 @@ const handleAddLedgerEntry = async () => {
     return;
   }
 
-  if (!ledgerFormData.reason.trim()) {
+    if (!ledgerFormData.reason.trim()) {
     toast.error('사유를 입력해주세요.');
     return;
+  }
+
+  if (ledgerFormData.entry_type === 'advance_use') {
+    const advanceDays = Math.abs(Number(ledgerFormData.days || 0));
+
+    if (!annualLeavePolicy.allowAdvanceUse) {
+      toast.error('현재 설정에서는 연차 선사용이 허용되지 않습니다.');
+      return;
+    }
+
+    if (
+      Number(annualLeavePolicy.maxAdvanceUse || 0) > 0 &&
+      advanceDays > Number(annualLeavePolicy.maxAdvanceUse || 0)
+    ) {
+      toast.error(`선사용은 최대 ${annualLeavePolicy.maxAdvanceUse}일까지 등록할 수 있습니다.`);
+      return;
+    }
   }
 
   addLedgerEntry.mutate({
@@ -557,8 +574,26 @@ const handleDeleteLedgerEntry = (id: string) => {
 const handleBulkCarryOver = async () => {
   const nextYear = accountYear + 1;
 
+  if (annualLeavePolicy.carryOverMode === 'none') {
+    toast.error('현재 설정에서는 연차 이월이 허용되지 않습니다.');
+    return;
+  }
+
+  const getCarryOverDays = (remainingDays: number) => {
+    if (annualLeavePolicy.carryOverMode === 'limited') {
+      return Math.min(remainingDays, Number(annualLeavePolicy.maxCarryOver || 0));
+    }
+
+    return remainingDays;
+  };
+
   const carryOverTargets = annualLeaveAccountRows
-    .filter(({ balance }) => Number(balance.remainingDays || 0) > 0)
+    .map(({ employee, balance }) => ({
+      employee,
+      balance,
+      carryOverDays: getCarryOverDays(Number(balance.remainingDays || 0)),
+    }))
+    .filter(({ carryOverDays }) => carryOverDays > 0)
     .filter(({ employee }) => {
       return !ledgerEntries.some(
         (entry) =>
@@ -568,9 +603,9 @@ const handleBulkCarryOver = async () => {
       );
     });
 
-  const skippedCount = annualLeaveAccountRows.filter(({ employee, balance }) => {
+    const skippedCount = annualLeaveAccountRows.filter(({ employee, balance }) => {
     return (
-      Number(balance.remainingDays || 0) > 0 &&
+      getCarryOverDays(Number(balance.remainingDays || 0)) > 0 &&
       ledgerEntries.some(
         (entry) =>
           entry.employee_id === employee.id &&
@@ -589,8 +624,8 @@ const handleBulkCarryOver = async () => {
     return;
   }
 
-  const totalDays = carryOverTargets.reduce(
-    (sum, { balance }) => sum + Number(balance.remainingDays || 0),
+    const totalDays = carryOverTargets.reduce(
+    (sum, { carryOverDays }) => sum + Number(carryOverDays || 0),
     0,
   );
 
@@ -605,13 +640,13 @@ const handleBulkCarryOver = async () => {
 
   try {
     await Promise.all(
-      carryOverTargets.map(({ employee, balance }) =>
+            carryOverTargets.map(({ employee, carryOverDays }) =>
         addLedgerEntry.mutateAsync({
           employee_id: employee.id,
           ledger_year: nextYear,
           ledger_date: `${nextYear}-01-01`,
           entry_type: 'carryover' as any,
-          days: Number(balance.remainingDays || 0),
+          days: Number(carryOverDays || 0),
           reason: `${accountYear}년 잔여연차 이월`,
         }),
       ),
