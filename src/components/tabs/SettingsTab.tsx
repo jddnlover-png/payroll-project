@@ -97,15 +97,21 @@ export function SettingsTab({ section = "payroll-items" }: SettingsTabProps = {}
 
       {section === "leave-rules" && (
         <LeaveRulesSettings
-          generationType={settings.leave_generation_type}
-          baseAnnualLeave={settings.base_annual_leave}
-          monthlyLeaveAmount={settings.monthly_leave_amount}
-          maxCarryOver={settings.max_carry_over}
-          additionalLeavePerYear={settings.additional_leave_per_year}
-          maxAdditionalLeave={settings.max_additional_leave}
-          saving={saving}
-          onSave={saveSettings}
-        />
+  generationType={settings.leave_generation_type}
+  baseAnnualLeave={settings.base_annual_leave}
+  monthlyLeaveAmount={settings.monthly_leave_amount}
+  maxCarryOver={settings.max_carry_over}
+  additionalLeavePerYear={settings.additional_leave_per_year}
+  maxAdditionalLeave={settings.max_additional_leave}
+
+  leavePolicyMode={settings.leave_policy_mode}
+  leaveCarryOverMode={settings.leave_carry_over_mode}
+  allowAdvanceLeave={settings.allow_advance_leave}
+  maxAdvanceLeave={settings.max_advance_leave}
+
+  saving={saving}
+  onSave={saveSettings}
+/>
       )}
 
       {section === "night-shift" && (

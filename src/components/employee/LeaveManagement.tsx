@@ -3,7 +3,10 @@ import { useEmployees } from '@/hooks/useEmployees';
 import { useLeaveRecords } from '@/hooks/useLeaveRecords';
 import { useAnnualLeavePayouts } from '@/hooks/useAnnualLeavePayouts';
 import { useAnnualLeaveLedger } from '@/hooks/useAnnualLeaveLedger';
-import { calculateAnnualLeaveBalance } from '@/utils/annualLeaveEngine';
+import {
+  calculateAnnualLeaveBalance,
+  type AnnualLeavePolicy,
+} from '@/utils/annualLeaveEngine';
 import { useOrganizationSettings } from '@/hooks/useOrganizationSettings';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -222,6 +225,21 @@ const handleDelete = (id: string) => {
   }, [leaveRecords, balanceYear]);
 
   const isLoading = employeesLoading || leaveLoading || payoutLoading || ledgerLoading;
+  const annualLeavePolicy: AnnualLeavePolicy = {
+  policyMode: settings?.leave_policy_mode === 'company' ? 'company' : 'legal',
+  generationType: settings?.leave_generation_type === 'monthly' ? 'monthly' : 'yearly',
+  baseAnnualLeave: Number(settings?.base_annual_leave ?? 15),
+  monthlyLeaveAmount: Number(settings?.monthly_leave_amount ?? 1),
+  carryOverMode:
+    settings?.leave_carry_over_mode === 'none'
+      ? 'none'
+      : settings?.leave_carry_over_mode === 'limited'
+        ? 'limited'
+        : 'unlimited',
+  maxCarryOver: Number(settings?.max_carry_over ?? 0),
+  allowAdvanceUse: Boolean(settings?.allow_advance_leave ?? false),
+  maxAdvanceUse: Number(settings?.max_advance_leave ?? 0),
+};
 
   // 입사일 기준 근로기준법 연차 자동 계산
   const calculateAnnualLeave = (hireDate: string, targetYear: number): number => {
@@ -352,10 +370,7 @@ const annualLeaveAccountRows = activeEmployees.map((emp) => {
       hire_date: emp.hire_date,
     },
     year: accountYear,
-    policy: {
-      policyMode: 'legal',
-      carryOverMode: 'unlimited',
-    },
+    policy: annualLeavePolicy,
     ledgerEntries,
     leaveUsages,
     payouts,
@@ -724,10 +739,7 @@ const balance = calculateAnnualLeaveBalance({
     hire_date: emp.hire_date,
   },
   year: balanceYear,
-  policy: {
-    policyMode: 'legal',
-    carryOverMode: 'unlimited',
-  },
+  policy: annualLeavePolicy,
   ledgerEntries,
   leaveUsages,
   payouts,
@@ -1304,10 +1316,7 @@ const balance = calculateAnnualLeaveBalance({
     hire_date: employee.hire_date,
   },
   year: balanceYear,
-  policy: {
-    policyMode: 'legal',
-    carryOverMode: 'unlimited',
-  },
+  policy: annualLeavePolicy,
   ledgerEntries,
   leaveUsages,
   payouts,

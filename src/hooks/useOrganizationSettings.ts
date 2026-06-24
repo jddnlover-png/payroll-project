@@ -21,13 +21,17 @@ export interface OrganizationSettings {
   late_deduction_rate: number;
   absent_deduction_rate: number;
   insurance_deduction_rate: number;
-  // 연차발생 설정
+    // 연차발생 설정
   leave_generation_type: string;
   base_annual_leave: number;
   monthly_leave_amount: number;
   max_carry_over: number;
   additional_leave_per_year: number;
   max_additional_leave: number;
+  leave_policy_mode: string;
+  leave_carry_over_mode: string;
+  allow_advance_leave: boolean;
+  max_advance_leave: number;
   // 연장근무 휴게시간
   overtime_break_2h: number;
   overtime_break_4h: number;
@@ -104,12 +108,16 @@ const defaultSettings: OrganizationSettings = {
   late_deduction_rate: 0.1,
   absent_deduction_rate: 1,
   insurance_deduction_rate: 0.1,
-  leave_generation_type: "yearly",
+    leave_generation_type: "yearly",
   base_annual_leave: 15,
   monthly_leave_amount: 1,
   max_carry_over: 5,
   additional_leave_per_year: 1,
   max_additional_leave: 10,
+  leave_policy_mode: "legal",
+  leave_carry_over_mode: "unlimited",
+  allow_advance_leave: false,
+  max_advance_leave: 0,
   overtime_break_2h: 30,
   overtime_break_4h: 60,
   night_break_minutes: 30,
@@ -191,12 +199,16 @@ export function useOrganizationSettings() {
           late_deduction_rate: Number(data.late_deduction_rate),
           absent_deduction_rate: Number(data.absent_deduction_rate),
           insurance_deduction_rate: Number(data.insurance_deduction_rate),
-          leave_generation_type: data.leave_generation_type,
+                    leave_generation_type: data.leave_generation_type,
           base_annual_leave: data.base_annual_leave,
           monthly_leave_amount: Number(data.monthly_leave_amount),
           max_carry_over: data.max_carry_over,
           additional_leave_per_year: data.additional_leave_per_year,
           max_additional_leave: data.max_additional_leave,
+          leave_policy_mode: (data as any).leave_policy_mode ?? "legal",
+          leave_carry_over_mode: (data as any).leave_carry_over_mode ?? "unlimited",
+          allow_advance_leave: (data as any).allow_advance_leave ?? false,
+          max_advance_leave: Number((data as any).max_advance_leave ?? 0),
           overtime_break_2h: data.overtime_break_2h,
           overtime_break_4h: data.overtime_break_4h,
           night_break_minutes: data.night_break_minutes,

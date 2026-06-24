@@ -170,7 +170,11 @@ export const calculateAnnualLeaveBalance = ({
   const adjustmentDays = sumLedgerDays(employeeLedgerEntries, "adjustment");
   const extraGrantDays = sumLedgerDays(employeeLedgerEntries, "extra_grant");
   const rawCarryOverDays = sumLedgerDays(employeeLedgerEntries, "carryover");
-  const advanceUseDays = sumLedgerDays(employeeLedgerEntries, "advance_use");
+  const rawAdvanceUseDays = sumLedgerDays(employeeLedgerEntries, "advance_use");
+
+const advanceUseDays = policy.allowAdvanceUse
+  ? Math.min(rawAdvanceUseDays, Number(policy.maxAdvanceUse || rawAdvanceUseDays))
+  : 0;
 
   const carryOverDays =
     policy.carryOverMode === "none"

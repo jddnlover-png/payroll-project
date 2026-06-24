@@ -21,7 +21,11 @@ interface LeaveRulesSettingsProps {
   monthlyLeaveAmount: number;
   maxCarryOver: number;
   additionalLeavePerYear: number;
-  maxAdditionalLeave: number;
+    maxAdditionalLeave: number;
+  leavePolicyMode: string;
+  leaveCarryOverMode: string;
+  allowAdvanceLeave: boolean;
+  maxAdvanceLeave: number;
   saving: boolean;
   onSave: (data: {
     leave_generation_type: string;
@@ -30,6 +34,10 @@ interface LeaveRulesSettingsProps {
     max_carry_over: number;
     additional_leave_per_year: number;
     max_additional_leave: number;
+    leave_policy_mode: string;
+    leave_carry_over_mode: string;
+    allow_advance_leave: boolean;
+    max_advance_leave: number;
   }) => Promise<boolean>;
 }
 
@@ -39,7 +47,11 @@ export function LeaveRulesSettings({
   monthlyLeaveAmount,
   maxCarryOver,
   additionalLeavePerYear,
-  maxAdditionalLeave,
+    maxAdditionalLeave,
+  leavePolicyMode,
+  leaveCarryOverMode,
+  allowAdvanceLeave,
+  maxAdvanceLeave,
   saving,
   onSave,
 }: LeaveRulesSettingsProps) {
@@ -47,9 +59,13 @@ export function LeaveRulesSettings({
   const [genType, setGenType] = useState(generationType);
   const [baseLeave, setBaseLeave] = useState(baseAnnualLeave);
   const [monthlyAmount, setMonthlyAmount] = useState(monthlyLeaveAmount);
-  const [carryOver, setCarryOver] = useState(maxCarryOver);
+    const [carryOver, setCarryOver] = useState(maxCarryOver);
   const [addPerYear, setAddPerYear] = useState(additionalLeavePerYear);
   const [maxAdd, setMaxAdd] = useState(maxAdditionalLeave);
+  const [policyMode, setPolicyMode] = useState(leavePolicyMode);
+  const [carryOverMode, setCarryOverMode] = useState(leaveCarryOverMode);
+  const [advanceEnabled, setAdvanceEnabled] = useState(allowAdvanceLeave);
+  const [advanceLimit, setAdvanceLimit] = useState(maxAdvanceLeave);
 
   useEffect(() => {
     setGenType(generationType);
@@ -57,17 +73,36 @@ export function LeaveRulesSettings({
     setMonthlyAmount(monthlyLeaveAmount);
     setCarryOver(maxCarryOver);
     setAddPerYear(additionalLeavePerYear);
-    setMaxAdd(maxAdditionalLeave);
-  }, [generationType, baseAnnualLeave, monthlyLeaveAmount, maxCarryOver, additionalLeavePerYear, maxAdditionalLeave]);
+        setMaxAdd(maxAdditionalLeave);
+    setPolicyMode(leavePolicyMode);
+    setCarryOverMode(leaveCarryOverMode);
+    setAdvanceEnabled(allowAdvanceLeave);
+    setAdvanceLimit(maxAdvanceLeave);
+  }, [
+    generationType,
+    baseAnnualLeave,
+    monthlyLeaveAmount,
+    maxCarryOver,
+    additionalLeavePerYear,
+    maxAdditionalLeave,
+    leavePolicyMode,
+    leaveCarryOverMode,
+    allowAdvanceLeave,
+    maxAdvanceLeave,
+  ]);
 
   const handleSave = async () => {
     const success = await onSave({
       leave_generation_type: genType,
       base_annual_leave: baseLeave,
       monthly_leave_amount: monthlyAmount,
-      max_carry_over: carryOver,
+            max_carry_over: carryOver,
       additional_leave_per_year: addPerYear,
       max_additional_leave: maxAdd,
+      leave_policy_mode: policyMode,
+      leave_carry_over_mode: carryOverMode,
+      allow_advance_leave: advanceEnabled,
+      max_advance_leave: advanceEnabled ? advanceLimit : 0,
     });
     if (success) {
       toast.success('연차발생 규칙이 저장되었습니다.');
@@ -81,6 +116,34 @@ export function LeaveRulesSettings({
         <CardDescription>입사일 기준 연차 자동 발생 규칙을 설정합니다.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+                <div className="space-y-2">
+          <Label>연차 정책 기준</Label>
+          <Select value={policyMode} onValueChange={(value) => setPolicyMode(value)}>
+            <SelectTrigger className="w-56">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="legal">근로기준법 기준</SelectItem>
+              <SelectItem value="company">회사 자체 기준</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-sm text-muted-foreground">
+            {policyMode === 'legal'
+              ? '근로기준법에 따라 입사일 기준으로 자동 발생 연차를 계산합니다.'
+              : '회사 규정에 따라 설정한 연차 발생 방식을 기준으로 계산합니다.'}
+          </p>
+        </div>
+
+        <div className="space-y-2 bg-muted/50 p-4 rounded-lg">
+          <Label className="text-base font-semibold">연차 정책 안내</Label>
+          <div className="space-y-2 text-sm text-muted-foreground">
+            <p>• <strong>근로기준법 기준:</strong> 법정 자동 발생분은 최대 25일까지 계산됩니다.</p>
+            <p>• <strong>회사 자체 기준:</strong> 회사가 법정보다 유리하게 운영하는 추가 부여, 이월, 선사용 정책을 반영할 수 있습니다.</p>
+            <p>• <strong>미사용 연차:</strong> 이월하거나 연차수당으로 지급하는 방식으로 관리하는 것을 권장합니다.</p>
+          </div>
+        </div>
+
+        <Separator />
         <div className="space-y-2">
           <Label>연차 발생 방식</Label>
           <Select
@@ -147,27 +210,77 @@ export function LeaveRulesSettings({
             <p>• <strong>근속 1년 이상:</strong> 기본 15일 발생</p>
             <p>• <strong>근속 3년차부터:</strong> 15일 + ⌊(근속연수-1)/2⌋일 추가</p>
             <p className="pl-4 text-xs">예: 3년차 → 16일, 5년차 → 17일, 7년차 → 18일, 21년차 → 25일</p>
-            <p>• <strong>최대 한도:</strong> 총 연차 25일 초과 불가</p>
+            <p>• <strong>법정 자동발생 한도:</strong> 법정 발생분은 최대 25일입니다.</p>
+<p>• <strong>회사 추가부여/이월:</strong> 회사 정책에 따라 25일을 초과해 관리할 수 있습니다.</p>
           </div>
         </div>
 
         <Separator />
 
-        <div className="space-y-2">
-          <Label>연차 이월 한도</Label>
-          <div className="flex items-center gap-2">
-            <Input
-              type="number"
-              min="0"
-              max="15"
-              value={carryOver}
-              onChange={(e) => setCarryOver(Number(e.target.value))}
-              className="w-24"
-            />
-            <span className="text-muted-foreground">일</span>
-          </div>
+                <div className="space-y-2">
+          <Label>연차 이월 정책</Label>
+          <Select value={carryOverMode} onValueChange={(value) => setCarryOverMode(value)}>
+            <SelectTrigger className="w-56">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="unlimited">무제한 이월</SelectItem>
+              <SelectItem value="limited">최대 N일 이월</SelectItem>
+              <SelectItem value="none">이월 안함</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {carryOverMode === 'limited' && (
+            <div className="flex items-center gap-2 pt-2">
+              <Input
+                type="number"
+                min="0"
+                value={carryOver}
+                onChange={(e) => setCarryOver(Number(e.target.value))}
+                className="w-24"
+              />
+              <span className="text-muted-foreground">일</span>
+            </div>
+          )}
+
           <p className="text-sm text-muted-foreground">
-            전년도 미사용 연차 중 최대 이월 가능 일수
+            {carryOverMode === 'unlimited' && '남은 연차를 제한 없이 다음 해로 이월할 수 있습니다.'}
+            {carryOverMode === 'limited' && '설정한 일수까지만 다음 해로 이월할 수 있습니다.'}
+            {carryOverMode === 'none' && '이월하지 않는 경우 미사용 연차는 연차수당 지급 등으로 정산해야 합니다.'}
+          </p>
+        </div>
+                <div className="space-y-2">
+          <Label>연차 선사용 정책</Label>
+          <Select
+            value={advanceEnabled ? 'enabled' : 'disabled'}
+            onValueChange={(value) => setAdvanceEnabled(value === 'enabled')}
+          >
+            <SelectTrigger className="w-56">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="disabled">선사용 불가</SelectItem>
+              <SelectItem value="enabled">선사용 허용</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {advanceEnabled && (
+            <div className="flex items-center gap-2 pt-2">
+              <Input
+                type="number"
+                min="0"
+                value={advanceLimit}
+                onChange={(e) => setAdvanceLimit(Number(e.target.value))}
+                className="w-24"
+              />
+              <span className="text-muted-foreground">일</span>
+            </div>
+          )}
+
+          <p className="text-sm text-muted-foreground">
+            {advanceEnabled
+              ? '다음 해 발생 예정 연차를 설정한 한도 내에서 미리 사용할 수 있도록 관리합니다.'
+              : '잔여연차가 부족한 경우 다음 해 연차를 미리 사용하지 못하도록 관리합니다.'}
           </p>
         </div>
 
@@ -179,7 +292,7 @@ export function LeaveRulesSettings({
                 generationType: genType as 'monthly' | 'yearly',
                 baseAnnualLeave: baseLeave,
                 monthlyLeaveAmount: monthlyAmount,
-                maxCarryOver: carryOver,
+                                maxCarryOver: carryOver,
                 additionalLeavePerYear: addPerYear,
                 maxAdditionalLeave: maxAdd,
               });
