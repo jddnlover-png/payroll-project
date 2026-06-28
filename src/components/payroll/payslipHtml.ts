@@ -340,8 +340,17 @@ if (item.itemId === "health-insurance") {
   const rate = 3.595;
   return `${fmtNum(healthInsuranceBase)}원 × ${rate}%`;
 }
-    if (item.itemId === "employment-insurance") return `${fmtNum(insuranceBase)}원 × 0.9%`;
-if (item.itemId === "long-term-care") return `건강보험료 × 12.81%`;
+
+if (item.itemId === "employment-insurance") {
+  return `${fmtNum(insuranceBase)}원 × 0.9%`;
+}
+
+if (item.itemId === "long-term-care") {
+  const rate = 12.81;
+  return (employee as any)?.longTermCareReduction || (employee as any)?.long_term_care_reduction
+    ? `건강보험료 × ${rate}% × 70% (경감 적용)`
+    : `건강보험료 × ${rate}%`;
+}
     if (item.itemId === "income-tax") return `${fmtNum(taxBase)}원 기준 간이세액표 적용`;
     if (item.itemId === "local-income-tax" || item.name.includes("지방소득세")) return "소득세 × 10%";
     if (si?.calculationType === "percentage" && si.defaultValue)

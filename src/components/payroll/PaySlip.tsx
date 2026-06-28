@@ -373,6 +373,21 @@ const getDeductionAmount = (itemId: string) => {
 
 const nationalPensionAmount = getDeductionAmount("national-pension");
 const healthInsuranceAmount = getDeductionAmount("health-insurance");
+const longTermCareAmount = getDeductionAmount("long-term-care");
+
+const isLongTermCareReductionApplied =
+  Boolean(
+    (employee as any)?.longTermCareReduction ||
+      (employee as any)?.long_term_care_reduction ||
+      (record as any)?.longTermCareReduction ||
+      (record as any)?.long_term_care_reduction,
+  ) ||
+  (() => {
+    if (healthInsuranceAmount <= 0 || longTermCareAmount <= 0) return false;
+
+    const normalAmount = Math.floor((healthInsuranceAmount * 12.81) / 100 / 10) * 10;
+    return longTermCareAmount < normalAmount;
+  })();
 
 const nationalPensionBaseRaw =
   Number((employee as any)?.national_pension_monthly_income) ||
@@ -416,8 +431,17 @@ if (item.itemId === "health-insurance") {
   const rate = 3.595;
   return `${fmtNum(healthInsuranceBase)}원 × ${rate}%`;
 }
-    if (item.itemId === "employment-insurance") return `${fmtNum(insuranceBase)}원 × ${si?.defaultValue ?? 0.9}%`;
-    if (item.itemId === "long-term-care") return `건강보험료 × ${si?.defaultValue ?? 12.81}%`;
+
+if (item.itemId === "employment-insurance") {
+  return `${fmtNum(insuranceBase)}원 × ${si?.defaultValue ?? 0.9}%`;
+}
+
+if (item.itemId === "long-term-care") {
+  const rate = si?.defaultValue ?? 12.81;
+  return isLongTermCareReductionApplied
+    ? `건강보험료 × ${rate}% × 70% (경감 적용)`
+    : `건강보험료 × ${rate}%`;
+}
     // 소득세: taxBase 기준 (모든 비과세 제외)
     if (item.itemId === "income-tax") return `${fmtNum(taxBase)}원 기준 간이세액표 적용`;
     if (item.itemId === "local-income-tax" || item.name.includes("지방소득세")) return "소득세 × 10%";
@@ -435,6 +459,8 @@ const employeeForPayslipHtml = {
   ...(employee as any),
   national_pension_monthly_income: nationalPensionBase,
   health_insurance_monthly_income: healthInsuranceBase,
+  longTermCareReduction: isLongTermCareReductionApplied,
+  long_term_care_reduction: isLongTermCareReductionApplied,
 };
 
 const getPayslipHtml = () =>

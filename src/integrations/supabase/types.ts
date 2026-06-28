@@ -926,9 +926,10 @@ export type Database = {
           phone: string | null
           position: string | null
           resident_number: string | null
-          resignation_date: string | null
-          settlement_type: string
-          updated_at: string
+resignation_date: string | null
+settlement_type: string
+long_term_care_reduction: boolean
+updated_at: string
         }
         Insert: {
   account_number?: string | null
@@ -956,9 +957,10 @@ export type Database = {
           phone?: string | null
           position?: string | null
           resident_number?: string | null
-          resignation_date?: string | null
-          settlement_type?: string
-          updated_at?: string
+resignation_date?: string | null
+settlement_type?: string
+long_term_care_reduction?: boolean
+updated_at?: string
         }
         Update: {
   account_number?: string | null
@@ -986,9 +988,10 @@ export type Database = {
           phone?: string | null
           position?: string | null
           resident_number?: string | null
-          resignation_date?: string | null
-          settlement_type?: string
-          updated_at?: string
+resignation_date?: string | null
+settlement_type?: string
+long_term_care_reduction?: boolean
+updated_at?: string
         }
         Relationships: [
           {

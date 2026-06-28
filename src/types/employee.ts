@@ -14,9 +14,10 @@ export interface Employee {
   hourlyRate?: number;
   employmentType: 'regular' | 'contract' | 'daily' | 'freelancer';
   status: 'active' | 'inactive' | 'pending';
-  bankName?: string;
+    bankName?: string;
   accountNumber?: string;
   jobCategory?: string;
+  longTermCareReduction?: boolean;
 }
 
 export interface AttendanceRecord {

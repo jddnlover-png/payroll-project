@@ -35,7 +35,11 @@ export interface Employee {
 
   // 월급제 연차수당 1일 금액
   // 시급제는 hourly_rate × 1일 정규시간으로 자동 계산
-  annual_leave_daily_amount: number;
+    annual_leave_daily_amount: number;
+
+  // 장기요양보험 경감 대상
+  // true이면 장기요양보험료 계산 후 30% 경감되어 70%만 공제
+  long_term_care_reduction: boolean;
 
   created_at: string;
   updated_at: string;

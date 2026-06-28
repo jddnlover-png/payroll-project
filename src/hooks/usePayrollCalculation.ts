@@ -629,7 +629,12 @@ const healthInsuranceAmount =
                   amount = taxResult.localIncomeTax;
                 } else if (item.id === "long-term-care") {
   // 장기요양: 건강보험료 기준
-  amount = Math.floor((healthInsuranceAmount * LONG_TERM_CARE_RATE) / 100 / 10) * 10;
+  const baseLongTermCareAmount =
+    Math.floor((healthInsuranceAmount * LONG_TERM_CARE_RATE) / 100 / 10) * 10;
+
+  amount = (emp as any).long_term_care_reduction
+    ? Math.floor((baseLongTermCareAmount * 0.7) / 10) * 10
+    : baseLongTermCareAmount;
 } else if (item.id === "health-insurance") {
   // 건강보험: 직원등록의 건강보험 보수월액 기준
   amount = healthInsuranceAmount;
@@ -866,7 +871,12 @@ const healthInsuranceAmount =
                 amount = taxResultM.localIncomeTax;
               } else if (item.id === "long-term-care") {
   // 장기요양보험 = 건강보험료 기준
-  amount = Math.floor((healthInsuranceAmount * LONG_TERM_CARE_RATE) / 100 / 10) * 10;
+  const baseLongTermCareAmount =
+    Math.floor((healthInsuranceAmount * LONG_TERM_CARE_RATE) / 100 / 10) * 10;
+
+  amount = (emp as any).long_term_care_reduction
+    ? Math.floor((baseLongTermCareAmount * 0.7) / 10) * 10
+    : baseLongTermCareAmount;
 } else if (item.id === "health-insurance") {
   // 건강보험: 직원등록의 건강보험 보수월액 기준
   amount = healthInsuranceAmount;

@@ -339,6 +339,7 @@ children_aged_8_to_20: 0,
 national_pension_monthly_income: "",
 health_insurance_monthly_income: "",
 annual_leave_daily_amount: "",
+long_term_care_reduction: false,
   });
 
   // 주민등록번호 포맷팅 (자동 하이픈 추가)
@@ -442,6 +443,7 @@ children_aged_8_to_20: 0,
 national_pension_monthly_income: "",
 health_insurance_monthly_income: "",
 annual_leave_daily_amount: "",
+long_term_care_reduction: false,
     });
     setEditingEmployeeId(null);
     setResidentNumberError("");
@@ -471,7 +473,10 @@ const maskedResidentNumber = formData.resident_number
   : null;
 
     if (editingEmployeeId) {
-      const updates: EmployeeUpdate & { resignation_date?: string | null } = {
+      const updates: EmployeeUpdate & {
+  resignation_date?: string | null;
+  long_term_care_reduction?: boolean;
+} = {
         name: formData.name,
         resident_number: maskedResidentNumber,
         department: formData.department,
@@ -494,11 +499,15 @@ children_aged_8_to_20: formData.children_aged_8_to_20,
 national_pension_monthly_income: Number(formData.national_pension_monthly_income) || 0,
 health_insurance_monthly_income: Number(formData.health_insurance_monthly_income) || 0,
 annual_leave_daily_amount: Number(formData.annual_leave_daily_amount) || 0,
+long_term_care_reduction: formData.long_term_care_reduction,
       };
 
       updateEmployee.mutate({ id: editingEmployeeId, ...updates });
     } else {
-      const newEmployee: Omit<EmployeeInsert, "organization_id"> & { resignation_date?: string | null } = {
+      const newEmployee: Omit<EmployeeInsert, "organization_id"> & {
+  resignation_date?: string | null;
+  long_term_care_reduction?: boolean;
+} = {
         employee_number: formData.employee_number || generateNextEmployeeNumber(),
         name: formData.name,
         resident_number: maskedResidentNumber,
@@ -523,6 +532,7 @@ children_aged_8_to_20: formData.children_aged_8_to_20,
 national_pension_monthly_income: Number(formData.national_pension_monthly_income) || 0,
 health_insurance_monthly_income: Number(formData.health_insurance_monthly_income) || 0,
 annual_leave_daily_amount: Number(formData.annual_leave_daily_amount) || 0,
+long_term_care_reduction: formData.long_term_care_reduction,
       };
 
       addEmployee.mutate(newEmployee);
@@ -559,6 +569,7 @@ children_aged_8_to_20: empAny.children_aged_8_to_20 ?? 0,
 national_pension_monthly_income: empAny.national_pension_monthly_income?.toString() || "",
 health_insurance_monthly_income: empAny.health_insurance_monthly_income?.toString() || "",
 annual_leave_daily_amount: empAny.annual_leave_daily_amount?.toString() || "",
+long_term_care_reduction: empAny.long_term_care_reduction ?? false,
     });
     setIsOpen(true);
   };
@@ -1372,42 +1383,63 @@ annual_leave_daily_amount: empAny.annual_leave_daily_amount?.toString() || "",
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label>국민연금 기준소득월액</Label>
-                            <Input
-                              type="number"
-                              value={formData.national_pension_monthly_income}
-                              onChange={(e) =>
-                                setFormData({
-                                  ...formData,
-                                  national_pension_monthly_income: e.target.value,
-                                })
-                              }
-                              placeholder="예: 3000000"
-                            />
-                            <p className="text-xs text-muted-foreground">
-                              국민연금공단 기준소득월액 변경 시 수정
-                            </p>
-                          </div>
+  <div className="space-y-2">
+    <Label>국민연금 기준소득월액</Label>
+    <Input
+      type="number"
+      value={formData.national_pension_monthly_income}
+      onChange={(e) =>
+        setFormData({
+          ...formData,
+          national_pension_monthly_income: e.target.value,
+        })
+      }
+      placeholder="예: 3000000"
+    />
+    <p className="text-xs text-muted-foreground">
+      국민연금공단 기준소득월액 변경 시 수정
+    </p>
+  </div>
 
-                          <div className="space-y-2">
-                            <Label>건강보험 보수월액</Label>
-                            <Input
-                              type="number"
-                              value={formData.health_insurance_monthly_income}
-                              onChange={(e) =>
-                                setFormData({
-                                  ...formData,
-                                  health_insurance_monthly_income: e.target.value,
-                                })
-                              }
-                              placeholder="예: 3000000"
-                            />
-                            <p className="text-xs text-muted-foreground">
-                              건강보험공단 보수월액 변경 시 수정
-                            </p>
-                          </div>
-                        </div>
+  <div className="space-y-2">
+    <Label>건강보험 보수월액</Label>
+    <Input
+      type="number"
+      value={formData.health_insurance_monthly_income}
+      onChange={(e) =>
+        setFormData({
+          ...formData,
+          health_insurance_monthly_income: e.target.value,
+        })
+      }
+      placeholder="예: 3000000"
+    />
+    <p className="text-xs text-muted-foreground">
+      건강보험공단 보수월액 변경 시 수정
+    </p>
+  </div>
+</div>
+
+<div className="rounded-md border bg-background p-3">
+  <div className="flex items-center space-x-2">
+    <Checkbox
+      id="long-term-care-reduction"
+      checked={formData.long_term_care_reduction}
+      onCheckedChange={(checked) =>
+        setFormData({
+          ...formData,
+          long_term_care_reduction: checked === true,
+        })
+      }
+    />
+    <Label htmlFor="long-term-care-reduction" className="text-sm font-medium">
+      장기요양보험 경감 대상
+    </Label>
+  </div>
+  <p className="mt-2 text-xs text-muted-foreground">
+    등록장애인 등 공단 경감 대상자에게 적용합니다. 장기요양보험료 계산 후 30% 경감되어 70%만 공제됩니다.
+  </p>
+</div>
                       </div>
 
                       <div className="md:col-span-2 flex justify-end gap-2 pt-4">
@@ -1720,15 +1752,21 @@ annual_leave_daily_amount: empAny.annual_leave_daily_amount?.toString() || "",
                   </p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground">건강보험 보수월액</p>
-                  <p className="font-medium">
-                    {((detailEmployee as any).health_insurance_monthly_income || 0).toLocaleString()}원
-                  </p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">이메일</p>
-                  <p className="font-medium">{detailEmployee.email || "-"}</p>
-                </div>
+  <p className="text-muted-foreground">건강보험 보수월액</p>
+  <p className="font-medium">
+    {((detailEmployee as any).health_insurance_monthly_income || 0).toLocaleString()}원
+  </p>
+</div>
+<div>
+  <p className="text-muted-foreground">장기요양보험 경감 대상</p>
+  <p className="font-medium">
+    {(detailEmployee as any).long_term_care_reduction ? "적용" : "미적용"}
+  </p>
+</div>
+<div>
+  <p className="text-muted-foreground">이메일</p>
+  <p className="font-medium">{detailEmployee.email || "-"}</p>
+</div>
                 <div>
                   <p className="text-muted-foreground">연락처</p>
                   <p className="font-medium">{detailEmployee.phone || "-"}</p>
