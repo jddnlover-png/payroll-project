@@ -395,15 +395,17 @@ const LeaveBalanceSummary = ({
       <p className="font-semibold">현재 잔여연차: {balance.remainingDays}일</p>
       <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-muted-foreground">
         <span>자동발생</span>
-        <span className="text-right">{balance.baseGrantedDays}일</span>
+<span className="text-right">+{balance.baseGrantedDays}일</span>
 
-        <span>이월</span>
-        <span className="text-right">{balance.carryOverDays}일</span>
+<span>이월</span>
+<span className="text-right">+{balance.carryOverDays}일</span>
 
-        <span>조정/추가</span>
-        <span className="text-right">{adjustmentTotal}일</span>
+<span>조정/추가</span>
+<span className="text-right">
+  {adjustmentTotal > 0 ? `+${adjustmentTotal}` : adjustmentTotal}일
+</span>
 
-        <span>휴가사용</span>
+<span>휴가사용</span>
 <span className="text-right">
   {Number(balance.usedLeaveDays || 0) === 0 ? '0일' : `-${balance.usedLeaveDays}일`}
 </span>
@@ -412,19 +414,24 @@ const LeaveBalanceSummary = ({
 <span className="text-right">
   {Number(balance.payoutDays || 0) === 0 ? '0일' : `-${balance.payoutDays}일`}
 </span>
+
+<span className="font-semibold text-foreground border-t pt-2 mt-1">현재잔여</span>
+<span className="text-right font-semibold text-foreground border-t pt-2 mt-1">
+  ={balance.remainingDays}일
+</span>
       </div>
 
       {showAdvance && (
         <>
           <div className="border-t pt-2 mt-2" />
           <div className="flex justify-between text-muted-foreground">
-            <span>선사용 가능</span>
-            <span>{advanceAvailableDays}일</span>
-          </div>
-          <div className="flex justify-between font-semibold">
-            <span>최대 사용 가능</span>
-            <span>{availableDays}일</span>
-          </div>
+  <span>선사용 가능</span>
+  <span>+{advanceAvailableDays}일</span>
+</div>
+<div className="flex justify-between font-semibold text-primary">
+  <span>최대 사용 가능</span>
+  <span>={availableDays}일</span>
+</div>
         </>
       )}
     </div>
