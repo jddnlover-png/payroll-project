@@ -414,14 +414,34 @@ const handleAddLedgerEntry = async () => {
     }
   }
 
-  addLedgerEntry.mutate({
-    employee_id: ledgerFormData.employee_id,
-    ledger_year: accountYear,
-    ledger_date: new Date().toISOString().split('T')[0],
-    entry_type: ledgerFormData.entry_type as any,
-    days: Number(ledgerFormData.days),
-    reason: ledgerFormData.reason.trim(),
-  });
+    const isAdvanceUse = ledgerFormData.entry_type === 'advance_use';
+  const targetLedgerYear = isAdvanceUse ? accountYear + 1 : accountYear;
+  const targetLedgerDate = isAdvanceUse
+    ? `${accountYear + 1}-01-01`
+    : new Date().toISOString().split('T')[0];
+
+  addLedgerEntry.mutate(
+    {
+      employee_id: ledgerFormData.employee_id,
+      ledger_year: targetLedgerYear,
+      ledger_date: targetLedgerDate,
+      entry_type: ledgerFormData.entry_type as any,
+      days: Number(ledgerFormData.days),
+      reason: isAdvanceUse
+        ? `${accountYear}년 연차 선사용: ${ledgerFormData.reason.trim()}`
+        : ledgerFormData.reason.trim(),
+    },
+    {
+      onSuccess: () => {
+        if (isAdvanceUse) {
+          toast.success(`${targetLedgerYear}년 연차계좌에 선사용 내역이 등록되었습니다.`);
+          setAccountYear(targetLedgerYear);
+        } else {
+          toast.success('연차계좌에 조정 내역이 등록되었습니다.');
+        }
+      },
+    },
+  );
 
   setLedgerFormData({
     employee_id: '',
@@ -1449,8 +1469,9 @@ const usageRate = totalAnnualLeave > 0 ? Math.round((usedLeave / totalAnnualLeav
     <CardHeader>
       <CardTitle className="text-base">연차계좌 조정 등록</CardTitle>
       <CardDescription>
-        최초 도입, 회사 추가부여, 이월, 선사용, 관리자 조정 내역을 등록합니다.
-      </CardDescription>
+  최초 도입, 회사 추가부여, 이월, 관리자 조정 내역을 등록합니다.
+  선사용은 다음 해 연차계좌에 자동 반영됩니다.
+</CardDescription>
     </CardHeader>
     <CardContent className="grid grid-cols-1 md:grid-cols-5 gap-4">
       <div className="space-y-2">
@@ -1490,7 +1511,7 @@ const usageRate = totalAnnualLeave > 0 ? Math.round((usedLeave / totalAnnualLeav
             <SelectItem value="adjustment">관리자 조정</SelectItem>
             <SelectItem value="extra_grant">회사 추가부여</SelectItem>
             <SelectItem value="carryover">이월</SelectItem>
-            <SelectItem value="advance_use">선사용</SelectItem>
+            <SelectItem value="advance_use">선사용(다음 해 차감)</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -1716,7 +1737,7 @@ const usageRate = totalAnnualLeave > 0 ? Math.round((usedLeave / totalAnnualLeav
                     <SelectItem value="adjustment">관리자 조정</SelectItem>
                     <SelectItem value="extra_grant">회사 추가부여</SelectItem>
                     <SelectItem value="carryover">이월</SelectItem>
-                    <SelectItem value="advance_use">선사용</SelectItem>
+                    <SelectItem value="advance_use">선사용(다음 해 차감)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
