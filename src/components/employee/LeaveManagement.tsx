@@ -404,10 +404,14 @@ const LeaveBalanceSummary = ({
         <span className="text-right">{adjustmentTotal}일</span>
 
         <span>휴가사용</span>
-        <span className="text-right">-{balance.usedLeaveDays}일</span>
+<span className="text-right">
+  {Number(balance.usedLeaveDays || 0) === 0 ? '0일' : `-${balance.usedLeaveDays}일`}
+</span>
 
-        <span>연차수당</span>
-        <span className="text-right">-{balance.payoutDays}일</span>
+<span>연차수당</span>
+<span className="text-right">
+  {Number(balance.payoutDays || 0) === 0 ? '0일' : `-${balance.payoutDays}일`}
+</span>
       </div>
 
       {showAdvance && (
@@ -558,10 +562,13 @@ const handleAddLedgerEntry = async () => {
   }
 
     const isAdvanceUse = ledgerFormData.entry_type === 'advance_use';
-  const targetLedgerYear = isAdvanceUse ? accountYear + 1 : accountYear;
-  const targetLedgerDate = isAdvanceUse
-    ? `${accountYear + 1}-01-01`
-    : new Date().toISOString().split('T')[0];
+const isCarryOver = ledgerFormData.entry_type === 'carryover';
+const shouldSaveToNextYear = isAdvanceUse || isCarryOver;
+
+const targetLedgerYear = shouldSaveToNextYear ? accountYear + 1 : accountYear;
+const targetLedgerDate = shouldSaveToNextYear
+  ? `${accountYear + 1}-01-01`
+  : new Date().toISOString().split('T')[0];
 
   addLedgerEntry.mutate(
     {
@@ -571,17 +578,22 @@ const handleAddLedgerEntry = async () => {
       entry_type: ledgerFormData.entry_type as any,
       days: Number(ledgerFormData.days),
       reason: isAdvanceUse
-        ? `${accountYear}년 연차 선사용: ${ledgerFormData.reason.trim()}`
-        : ledgerFormData.reason.trim(),
+  ? `${accountYear}년 연차 선사용: ${ledgerFormData.reason.trim()}`
+  : isCarryOver
+    ? `${accountYear}년 잔여연차 이월: ${ledgerFormData.reason.trim()}`
+    : ledgerFormData.reason.trim(),
     },
     {
       onSuccess: () => {
         if (isAdvanceUse) {
-          toast.success(`${targetLedgerYear}년 연차계좌에 선사용 내역이 등록되었습니다.`);
-          setAccountYear(targetLedgerYear);
-        } else {
-          toast.success('연차계좌에 조정 내역이 등록되었습니다.');
-        }
+  toast.success(`${targetLedgerYear}년 연차계좌에 선사용 내역이 등록되었습니다.`);
+  setAccountYear(targetLedgerYear);
+} else if (isCarryOver) {
+  toast.success(`${targetLedgerYear}년 연차계좌에 이월 내역이 등록되었습니다.`);
+  setAccountYear(targetLedgerYear);
+} else {
+  toast.success('연차계좌에 조정 내역이 등록되었습니다.');
+}
       },
     },
   );
