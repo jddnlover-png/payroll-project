@@ -362,12 +362,9 @@ const getEmployeeAnnualLeaveBalance = (employeeId: string, targetYear: number) =
 const getAdvanceAvailableDays = (employeeId: string, targetYear: number) => {
   if (!annualLeavePolicy.allowAdvanceUse) return 0;
 
-  const maxAdvanceUse = Number(annualLeavePolicy.maxAdvanceUse || 0);
-  if (maxAdvanceUse <= 0) return 0;
-
   const nextYear = targetYear + 1;
 
-  const alreadyUsedAdvanceDays = ledgerEntries
+  return ledgerEntries
     .filter(
       (entry) =>
         entry.employee_id === employeeId &&
@@ -375,8 +372,6 @@ const getAdvanceAvailableDays = (employeeId: string, targetYear: number) => {
         entry.entry_type === 'advance_use',
     )
     .reduce((sum, entry) => sum + Math.abs(Number(entry.days || 0)), 0);
-
-  return Math.max(0, maxAdvanceUse - alreadyUsedAdvanceDays);
 };
 
 const LeaveBalanceSummary = ({
