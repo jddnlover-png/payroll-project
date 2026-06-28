@@ -129,14 +129,28 @@ const [payoutFormData, setPayoutFormData] = useState({
       toast.error('필수 항목을 입력해주세요.');
       return;
     }
-    const days = calculateDays(formData.startDate, formData.endDate);
-    addLeaveRecord.mutate(
+    const days = formData.leaveType === 'half_day' ? 0.5 : calculateDays(formData.startDate, formData.endDate);
+
+if (formData.leaveType === 'annual' || formData.leaveType === 'half_day') {
+  const startYear = formData.startDate.getFullYear();
+  const balance = getEmployeeAnnualLeaveBalance(formData.employeeId, startYear);
+  const remainingDays = Number(balance?.remainingDays || 0);
+  const advanceAvailableDays = getAdvanceAvailableDays(formData.employeeId, startYear);
+  const availableDays = remainingDays + advanceAvailableDays;
+
+  if (days > availableDays) {
+    toast.error(`사용 가능 연차 ${availableDays}일을 초과했습니다.`);
+    return;
+  }
+}
+
+addLeaveRecord.mutate(
       {
         employee_id: formData.employeeId,
         leave_type: formData.leaveType,
         start_date: format(formData.startDate, 'yyyy-MM-dd'),
         end_date: format(formData.endDate, 'yyyy-MM-dd'),
-        days: formData.leaveType === 'half_day' ? 0.5 : days,
+        days,
         reason: formData.reason,
         status: 'approved',
       },
@@ -170,15 +184,28 @@ const handleUpdate = () => {
     return;
   }
 
-  const days = calculateDays(formData.startDate, formData.endDate);
+  const days = formData.leaveType === 'half_day' ? 0.5 : calculateDays(formData.startDate, formData.endDate);
 
-  updateLeaveRecord.mutate(
+if (formData.leaveType === 'annual' || formData.leaveType === 'half_day') {
+  const startYear = formData.startDate.getFullYear();
+  const balance = getEmployeeAnnualLeaveBalance(formData.employeeId, startYear);
+  const remainingDays = Number(balance?.remainingDays || 0);
+  const advanceAvailableDays = getAdvanceAvailableDays(formData.employeeId, startYear);
+  const availableDays = remainingDays + advanceAvailableDays;
+
+  if (days > availableDays) {
+    toast.error(`사용 가능 연차 ${availableDays}일을 초과했습니다.`);
+    return;
+  }
+}
+
+updateLeaveRecord.mutate(
     {
       id: editingRecordId,
       leave_type: formData.leaveType,
       start_date: format(formData.startDate, 'yyyy-MM-dd'),
       end_date: format(formData.endDate, 'yyyy-MM-dd'),
-      days: formData.leaveType === 'half_day' ? 0.5 : days,
+      days,
       reason: formData.reason,
       status: 'approved',
     },
@@ -293,6 +320,118 @@ const getAnnualLeavePayoutAmount = (employee: (typeof employees)[0], days: numbe
   return Math.round(getAnnualLeaveDailyAmount(employee) * days);
 };
 
+const getEmployeeAnnualLeaveBalance = (employeeId: string, targetYear: number) => {
+  const employee = activeEmployees.find((emp) => emp.id === employeeId);
+
+  if (!employee) return null;
+
+  const leaveUsages = leaveRecords
+    .filter((r) => {
+      const startYear = parseISO(r.start_date).getFullYear();
+      return r.employee_id === employeeId && r.status === 'approved' && startYear === targetYear;
+    })
+    .map((r) => ({
+      employee_id: r.employee_id,
+      days: Number(r.days || 0),
+    }));
+
+  const payouts = annualLeavePayouts
+    .filter(
+      (p) =>
+        p.employee_id === employeeId &&
+        p.settlement_month.startsWith(`${targetYear}-`),
+    )
+    .map((p) => ({
+      employee_id: p.employee_id,
+      days: Number(p.days || 0),
+    }));
+
+  return calculateAnnualLeaveBalance({
+    employee: {
+      id: employee.id,
+      hire_date: employee.hire_date,
+    },
+    year: targetYear,
+    policy: annualLeavePolicy,
+    ledgerEntries,
+    leaveUsages,
+    payouts,
+  });
+};
+
+const getAdvanceAvailableDays = (employeeId: string, targetYear: number) => {
+  if (!annualLeavePolicy.allowAdvanceUse) return 0;
+
+  const maxAdvanceUse = Number(annualLeavePolicy.maxAdvanceUse || 0);
+  if (maxAdvanceUse <= 0) return 0;
+
+  const nextYear = targetYear + 1;
+
+  const alreadyUsedAdvanceDays = ledgerEntries
+    .filter(
+      (entry) =>
+        entry.employee_id === employeeId &&
+        entry.ledger_year === nextYear &&
+        entry.entry_type === 'advance_use',
+    )
+    .reduce((sum, entry) => sum + Math.abs(Number(entry.days || 0)), 0);
+
+  return Math.max(0, maxAdvanceUse - alreadyUsedAdvanceDays);
+};
+
+const LeaveBalanceSummary = ({
+  balance,
+  advanceAvailableDays = 0,
+  showAdvance = false,
+}: {
+  balance: NonNullable<ReturnType<typeof getEmployeeAnnualLeaveBalance>>;
+  advanceAvailableDays?: number;
+  showAdvance?: boolean;
+}) => {
+  const adjustmentTotal =
+    Number(balance.initialAdjustmentDays || 0) +
+    Number(balance.adjustmentDays || 0) +
+    Number(balance.extraGrantDays || 0);
+
+  const availableDays = Number(balance.remainingDays || 0) + Number(advanceAvailableDays || 0);
+
+  return (
+    <div className="rounded-md border bg-muted/30 p-3 text-sm space-y-1">
+      <p className="font-semibold">현재 잔여연차: {balance.remainingDays}일</p>
+      <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-muted-foreground">
+        <span>자동발생</span>
+        <span className="text-right">{balance.baseGrantedDays}일</span>
+
+        <span>이월</span>
+        <span className="text-right">{balance.carryOverDays}일</span>
+
+        <span>조정/추가</span>
+        <span className="text-right">{adjustmentTotal}일</span>
+
+        <span>휴가사용</span>
+        <span className="text-right">-{balance.usedLeaveDays}일</span>
+
+        <span>연차수당</span>
+        <span className="text-right">-{balance.payoutDays}일</span>
+      </div>
+
+      {showAdvance && (
+        <>
+          <div className="border-t pt-2 mt-2" />
+          <div className="flex justify-between text-muted-foreground">
+            <span>선사용 가능</span>
+            <span>{advanceAvailableDays}일</span>
+          </div>
+          <div className="flex justify-between font-semibold">
+            <span>최대 사용 가능</span>
+            <span>{availableDays}일</span>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
 const resetPayoutForm = () => {
   setPayoutFormData({
     employeeId: '',
@@ -311,11 +450,20 @@ const handleAddPayout = () => {
   const days = Number(payoutFormData.days);
 
   if (!Number.isFinite(days) || days <= 0) {
-    toast.error('지급일수는 0보다 큰 숫자로 입력해주세요.');
-    return;
-  }
+  toast.error('지급일수는 0보다 큰 숫자로 입력해주세요.');
+  return;
+}
 
-  addAnnualLeavePayout.mutate(
+const settlementYear = Number(payoutFormData.settlementMonth.split('-')[0]);
+const balance = getEmployeeAnnualLeaveBalance(payoutFormData.employeeId, settlementYear);
+const remainingDays = Number(balance?.remainingDays || 0);
+
+if (days > remainingDays) {
+  toast.error(`잔여연차 ${remainingDays}일을 초과하여 연차수당을 등록할 수 없습니다.`);
+  return;
+}
+
+addAnnualLeavePayout.mutate(
     {
       employee_id: payoutFormData.employeeId,
       settlement_month: payoutFormData.settlementMonth,
@@ -895,10 +1043,28 @@ const rate = totalLeave > 0 ? Math.round((usedLeave / totalLeave) * 100) : 0;
                     <div className="space-y-2">
                       <Label>직원 선택 *</Label>
                       <EmployeeCombobox
-                        employees={activeEmployees}
-                        value={formData.employeeId}
-                        onValueChange={(v) => setFormData({ ...formData, employeeId: v })}
-                      />
+  employees={activeEmployees}
+  value={formData.employeeId}
+  onValueChange={(v) => setFormData({ ...formData, employeeId: v })}
+/>
+
+{formData.employeeId && (
+  (() => {
+    const targetYear = formData.startDate?.getFullYear() ?? requestYear;
+    const balance = getEmployeeAnnualLeaveBalance(formData.employeeId, targetYear);
+    const advanceAvailableDays = getAdvanceAvailableDays(formData.employeeId, targetYear);
+
+    if (!balance) return null;
+
+    return (
+      <LeaveBalanceSummary
+        balance={balance}
+        advanceAvailableDays={advanceAvailableDays}
+        showAdvance
+      />
+    );
+  })()
+)}
                     </div>
                     <div className="space-y-2">
                       <Label>휴가 유형 *</Label>
@@ -985,6 +1151,24 @@ const rate = totalLeave > 0 ? Math.round((usedLeave / totalLeave) * 100) : 0;
 <p className="text-xs text-muted-foreground">
   직원 변경은 지원하지 않습니다. 직원이 잘못된 경우 삭제 후 다시 신청하세요.
 </p>
+
+{formData.employeeId && (
+  (() => {
+    const targetYear = formData.startDate?.getFullYear() ?? requestYear;
+    const balance = getEmployeeAnnualLeaveBalance(formData.employeeId, targetYear);
+    const advanceAvailableDays = getAdvanceAvailableDays(formData.employeeId, targetYear);
+
+    if (!balance) return null;
+
+    return (
+      <LeaveBalanceSummary
+        balance={balance}
+        advanceAvailableDays={advanceAvailableDays}
+        showAdvance
+      />
+    );
+  })()
+)}
       </div>
 
       <div className="space-y-2">
@@ -1810,13 +1994,24 @@ const usageRate = totalAnnualLeave > 0 ? Math.round((usedLeave / totalAnnualLeav
                 <div className="space-y-2">
                   <Label>직원 *</Label>
                   <EmployeeCombobox
-                    employees={activeEmployees}
-                    value={payoutFormData.employeeId}
-                    onValueChange={(employeeId) =>
-                      setPayoutFormData((prev) => ({ ...prev, employeeId }))
-                    }
-                    placeholder="직원 선택"
-                  />
+  employees={activeEmployees}
+  value={payoutFormData.employeeId}
+  onValueChange={(employeeId) =>
+    setPayoutFormData((prev) => ({ ...prev, employeeId }))
+  }
+  placeholder="직원 선택"
+/>
+
+{payoutFormData.employeeId && (
+  (() => {
+    const settlementYear = Number(payoutFormData.settlementMonth.split('-')[0]);
+    const balance = getEmployeeAnnualLeaveBalance(payoutFormData.employeeId, settlementYear);
+
+    if (!balance) return null;
+
+    return <LeaveBalanceSummary balance={balance} />;
+  })()
+)}
                 </div>
 
                 <div className="space-y-2">
