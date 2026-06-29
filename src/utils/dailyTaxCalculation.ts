@@ -128,11 +128,11 @@ export function calculateDailyTax(
     }
   }
 
-  // 장기요양보험
-  let longTermCareInsurance = 0;
-  if (dpSettings.apply_health_insurance && healthInsurance > 0) {
-    longTermCareInsurance = truncateTo10(healthInsurance * (dpSettings.long_term_care_rate / 100) * 0.5);
-  }
+  // 장기요양보험 = 건강보험료 × 장기요양보험 요율
+let longTermCareInsurance = 0;
+if (dpSettings.apply_health_insurance && healthInsurance > 0) {
+  longTermCareInsurance = truncateTo10(healthInsurance * (dpSettings.long_term_care_rate / 100));
+}
 
   // 산재보험 (사업주 부담, 참고용)
   const industrialAccident = truncateTo10(totalWage * (dpSettings.industrial_accident_rate / 100));
