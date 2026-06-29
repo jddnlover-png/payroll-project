@@ -194,7 +194,7 @@ export const defaultDeductionItems: PayrollItem[] = [
   isActive: true,
   isLocked: true,
   calculationType: "percentage",
-  defaultValue: 12.81,
+defaultValue: 13.14,
   description: "건강보험료 기준으로 자동 계산",
 },
 ];

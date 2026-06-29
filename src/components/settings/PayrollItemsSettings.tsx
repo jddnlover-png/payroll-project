@@ -382,7 +382,9 @@ export const PayrollItemsSettings = () => {
         <div className="flex items-center justify-between">
           <div>
             <CardTitle>급여 항목 설정</CardTitle>
-            <CardDescription>급여계산서 및 급여대장에 표시될 지급항목과 공제항목을 관리합니다.</CardDescription>
+            <CardDescription>
+  급여계산서 및 급여대장에 표시될 지급항목과 공제항목의 사용 여부를 관리합니다. 4대보험 요율은 [보험요율] 메뉴에서 설정합니다.
+</CardDescription>
           </div>
           <Button variant="outline" size="sm" onClick={handleReset}>
             <RotateCcw className="h-4 w-4 mr-2" />

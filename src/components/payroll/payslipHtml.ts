@@ -332,21 +332,22 @@ const displayTotalWorkMinutes = Math.max(
     const si = deductionItems.find((di) => di.id === item.itemId);
 
     if (item.itemId === "national-pension") {
-  const rate = 4.75;
+  const rate = Number(si?.defaultValue ?? 4.75);
   return `${fmtNum(nationalPensionBase)}원 × ${rate}%`;
 }
 
 if (item.itemId === "health-insurance") {
-  const rate = 3.595;
+  const rate = Number(si?.defaultValue ?? 3.595);
   return `${fmtNum(healthInsuranceBase)}원 × ${rate}%`;
 }
 
 if (item.itemId === "employment-insurance") {
-  return `${fmtNum(insuranceBase)}원 × 0.9%`;
+  const rate = Number(si?.defaultValue ?? 0.9);
+  return `${fmtNum(insuranceBase)}원 × ${rate}%`;
 }
 
 if (item.itemId === "long-term-care") {
-  const rate = 12.81;
+  const rate = Number(si?.defaultValue ?? 13.14);
   return (employee as any)?.longTermCareReduction || (employee as any)?.long_term_care_reduction
     ? `건강보험료 × ${rate}% × 70% (경감 적용)`
     : `건강보험료 × ${rate}%`;

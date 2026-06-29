@@ -21,6 +21,13 @@ interface MergedPayrollItem extends PayrollItem {
   overrideValue?: number;
 }
 
+const INSURANCE_DEDUCTION_ITEM_IDS = [
+  "national-pension",
+  "health-insurance",
+  "employment-insurance",
+  "long-term-care",
+];
+
 export function useEmployeePayrollSettings() {
   const { currentOrganization } = useOrganization();
   const { paymentItems: orgPaymentItems, deductionItems: orgDeductionItems } = usePayrollSettingsStore();
@@ -95,6 +102,12 @@ export function useEmployeePayrollSettings() {
       .filter(item => item.isActive)
       .map(orgItem => {
         const override = employeeSettings?.deduction_items?.find(o => o.itemId === orgItem.id);
+          const isInsuranceDeduction =
+    INSURANCE_DEDUCTION_ITEM_IDS.includes(orgItem.id);
+
+  if (isInsuranceDeduction) {
+    return { ...orgItem };
+  }
         
         // 오버라이드가 있으면 적용
         if (override) {

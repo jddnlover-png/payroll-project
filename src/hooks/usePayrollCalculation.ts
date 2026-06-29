@@ -15,10 +15,21 @@ import { calculateSalaryDetail, AttendanceRawRecord } from "@/utils/salaryDetail
 import { calculateProductionExempt } from "@/utils/productionTaxExemption";
 import { calculateIncomeTax } from "@/lib/incomeTaxCalculation";
 
-const NATIONAL_PENSION_RATE = 4.75;
-const HEALTH_INSURANCE_RATE = 3.595;
-const EMPLOYMENT_INSURANCE_RATE = 0.9;
-const LONG_TERM_CARE_RATE = 12.81;
+const FALLBACK_NATIONAL_PENSION_RATE = 4.75;
+const FALLBACK_HEALTH_INSURANCE_RATE = 3.595;
+const FALLBACK_EMPLOYMENT_INSURANCE_RATE = 0.9;
+const FALLBACK_LONG_TERM_CARE_RATE = 13.14;
+
+const getDeductionRate = (
+  deductionItems: { id: string; defaultValue?: number }[],
+  itemId: string,
+  fallbackRate: number,
+) => {
+  const item = deductionItems.find((deduction) => deduction.id === itemId);
+  const rate = Number(item?.defaultValue);
+
+  return Number.isFinite(rate) ? rate : fallbackRate;
+};
 
 export function usePayrollCalculation(year: number, month: number) {
   const queryClient = useQueryClient();
@@ -609,8 +620,32 @@ const nationalPensionBase = Math.min(
   Math.max(400_000, nationalPensionBaseRaw),
 );
 
+const nationalPensionRate = getDeductionRate(
+  activeDeductionItems,
+  "national-pension",
+  FALLBACK_NATIONAL_PENSION_RATE,
+);
+
+const healthInsuranceRate = getDeductionRate(
+  activeDeductionItems,
+  "health-insurance",
+  FALLBACK_HEALTH_INSURANCE_RATE,
+);
+
+const employmentInsuranceRate = getDeductionRate(
+  activeDeductionItems,
+  "employment-insurance",
+  FALLBACK_EMPLOYMENT_INSURANCE_RATE,
+);
+
+const longTermCareRate = getDeductionRate(
+  activeDeductionItems,
+  "long-term-care",
+  FALLBACK_LONG_TERM_CARE_RATE,
+);
+
 const healthInsuranceAmount =
-  Math.floor((healthInsuranceBase * HEALTH_INSURANCE_RATE) / 100 / 10) * 10;
+  Math.floor((healthInsuranceBase * healthInsuranceRate) / 100 / 10) * 10;
               // 간이세액표 소득세 계산
               const taxResult = await calculateIncomeTax({
                 taxBase,
@@ -630,7 +665,7 @@ const healthInsuranceAmount =
                 } else if (item.id === "long-term-care") {
   // 장기요양: 건강보험료 기준
   const baseLongTermCareAmount =
-    Math.floor((healthInsuranceAmount * LONG_TERM_CARE_RATE) / 100 / 10) * 10;
+  Math.floor((healthInsuranceAmount * longTermCareRate) / 100 / 10) * 10;
 
   amount = (emp as any).long_term_care_reduction
     ? Math.floor((baseLongTermCareAmount * 0.7) / 10) * 10
@@ -640,10 +675,10 @@ const healthInsuranceAmount =
   amount = healthInsuranceAmount;
 } else if (item.id === "national-pension") {
   // 국민연금: 직원등록의 기준소득월액 기준
-  amount = Math.floor((nationalPensionBase * NATIONAL_PENSION_RATE) / 100 / 10) * 10;
+  amount = Math.floor((nationalPensionBase * nationalPensionRate) / 100 / 10) * 10;
 } else if (item.id === "employment-insurance") {
   // 고용보험: 기존처럼 지급총액 기준 유지
-  amount = Math.floor((insuranceBase * EMPLOYMENT_INSURANCE_RATE) / 100 / 10) * 10;
+  amount = Math.floor((insuranceBase * employmentInsuranceRate) / 100 / 10) * 10;
                 } else if (item.calculationType === "percentage" && item.defaultValue) {
                   // 기타 비율 항목: insuranceBase 기준
                   amount = Math.floor((insuranceBase * item.defaultValue) / 100 / 10) * 10;
@@ -850,8 +885,32 @@ const nationalPensionBaseM = Math.min(
 );
 
 // 건강보험료 먼저 계산 (장기요양보험 산출 기준)
+const nationalPensionRateM = getDeductionRate(
+  activeDeductionItems,
+  "national-pension",
+  FALLBACK_NATIONAL_PENSION_RATE,
+);
+
+const healthInsuranceRateM = getDeductionRate(
+  activeDeductionItems,
+  "health-insurance",
+  FALLBACK_HEALTH_INSURANCE_RATE,
+);
+
+const employmentInsuranceRateM = getDeductionRate(
+  activeDeductionItems,
+  "employment-insurance",
+  FALLBACK_EMPLOYMENT_INSURANCE_RATE,
+);
+
+const longTermCareRateM = getDeductionRate(
+  activeDeductionItems,
+  "long-term-care",
+  FALLBACK_LONG_TERM_CARE_RATE,
+);
+
 const healthInsuranceAmount =
-  Math.floor((healthInsuranceBaseM * HEALTH_INSURANCE_RATE) / 100 / 10) * 10;
+  Math.floor((healthInsuranceBaseM * healthInsuranceRateM) / 100 / 10) * 10;
 
             // 간이세액표 소득세 계산
             const taxResultM = await calculateIncomeTax({
@@ -872,7 +931,7 @@ const healthInsuranceAmount =
               } else if (item.id === "long-term-care") {
   // 장기요양보험 = 건강보험료 기준
   const baseLongTermCareAmount =
-    Math.floor((healthInsuranceAmount * LONG_TERM_CARE_RATE) / 100 / 10) * 10;
+  Math.floor((healthInsuranceAmount * longTermCareRateM) / 100 / 10) * 10;
 
   amount = (emp as any).long_term_care_reduction
     ? Math.floor((baseLongTermCareAmount * 0.7) / 10) * 10
@@ -882,10 +941,10 @@ const healthInsuranceAmount =
   amount = healthInsuranceAmount;
 } else if (item.id === "national-pension") {
   // 국민연금: 직원등록의 기준소득월액 기준
-  amount = Math.floor((nationalPensionBaseM * NATIONAL_PENSION_RATE) / 100 / 10) * 10;
+  amount = Math.floor((nationalPensionBaseM * nationalPensionRateM) / 100 / 10) * 10;
 } else if (item.id === "employment-insurance") {
   // 고용보험: 기존처럼 지급총액 기준 유지
-  amount = Math.floor((insuranceBaseM * EMPLOYMENT_INSURANCE_RATE) / 100 / 10) * 10;
+  amount = Math.floor((insuranceBaseM * employmentInsuranceRateM) / 100 / 10) * 10;
               } else if (item.calculationType === "percentage" && item.defaultValue) {
                 // 기타 비율 항목: insuranceBaseM 기준
                 amount = Math.floor((insuranceBaseM * item.defaultValue) / 100 / 10) * 10;

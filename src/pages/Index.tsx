@@ -47,6 +47,7 @@ import {
   Network,
   UserCheck,
   Star,
+ShieldCheck,
 } from "lucide-react";
 
 interface SubItem {
@@ -113,10 +114,11 @@ const menuItems: MenuItem[] = [
     icon: Settings,
     subItems: [
       { id: "work-hours", label: "근무 시간", icon: Timer },
-      { id: "payroll-calc", label: "급여계산", icon: Calculator },
-      { id: "payroll-items", label: "급여 항목", icon: ListChecks },
-      { id: "employee-payroll", label: "직원별 급여", icon: UserCog },
-      { id: "salary-work-standards", label: "급여/근무 기준", icon: UserCheck },
+{ id: "payroll-calc", label: "급여계산", icon: Calculator },
+{ id: "payroll-items", label: "급여 항목", icon: ListChecks },
+{ id: "insurance-rates", label: "보험요율", icon: ShieldCheck },
+{ id: "employee-payroll", label: "직원별 급여", icon: UserCog },
+{ id: "salary-work-standards", label: "급여/근무 기준", icon: UserCheck },
       { id: "allowance", label: "초과근무 시간", icon: Coins },
       { id: "night-shift", label: "야간 교대근무 설정", icon: Moon },
       { id: "leave-rules", label: "연차 규칙", icon: TreePalm },
