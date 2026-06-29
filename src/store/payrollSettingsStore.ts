@@ -44,8 +44,12 @@ function normalizeInsuranceRates(items: PayrollItem[]): PayrollItem[] {
     }
 
     if (item.id === "long-term-care") {
-      return { ...item, defaultValue: 13.14 };
-    }
+  return {
+    ...item,
+    defaultValue: 13.14,
+    description: "건강보험료 × 장기요양보험 요율로 자동 계산",
+  };
+}
 
     return item;
   });
@@ -142,7 +146,7 @@ export const usePayrollSettingsStore = create<PayrollSettingsStore>()(
     }),
     {
       name: "payroll-settings-storage",
-      version: 8,
+      version: 9,
 migrate: (persistedState: any, version: number) => {
   if (version < 5) {
     return {
