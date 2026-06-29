@@ -1114,9 +1114,9 @@ const rate = totalLeave > 0 ? Math.round((usedLeave / totalLeave) * 100) : 0;
                         <SelectContent>
                           <SelectItem value="annual">연차</SelectItem>
                           <SelectItem value="half_day">반차</SelectItem>
-                          <SelectItem value="sick">병가</SelectItem>
+                          
                           <SelectItem value="personal">경조사</SelectItem>
-                          <SelectItem value="other">기타</SelectItem>
+                          
                         </SelectContent>
                       </Select>
                     </div>
@@ -1224,9 +1224,9 @@ const rate = totalLeave > 0 ? Math.round((usedLeave / totalLeave) * 100) : 0;
           <SelectContent>
             <SelectItem value="annual">연차</SelectItem>
             <SelectItem value="half_day">반차</SelectItem>
-            <SelectItem value="sick">병가</SelectItem>
+            
             <SelectItem value="personal">경조사</SelectItem>
-            <SelectItem value="other">기타</SelectItem>
+            
           </SelectContent>
         </Select>
       </div>
