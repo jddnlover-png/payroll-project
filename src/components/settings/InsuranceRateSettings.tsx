@@ -1,7 +1,10 @@
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ShieldCheck } from "lucide-react";
+import { toast } from "sonner";
 import { usePayrollSettingsStore } from "@/store/payrollSettingsStore";
 
 const INSURANCE_ITEMS = [
@@ -29,15 +32,39 @@ const INSURANCE_ITEMS = [
 
 export const InsuranceRateSettings = () => {
   const { deductionItems, updateDeductionItem } = usePayrollSettingsStore();
+  const [rates, setRates] = useState<Record<string, string>>({});
 
   const getItem = (id: string) => deductionItems.find((item) => item.id === id);
 
-  const handleChange = (id: string, value: string) => {
-    const rate = value === "" ? undefined : Number(value);
+  useEffect(() => {
+    const nextRates: Record<string, string> = {};
 
-    updateDeductionItem(id, {
-      defaultValue: Number.isFinite(rate) ? rate : undefined,
+    INSURANCE_ITEMS.forEach((insurance) => {
+      const item = getItem(insurance.id);
+      nextRates[insurance.id] = item?.defaultValue?.toString() ?? "";
     });
+
+    setRates(nextRates);
+  }, [deductionItems]);
+
+  const handleChange = (id: string, value: string) => {
+    setRates((prev) => ({
+      ...prev,
+      [id]: value,
+    }));
+  };
+
+  const handleSave = () => {
+    INSURANCE_ITEMS.forEach((insurance) => {
+      const value = rates[insurance.id];
+      const rate = value === "" ? undefined : Number(value);
+
+      updateDeductionItem(insurance.id, {
+        defaultValue: Number.isFinite(rate) ? rate : undefined,
+      });
+    });
+
+    toast.success("보험요율이 저장되었습니다.");
   };
 
   return (
@@ -77,8 +104,8 @@ export const InsuranceRateSettings = () => {
                   type="number"
                   step="0.001"
                   min="0"
-                  value={item?.defaultValue ?? ""}
-                  onChange={(e) => handleChange(insurance.id, e.target.value)}
+                  value={rates[insurance.id] ?? ""}
+onChange={(e) => handleChange(insurance.id, e.target.value)}
                   className="text-right"
                 />
                 <span className="text-sm text-muted-foreground">%</span>
@@ -88,8 +115,12 @@ export const InsuranceRateSettings = () => {
         })}
 
         <div className="rounded-lg bg-muted p-4 text-sm text-muted-foreground">
-          장기요양보험은 기준금액이 아니라 <strong>건강보험료 × 장기요양보험 요율</strong>로 계산됩니다.
-        </div>
+  장기요양보험은 기준금액이 아니라 <strong>건강보험료 × 장기요양보험 요율</strong>로 계산됩니다.
+</div>
+
+<div className="flex justify-end">
+  <Button onClick={handleSave}>저장</Button>
+</div>
       </CardContent>
     </Card>
   );
