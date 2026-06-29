@@ -495,6 +495,33 @@ const handleDeletePayout = (id: string) => {
 const payoutYearRecords = annualLeavePayouts.filter((p) =>
   p.settlement_month.startsWith(`${payoutYear}-`),
 );
+const selectedPayoutEmployee = employees.find((e) => e.id === payoutFormData.employeeId);
+const payoutSettlementYear = Number(payoutFormData.settlementMonth.split('-')[0]);
+const payoutBalance = payoutFormData.employeeId
+  ? getEmployeeAnnualLeaveBalance(payoutFormData.employeeId, payoutSettlementYear)
+  : null;
+
+const payoutDays = Number(payoutFormData.days || 0);
+const payoutRemainingDays = Number(payoutBalance?.remainingDays || 0);
+const payoutAfterRemainingDays =
+  payoutBalance && Number.isFinite(payoutDays)
+    ? payoutRemainingDays - payoutDays
+    : payoutRemainingDays;
+
+const isInvalidPayoutDays =
+  payoutFormData.days !== '' && (!Number.isFinite(payoutDays) || payoutDays <= 0);
+
+const isPayoutDaysExceeded =
+  Boolean(payoutBalance) && Number.isFinite(payoutDays) && payoutDays > payoutRemainingDays;
+
+const payoutDailyAmount = selectedPayoutEmployee
+  ? getAnnualLeaveDailyAmount(selectedPayoutEmployee)
+  : 0;
+
+const payoutEstimatedAmount =
+  selectedPayoutEmployee && Number.isFinite(payoutDays) && payoutDays > 0
+    ? getAnnualLeavePayoutAmount(selectedPayoutEmployee, payoutDays)
+    : 0;
 
 const annualLeaveAccountRows = activeEmployees.map((emp) => {
   const leaveUsages = leaveRecords
@@ -2016,15 +2043,28 @@ const usageRate = totalAnnualLeave > 0 ? Math.round((usedLeave / totalAnnualLeav
   placeholder="직원 선택"
 />
 
-{payoutFormData.employeeId && (
-  (() => {
-    const settlementYear = Number(payoutFormData.settlementMonth.split('-')[0]);
-    const balance = getEmployeeAnnualLeaveBalance(payoutFormData.employeeId, settlementYear);
+{payoutBalance && (
+  <div className="space-y-2">
+    <LeaveBalanceSummary balance={payoutBalance} />
 
-    if (!balance) return null;
+    <div className="rounded-md border bg-muted/20 p-3 text-sm space-y-1">
+      <div className="flex justify-between">
+        <span className="text-muted-foreground">최대 지급 가능</span>
+        <span className="font-semibold">{payoutRemainingDays}일</span>
+      </div>
 
-    return <LeaveBalanceSummary balance={balance} />;
-  })()
+      <div className="flex justify-between">
+        <span className="text-muted-foreground">지급 후 잔여연차</span>
+        <span className={cn('font-semibold', payoutAfterRemainingDays < 0 && 'text-red-600')}>
+          {Number.isFinite(payoutAfterRemainingDays) ? payoutAfterRemainingDays : payoutRemainingDays}일
+        </span>
+      </div>
+
+      <p className="pt-1 text-xs text-muted-foreground">
+        연차수당은 현재 잔여연차 범위 내에서만 지급할 수 있습니다.
+      </p>
+    </div>
+  </div>
 )}
                 </div>
 
@@ -2051,18 +2091,29 @@ const usageRate = totalAnnualLeave > 0 ? Math.round((usedLeave / totalAnnualLeav
                     }
                     placeholder="예: 1"
                   />
+                  {isPayoutDaysExceeded && (
+  <p className="text-xs text-red-600">
+    지급 가능 일수 {payoutRemainingDays}일을 초과했습니다.
+  </p>
+)}
+
+{isInvalidPayoutDays && (
+  <p className="text-xs text-red-600">
+    지급일수는 0보다 큰 숫자로 입력해주세요.
+  </p>
+)}
+                  
                 </div>
 
                 <div className="space-y-2">
                   <Label>예상 지급액</Label>
                   <div className="h-10 flex items-center rounded-md border bg-muted/30 px-3 text-sm font-medium">
-                    {(() => {
-                      const employee = employees.find((e) => e.id === payoutFormData.employeeId);
-                      const days = Number(payoutFormData.days || 0);
-                      if (!employee || !days) return '0원';
-                      return `${getAnnualLeavePayoutAmount(employee, days).toLocaleString()}원`;
-                    })()}
+                    {`${payoutEstimatedAmount.toLocaleString()}원`}
+                    
                   </div>
+                  <p className="text-xs text-muted-foreground">
+  1일 기준액 {payoutDailyAmount.toLocaleString()}원 × 지급일수
+</p>
                 </div>
               </div>
 
@@ -2079,7 +2130,17 @@ const usageRate = totalAnnualLeave > 0 ? Math.round((usedLeave / totalAnnualLeav
               </div>
 
               <div className="flex justify-end">
-                <Button onClick={handleAddPayout} disabled={addAnnualLeavePayout.isPending}>
+                <Button
+  onClick={handleAddPayout}
+  disabled={
+    addAnnualLeavePayout.isPending ||
+    !payoutFormData.employeeId ||
+    !payoutFormData.settlementMonth ||
+    !payoutFormData.days ||
+    isInvalidPayoutDays ||
+    isPayoutDaysExceeded
+  }
+>
                   {addAnnualLeavePayout.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                   <Plus className="w-4 h-4 mr-2" />
                   등록
