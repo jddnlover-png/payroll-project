@@ -1,6 +1,7 @@
 import { useEmployeeStore } from "@/store/employeeStore";
 import { useOrganizationSettings } from "@/hooks/useOrganizationSettings";
 import { PayrollItemsSettings } from "@/components/settings/PayrollItemsSettings";
+import { InsuranceRateSettings } from "@/components/settings/InsuranceRateSettings";
 import { CompanyInfoSettings } from "@/components/settings/CompanyInfoSettings";
 import { EmployeePayrollSettings } from "@/components/settings/EmployeePayrollSettings";
 import { WorkHoursSettings } from "@/components/settings/WorkHoursSettings";
@@ -35,6 +36,8 @@ export function SettingsTab({ section = "payroll-items" }: SettingsTabProps = {}
     return (
     <div className="space-y-6 max-w-4xl">
       {section === "payroll-items" && <PayrollItemsSettings />}
+
+{section === "insurance-rates" && <InsuranceRateSettings />}
 
       {section === "employee-payroll" && <EmployeePayrollSettings />}
 
