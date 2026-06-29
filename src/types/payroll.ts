@@ -195,6 +195,6 @@ export const defaultDeductionItems: PayrollItem[] = [
   isLocked: true,
   calculationType: "percentage",
 defaultValue: 13.14,
-  description: "건강보험료 기준으로 자동 계산",
+  description: "건강보험료 × 장기요양보험 요율로 자동 계산",
 },
 ];
