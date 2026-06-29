@@ -29,6 +29,28 @@ function mergeDefaults(existing: PayrollItem[], defaults: PayrollItem[]): Payrol
   return result;
 }
 
+function normalizeInsuranceRates(items: PayrollItem[]): PayrollItem[] {
+  return items.map((item) => {
+    if (item.id === "national-pension") {
+      return { ...item, defaultValue: 4.75 };
+    }
+
+    if (item.id === "health-insurance") {
+      return { ...item, defaultValue: 3.595 };
+    }
+
+    if (item.id === "employment-insurance") {
+      return { ...item, defaultValue: 0.9 };
+    }
+
+    if (item.id === "long-term-care") {
+      return { ...item, defaultValue: 13.14 };
+    }
+
+    return item;
+  });
+}
+
 interface PayrollSettingsStore {
   paymentItems: PayrollItem[];
   deductionItems: PayrollItem[];
@@ -120,7 +142,7 @@ export const usePayrollSettingsStore = create<PayrollSettingsStore>()(
     }),
     {
       name: "payroll-settings-storage",
-      version: 7,
+      version: 8,
 migrate: (persistedState: any, version: number) => {
   if (version < 5) {
     return {
@@ -165,7 +187,12 @@ migrate: (persistedState: any, version: number) => {
     };
   }
 
-  return persistedState;
+    return {
+    ...persistedState,
+    deductionItems: normalizeInsuranceRates(
+      persistedState?.deductionItems || defaultDeductionItems,
+    ),
+  };
 },
     },
   ),
