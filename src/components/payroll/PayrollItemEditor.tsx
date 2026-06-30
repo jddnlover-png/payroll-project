@@ -39,9 +39,24 @@ export function PayrollItemEditor({
   const activePaymentItems = paymentItems.filter(item => item.isActive);
   const activeDeductionItems = deductionItems.filter(item => item.isActive);
 
-  // manual 타입 항목만 편집 가능
-  const manualPaymentItems = activePaymentItems.filter(item => item.calculationType === 'manual');
-  const manualDeductionItems = activeDeductionItems.filter(item => item.calculationType === 'manual');
+  // 수정 가능한 지급항목
+const editablePaymentItems = activePaymentItems.filter(item =>
+  item.calculationType === 'manual' ||
+  [
+    'bonus',
+    'meal',
+    'vehicle-allowance',
+    'childcare-allowance',
+    'research-allowance',
+    'other-allowance',
+  ].includes(item.id)
+);
+
+// 수정 가능한 공제항목
+const editableDeductionItems = activeDeductionItems.filter(item =>
+  item.calculationType === 'manual' ||
+  item.id === 'advance-payment'
+);
 
   useEffect(() => {
     if (record && open) {
@@ -117,28 +132,32 @@ export function PayrollItemEditor({
 
   // 총 지급액/공제액 계산
   const calculateTotalPayments = () => {
-    let total = 0;
-    activePaymentItems.forEach(item => {
-      if (item.calculationType === 'manual') {
-        total += getItemValue(editedPaymentItems, item.id);
-      } else {
-        total += getItemValue(record?.paymentItems || [], item.id);
-      }
-    });
-    return total;
-  };
+  let total = 0;
+  activePaymentItems.forEach(item => {
+    const editable = editablePaymentItems.some(i => i.id === item.id);
+
+    if (editable) {
+      total += getItemValue(editedPaymentItems, item.id);
+    } else {
+      total += getItemValue(record?.paymentItems || [], item.id);
+    }
+  });
+  return total;
+};
 
   const calculateTotalDeductions = () => {
-    let total = 0;
-    activeDeductionItems.forEach(item => {
-      if (item.calculationType === 'manual') {
-        total += getItemValue(editedDeductionItems, item.id);
-      } else {
-        total += getItemValue(record?.deductionItems || [], item.id);
-      }
-    });
-    return total;
-  };
+  let total = 0;
+  activeDeductionItems.forEach(item => {
+    const editable = editableDeductionItems.some(i => i.id === item.id);
+
+    if (editable) {
+      total += getItemValue(editedDeductionItems, item.id);
+    } else {
+      total += getItemValue(record?.deductionItems || [], item.id);
+    }
+  });
+  return total;
+};
 
   if (!record) return null;
 
@@ -153,78 +172,129 @@ export function PayrollItemEditor({
         </DialogHeader>
 
         <div className="space-y-6 py-4 max-h-[60vh] overflow-y-auto">
-          {/* 수동 지급 항목 */}
-          {manualPaymentItems.length > 0 && (
-            <div className="space-y-4">
-              <h4 className="font-medium text-sm text-muted-foreground">수동 입력 지급항목</h4>
-              {manualPaymentItems.map(item => (
-                <div key={item.id} className="grid grid-cols-2 gap-4 items-center">
-                  <Label htmlFor={`payment-${item.id}`}>{item.name}</Label>
-                  <Input
-                    id={`payment-${item.id}`}
-                    type="text"
-                    value={formatCurrency(getItemValue(editedPaymentItems, item.id))}
-                    onChange={(e) => handlePaymentChange(item.id, item.name, e.target.value)}
-                    className="text-right"
-                    placeholder="0"
-                  />
-                </div>
-              ))}
-            </div>
-          )}
+          {/* 지급 항목 */}
+{activePaymentItems.length > 0 && (
+  <div className="space-y-4">
+    <h4 className="font-medium text-sm text-muted-foreground">
+      지급항목
+    </h4>
 
-          {manualPaymentItems.length > 0 && manualDeductionItems.length > 0 && (
-            <Separator />
-          )}
+    {activePaymentItems.map(item => {
+      const editable = editablePaymentItems.some(i => i.id === item.id);
 
-          {/* 수동 공제 항목 */}
-          {manualDeductionItems.length > 0 && (
-            <div className="space-y-4">
-              <h4 className="font-medium text-sm text-muted-foreground">
-                수동 입력 공제항목
-                <span className="block text-xs text-muted-foreground/70 mt-1">
-                  음수 입력 시 환급(플러스) 처리됩니다
-                </span>
-              </h4>
-              {manualDeductionItems.map(item => {
-                const itemValue = getItemValue(editedDeductionItems, item.id);
-                const rawInput = deductionRawInputs[item.id];
-                const displayValue = rawInput !== undefined
-                  ? rawInput
-                  : (itemValue < 0 ? `-${formatCurrency(Math.abs(itemValue))}` : formatCurrency(itemValue));
-                return (
-                  <div key={item.id} className="grid grid-cols-2 gap-4 items-center">
-                    <Label htmlFor={`deduction-${item.id}`}>{item.name}</Label>
-                    <Input
-                      id={`deduction-${item.id}`}
-                      type="text"
-                      value={displayValue}
-                      onChange={(e) => handleDeductionChange(item.id, item.name, e.target.value)}
-                      onFocus={(e) => e.target.select()}
-                      onBlur={() => {
-                        // Format on blur
-                        setDeductionRawInputs(prev => {
-                          const next = { ...prev };
-                          delete next[item.id];
-                          return next;
-                        });
-                      }}
-                      className={`text-right ${itemValue < 0 ? 'text-green-600' : ''}`}
-                      placeholder="0"
-                    />
-                  </div>
-                );
-              })}
-            </div>
-          )}
+      return (
+        <div key={item.id} className="grid grid-cols-2 gap-4 items-center">
+          <Label htmlFor={`payment-${item.id}`}>
+            {item.name}
 
-          {manualPaymentItems.length === 0 && manualDeductionItems.length === 0 && (
-            <div className="text-center text-muted-foreground py-8">
-              수동 입력 가능한 항목이 없습니다.
-              <br />
-              설정에서 수동 입력 항목을 추가해주세요.
-            </div>
-          )}
+            {!editable && (
+              <span className="ml-2 text-xs text-muted-foreground">
+                (자동계산)
+              </span>
+            )}
+          </Label>
+
+          <Input
+            id={`payment-${item.id}`}
+            type="text"
+            value={formatCurrency(
+              editable
+                ? getItemValue(editedPaymentItems, item.id)
+                : getItemValue(record?.paymentItems || [], item.id)
+            )}
+            onChange={(e) => {
+              if (editable) {
+                handlePaymentChange(item.id, item.name, e.target.value);
+              }
+            }}
+            disabled={!editable}
+            className="text-right"
+            placeholder="0"
+          />
+        </div>
+      );
+    })}
+  </div>
+)}
+
+          {activePaymentItems.length > 0 && activeDeductionItems.length > 0 && (
+  <Separator />
+)}
+
+          {/* 공제 항목 */}
+{activeDeductionItems.length > 0 && (
+  <div className="space-y-4">
+    <h4 className="font-medium text-sm text-muted-foreground">
+      공제항목
+      <span className="block text-xs text-muted-foreground/70 mt-1">
+        음수 입력 시 환급(플러스) 처리됩니다.
+      </span>
+    </h4>
+
+    {activeDeductionItems.map(item => {
+      const editable = editableDeductionItems.some(i => i.id === item.id);
+
+      const itemValue = editable
+        ? getItemValue(editedDeductionItems, item.id)
+        : getItemValue(record?.deductionItems || [], item.id);
+
+      const rawInput = deductionRawInputs[item.id];
+
+      const displayValue =
+        rawInput !== undefined
+          ? rawInput
+          : itemValue < 0
+            ? `-${formatCurrency(Math.abs(itemValue))}`
+            : formatCurrency(itemValue);
+
+      return (
+        <div key={item.id} className="grid grid-cols-2 gap-4 items-center">
+          <Label htmlFor={`deduction-${item.id}`}>
+            {item.name}
+
+            {!editable && (
+              <span className="ml-2 text-xs text-muted-foreground">
+                (자동계산)
+              </span>
+            )}
+          </Label>
+
+          <Input
+            id={`deduction-${item.id}`}
+            type="text"
+            value={displayValue}
+            onChange={(e) => {
+              if (editable) {
+                handleDeductionChange(item.id, item.name, e.target.value);
+              }
+            }}
+            onFocus={(e) => editable && e.target.select()}
+            onBlur={() => {
+              if (editable) {
+                setDeductionRawInputs(prev => {
+                  const next = { ...prev };
+                  delete next[item.id];
+                  return next;
+                });
+              }
+            }}
+            disabled={!editable}
+            className={`text-right ${itemValue < 0 ? 'text-green-600' : ''}`}
+            placeholder="0"
+          />
+        </div>
+      );
+    })}
+  </div>
+)}
+
+          {activePaymentItems.length === 0 && activeDeductionItems.length === 0 && (
+  <div className="text-center text-muted-foreground py-8">
+    표시할 급여 항목이 없습니다.
+    <br />
+    설정에서 급여 항목을 추가해주세요.
+  </div>
+)}
 
           {/* 총계 표시 */}
           <Separator />
