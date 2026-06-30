@@ -345,8 +345,12 @@ export const PayrollItemsSettings = () => {
             <Select
               value={formData.calculationType}
               onValueChange={(value: "fixed" | "percentage" | "manual") =>
-                setFormData({ ...formData, calculationType: value })
-              }
+  setFormData({
+    ...formData,
+    calculationType: value,
+    defaultValue: value === "manual" ? "" : formData.defaultValue,
+  })
+}
             >
               <SelectTrigger>
                 <SelectValue />
@@ -442,8 +446,12 @@ export const PayrollItemsSettings = () => {
                     <Select
                       value={formData.calculationType}
                       onValueChange={(value: "fixed" | "percentage" | "manual") =>
-                        setFormData({ ...formData, calculationType: value })
-                      }
+  setFormData({
+    ...formData,
+    calculationType: value,
+    defaultValue: value === "manual" ? "" : formData.defaultValue,
+  })
+}
                     >
                       <SelectTrigger>
                         <SelectValue />

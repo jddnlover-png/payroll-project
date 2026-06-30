@@ -239,13 +239,7 @@ const initialDeductionItems: EmployeePayrollOverride[] = deductionItems
 
   const selectedEmployee = employees.find(emp => emp.id === selectedEmployeeId);
 
-const getPaymentItem = (itemId: string) => {
-  return paymentItems.find(item => item.id === itemId);
-};
 
-const getDeductionItem = (itemId: string) => {
-  return deductionItems.find(item => item.id === itemId);
-};
 
 const NON_EDITABLE_PAYMENT_ITEM_IDS = [
   "base-salary",
