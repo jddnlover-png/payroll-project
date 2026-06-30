@@ -73,9 +73,15 @@ const isEditableDeductionItem = (itemId: string, itemName?: string) =>
   editableDeductionItemIds.includes(itemId) ||
   editableDeductionItemNames.includes(itemName || '');
   const displayPaymentItems: PayrollItemValue[] = [
-  ...(record?.paymentItems || []).filter(item =>
-    activePaymentItems.some(activeItem => activeItem.id === item.itemId)
-  ),
+  ...(record?.paymentItems || []).filter(item => {
+    const editable = isEditablePaymentItem(item.itemId, item.name);
+
+    if (editable && item.amount === 0) {
+      return false;
+    }
+
+    return true;
+  }),
   ...activePaymentItems
     .filter(item =>
       isEditablePaymentItem(item.id, item.name) &&
@@ -90,9 +96,15 @@ const isEditableDeductionItem = (itemId: string, itemName?: string) =>
 ];
 
 const displayDeductionItems: PayrollItemValue[] = [
-  ...(record?.deductionItems || []).filter(item =>
-    activeDeductionItems.some(activeItem => activeItem.id === item.itemId)
-  ),
+  ...(record?.deductionItems || []).filter(item => {
+    const editable = isEditableDeductionItem(item.itemId, item.name);
+
+    if (editable && item.amount === 0) {
+      return false;
+    }
+
+    return true;
+  }),
   ...activeDeductionItems
     .filter(item =>
       isEditableDeductionItem(item.id, item.name) &&
