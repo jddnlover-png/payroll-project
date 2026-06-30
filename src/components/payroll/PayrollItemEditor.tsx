@@ -72,51 +72,25 @@ const isEditablePaymentItem = (itemId: string, itemName?: string) =>
 const isEditableDeductionItem = (itemId: string, itemName?: string) =>
   editableDeductionItemIds.includes(itemId) ||
   editableDeductionItemNames.includes(itemName || '');
-  const displayPaymentItems: PayrollItemValue[] = [
-  ...(record?.paymentItems || []).filter(item => {
-    const editable = isEditablePaymentItem(item.itemId, item.name);
+  const displayPaymentItems: PayrollItemValue[] = (record?.paymentItems || []).filter(item => {
+  const editable = isEditablePaymentItem(item.itemId, item.name);
 
-    if (editable && item.amount === 0) {
-      return false;
-    }
+  if (editable && item.amount === 0) {
+    return false;
+  }
 
-    return true;
-  }),
-  ...activePaymentItems
-    .filter(item =>
-      isEditablePaymentItem(item.id, item.name) &&
-      !(record?.paymentItems || []).some(recordItem => recordItem.itemId === item.id)
-    )
-    .map(item => ({
-      itemId: item.id,
-      name: item.name,
-      amount: 0,
-      type: 'payment' as const,
-    })),
-];
+  return true;
+});
 
-const displayDeductionItems: PayrollItemValue[] = [
-  ...(record?.deductionItems || []).filter(item => {
-    const editable = isEditableDeductionItem(item.itemId, item.name);
+const displayDeductionItems: PayrollItemValue[] = (record?.deductionItems || []).filter(item => {
+  const editable = isEditableDeductionItem(item.itemId, item.name);
 
-    if (editable && item.amount === 0) {
-      return false;
-    }
+  if (editable && item.amount === 0) {
+    return false;
+  }
 
-    return true;
-  }),
-  ...activeDeductionItems
-    .filter(item =>
-      isEditableDeductionItem(item.id, item.name) &&
-      !(record?.deductionItems || []).some(recordItem => recordItem.itemId === item.id)
-    )
-    .map(item => ({
-      itemId: item.id,
-      name: item.name,
-      amount: 0,
-      type: 'deduction' as const,
-    })),
-];
+  return true;
+});
 
   useEffect(() => {
     if (record && open) {
