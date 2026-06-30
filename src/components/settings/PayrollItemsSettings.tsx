@@ -69,7 +69,12 @@ export const PayrollItemsSettings = () => {
       isActive: true,
       isLocked: false, // 회사별 추가 항목은 항상 수정/삭제 가능
       calculationType: formData.calculationType,
-      defaultValue: formData.defaultValue ? parseFloat(formData.defaultValue) : undefined,
+      defaultValue:
+  formData.calculationType === "manual"
+    ? undefined
+    : formData.defaultValue
+      ? parseFloat(formData.defaultValue)
+      : undefined,
       description: formData.description,
     };
 
@@ -93,7 +98,12 @@ export const PayrollItemsSettings = () => {
     const updates = {
       name: formData.name,
       calculationType: formData.calculationType,
-      defaultValue: formData.defaultValue ? parseFloat(formData.defaultValue) : undefined,
+      defaultValue:
+  formData.calculationType === "manual"
+    ? undefined
+    : formData.defaultValue
+      ? parseFloat(formData.defaultValue)
+      : undefined,
       description: formData.description,
     };
 
@@ -315,7 +325,10 @@ export const PayrollItemsSettings = () => {
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>{currentTab === "payment" ? "지급" : "공제"} 항목 정보를 입력하세요.</DialogDescription>
+          <DialogDescription>
+  {currentTab === "payment" ? "지급" : "공제"} 항목 정보를 입력하세요.
+  정액은 전 직원에게 동일 금액으로 적용되고, 수동입력은 직원별 급여항목 설정에서 개별 금액을 입력합니다.
+</DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="grid gap-2">
@@ -410,8 +423,9 @@ export const PayrollItemsSettings = () => {
                 <DialogHeader>
                   <DialogTitle>새 {currentTab === "payment" ? "지급" : "공제"} 항목 추가</DialogTitle>
                   <DialogDescription>
-                    {currentTab === "payment" ? "지급" : "공제"} 항목 정보를 입력하세요.
-                  </DialogDescription>
+  {currentTab === "payment" ? "지급" : "공제"} 항목 정보를 입력하세요.
+  정액은 전 직원에게 동일 금액으로 적용되고, 수동입력은 직원별 급여항목 설정에서 개별 금액을 입력합니다.
+</DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
                   <div className="grid gap-2">

@@ -21,6 +21,7 @@ interface EmployeePayrollOverride {
   name: string;
   isActive: boolean;
   value?: number;
+  calculationType?: "fixed" | "percentage" | "manual";
 }
 
 interface EmployeeSettings {
@@ -90,11 +91,12 @@ export const EmployeePayrollSettings = () => {
       .map(item => {
         const override = existingSettings?.payment_items?.find(o => o.itemId === item.id);
         return {
-          itemId: item.id,
-          name: item.name,
-          isActive: override ? override.isActive : true,
-          value: override?.value ?? item.defaultValue,
-        };
+  itemId: item.id,
+  name: item.name,
+  isActive: override ? override.isActive : true,
+  value: override?.value ?? item.defaultValue,
+  calculationType: item.calculationType,
+};
       });
 
 
@@ -103,11 +105,12 @@ const initialDeductionItems: EmployeePayrollOverride[] = deductionItems
   .map(item => {
     const override = existingSettings?.deduction_items?.find(o => o.itemId === item.id);
     return {
-      itemId: item.id,
-      name: item.name,
-      isActive: override ? override.isActive : true,
-      value: override?.value ?? item.defaultValue,
-    };
+  itemId: item.id,
+  name: item.name,
+  isActive: override ? override.isActive : true,
+  value: override?.value ?? item.defaultValue,
+  calculationType: item.calculationType,
+};
   });
 
     setCurrentPaymentItems(initialPaymentItems);
@@ -236,6 +239,45 @@ const initialDeductionItems: EmployeePayrollOverride[] = deductionItems
 
   const selectedEmployee = employees.find(emp => emp.id === selectedEmployeeId);
 
+const getPaymentItem = (itemId: string) => {
+  return paymentItems.find(item => item.id === itemId);
+};
+
+const getDeductionItem = (itemId: string) => {
+  return deductionItems.find(item => item.id === itemId);
+};
+
+const NON_EDITABLE_PAYMENT_ITEM_IDS = [
+  "base-salary",
+  "overtime",
+  "night-shift-allowance",
+  "holiday-work-allowance",
+  "weekly-holiday-allowance",
+];
+
+const NON_EDITABLE_DEDUCTION_ITEM_IDS = [
+  "income-tax",
+  "local-income-tax",
+  "national-pension",
+  "health-insurance",
+  "employment-insurance",
+  "long-term-care",
+];
+
+const canEditPaymentValue = (item: EmployeePayrollOverride) => {
+  return (
+    item.calculationType === "manual" &&
+    !NON_EDITABLE_PAYMENT_ITEM_IDS.includes(item.itemId)
+  );
+};
+
+const canEditDeductionValue = (item: EmployeePayrollOverride) => {
+  return (
+    item.calculationType === "manual" &&
+    !NON_EDITABLE_DEDUCTION_ITEM_IDS.includes(item.itemId)
+  );
+};
+
   return (
     <Card>
       <CardHeader>
@@ -360,12 +402,7 @@ const initialDeductionItems: EmployeePayrollOverride[] = deductionItems
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
-  {[
-    "meal-allowance",
-    "transport-allowance",
-    "childcare-allowance",
-    "research-allowance",
-  ].includes(item.itemId) ? (
+  {canEditPaymentValue(item) ? (
     <>
       <Input
         type="number"
@@ -388,7 +425,7 @@ const initialDeductionItems: EmployeePayrollOverride[] = deductionItems
         className="w-32 text-right text-muted-foreground"
         disabled
       />
-      <span className="text-sm text-muted-foreground w-8">%</span>
+      <span className="text-sm text-muted-foreground w-8">원</span>
     </>
   )}
 </div>
@@ -409,12 +446,32 @@ const initialDeductionItems: EmployeePayrollOverride[] = deductionItems
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
-  <Input
-    value="기본값"
-    className="w-32 text-right text-muted-foreground"
-    disabled
-  />
-  <span className="text-sm text-muted-foreground w-8">%</span>
+  {canEditDeductionValue(item) ? (
+    <>
+      <Input
+        type="number"
+        value={item.value ?? ""}
+        onChange={(e) =>
+          updateDeductionItem(item.itemId, {
+            value: e.target.value ? Number(e.target.value) : undefined,
+          })
+        }
+        className="w-32 text-right"
+        placeholder="금액"
+        disabled={!item.isActive}
+      />
+      <span className="text-sm text-muted-foreground w-8">원</span>
+    </>
+  ) : (
+    <>
+      <Input
+        value="기본값"
+        className="w-32 text-right text-muted-foreground"
+        disabled
+      />
+      <span className="text-sm text-muted-foreground w-8">원</span>
+    </>
+  )}
 </div>
                     </div>
                   ))}

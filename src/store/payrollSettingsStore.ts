@@ -192,11 +192,18 @@ migrate: (persistedState: any, version: number) => {
   }
 
     return {
-    ...persistedState,
-    deductionItems: normalizeInsuranceRates(
+  ...persistedState,
+  paymentItems: mergeDefaults(
+    persistedState?.paymentItems || defaultPaymentItems,
+    defaultPaymentItems,
+  ),
+  deductionItems: normalizeInsuranceRates(
+    mergeDefaults(
       persistedState?.deductionItems || defaultDeductionItems,
+      defaultDeductionItems,
     ),
-  };
+  ),
+};
 },
     },
   ),

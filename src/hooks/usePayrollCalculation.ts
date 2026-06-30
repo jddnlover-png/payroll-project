@@ -684,6 +684,9 @@ const healthInsuranceAmount =
                   amount = Math.floor((insuranceBase * item.defaultValue) / 100 / 10) * 10;
                 } else if (item.calculationType === "fixed" && item.defaultValue) {
                   amount = item.defaultValue;
+                } else if (item.calculationType === "manual") {
+                  // 수동입력 공제항목: 직원별 overrideValue 우선 적용
+                  amount = (item as any).overrideValue ?? item.defaultValue ?? 0;
                 }
                 return { itemId: item.id, name: item.name, amount, type: "deduction" as const };
               });
@@ -950,6 +953,9 @@ const healthInsuranceAmount =
                 amount = Math.floor((insuranceBaseM * item.defaultValue) / 100 / 10) * 10;
               } else if (item.calculationType === "fixed" && item.defaultValue) {
                 amount = item.defaultValue;
+              } else if (item.calculationType === "manual") {
+                // 수동입력 공제항목: 직원별 overrideValue 우선 적용
+                amount = (item as any).overrideValue ?? item.defaultValue ?? 0;
               }
               return { itemId: item.id, name: item.name, amount, type: "deduction" as const };
             });
