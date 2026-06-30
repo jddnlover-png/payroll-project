@@ -327,7 +327,8 @@ export const PayrollItemsSettings = () => {
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>
   {currentTab === "payment" ? "지급" : "공제"} 항목 정보를 입력하세요.
-  정액은 전 직원에게 동일 금액으로 적용되고, 수동입력은 직원별 급여항목 설정에서 개별 금액을 입력합니다.
+  정액은 회사 공통 기본값으로 적용됩니다. 단, 식대 등 비과세 항목은 직원별 금액 수정이 가능합니다.
+  비율(%)은 기준금액에 비율로 계산되고, 수동입력은 직원별 급여항목 설정에서 개별 금액을 입력합니다.
 </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
@@ -428,7 +429,8 @@ export const PayrollItemsSettings = () => {
                   <DialogTitle>새 {currentTab === "payment" ? "지급" : "공제"} 항목 추가</DialogTitle>
                   <DialogDescription>
   {currentTab === "payment" ? "지급" : "공제"} 항목 정보를 입력하세요.
-  정액은 전 직원에게 동일 금액으로 적용되고, 수동입력은 직원별 급여항목 설정에서 개별 금액을 입력합니다.
+  정액은 회사 공통 기본값으로 적용됩니다. 단, 식대 등 비과세 항목은 직원별 금액 수정이 가능합니다.
+  비율(%)은 기준금액에 비율로 계산되고, 수동입력은 직원별 급여항목 설정에서 개별 금액을 입력합니다.
 </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
