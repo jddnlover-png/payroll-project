@@ -258,9 +258,19 @@ const NON_EDITABLE_DEDUCTION_ITEM_IDS = [
   "long-term-care",
 ];
 
+const TAX_EXEMPT_EDITABLE_PAYMENT_ITEM_IDS = [
+  "meal-allowance",
+  "transport-allowance",
+  "childcare-allowance",
+  "research-allowance",
+];
+
 const canEditPaymentValue = (item: EmployeePayrollOverride) => {
   return (
-    item.calculationType === "manual" &&
+    (
+      item.calculationType === "manual" ||
+      TAX_EXEMPT_EDITABLE_PAYMENT_ITEM_IDS.includes(item.itemId)
+    ) &&
     !NON_EDITABLE_PAYMENT_ITEM_IDS.includes(item.itemId)
   );
 };
