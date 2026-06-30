@@ -39,24 +39,68 @@ export function PayrollItemEditor({
   const activePaymentItems = paymentItems.filter(item => item.isActive);
   const activeDeductionItems = deductionItems.filter(item => item.isActive);
 
-  // 수정 가능한 지급항목
-const editablePaymentItems = activePaymentItems.filter(item =>
-  item.calculationType === 'manual' ||
-  [
-    'bonus',
-    'meal',
-    'vehicle-allowance',
-    'childcare-allowance',
-    'research-allowance',
-    'other-allowance',
-  ].includes(item.id)
-);
+  const editablePaymentItemIds = [
+  'bonus',
+  'meal',
+  'vehicle-allowance',
+  'childcare-allowance',
+  'research-allowance',
+  'other-allowance',
+];
 
-// 수정 가능한 공제항목
-const editableDeductionItems = activeDeductionItems.filter(item =>
-  item.calculationType === 'manual' ||
-  item.id === 'advance-payment'
-);
+const editablePaymentItemNames = [
+  '상여금',
+  '식대',
+  '차량운전보조금',
+  '보육수당',
+  '연구활동비',
+  '기타수당',
+];
+
+const editableDeductionItemIds = [
+  'advance-payment',
+];
+
+const editableDeductionItemNames = [
+  '가불금',
+];
+
+const isEditablePaymentItem = (itemId: string, itemName?: string) =>
+  editablePaymentItemIds.includes(itemId) ||
+  editablePaymentItemNames.includes(itemName || '');
+
+const isEditableDeductionItem = (itemId: string, itemName?: string) =>
+  editableDeductionItemIds.includes(itemId) ||
+  editableDeductionItemNames.includes(itemName || '');
+  const displayPaymentItems: PayrollItemValue[] = [
+  ...(record?.paymentItems || []),
+  ...activePaymentItems
+    .filter(item =>
+      isEditablePaymentItem(item.id, item.name) &&
+      !(record?.paymentItems || []).some(recordItem => recordItem.itemId === item.id)
+    )
+    .map(item => ({
+      itemId: item.id,
+      name: item.name,
+      amount: 0,
+      type: 'payment' as const,
+    })),
+];
+
+const displayDeductionItems: PayrollItemValue[] = [
+  ...(record?.deductionItems || []),
+  ...activeDeductionItems
+    .filter(item =>
+      isEditableDeductionItem(item.id, item.name) &&
+      !(record?.deductionItems || []).some(recordItem => recordItem.itemId === item.id)
+    )
+    .map(item => ({
+      itemId: item.id,
+      name: item.name,
+      amount: 0,
+      type: 'deduction' as const,
+    })),
+];
 
   useEffect(() => {
     if (record && open) {
@@ -132,31 +176,27 @@ const editableDeductionItems = activeDeductionItems.filter(item =>
 
   // 총 지급액/공제액 계산
   const calculateTotalPayments = () => {
-  let total = 0;
-  activePaymentItems.forEach(item => {
-    const editable = editablePaymentItems.some(i => i.id === item.id);
+  return displayPaymentItems.reduce((total, item) => {
+    const editable = isEditablePaymentItem(item.itemId, item.name);
 
-    if (editable) {
-      total += getItemValue(editedPaymentItems, item.id);
-    } else {
-      total += getItemValue(record?.paymentItems || [], item.id);
-    }
-  });
-  return total;
+    return total + (
+      editable
+        ? getItemValue(editedPaymentItems, item.itemId)
+        : item.amount
+    );
+  }, 0);
 };
 
   const calculateTotalDeductions = () => {
-  let total = 0;
-  activeDeductionItems.forEach(item => {
-    const editable = editableDeductionItems.some(i => i.id === item.id);
+  return displayDeductionItems.reduce((total, item) => {
+    const editable = isEditableDeductionItem(item.itemId, item.name);
 
-    if (editable) {
-      total += getItemValue(editedDeductionItems, item.id);
-    } else {
-      total += getItemValue(record?.deductionItems || [], item.id);
-    }
-  });
-  return total;
+    return total + (
+      editable
+        ? getItemValue(editedDeductionItems, item.itemId)
+        : item.amount
+    );
+  }, 0);
 };
 
   if (!record) return null;
@@ -173,20 +213,22 @@ const editableDeductionItems = activeDeductionItems.filter(item =>
 
         <div className="space-y-6 py-4 max-h-[60vh] overflow-y-auto">
           {/* 지급 항목 */}
-{activePaymentItems.length > 0 && (
+{displayPaymentItems.length > 0 && (
   <div className="space-y-4">
     <h4 className="font-medium text-sm text-muted-foreground">
       지급항목
     </h4>
 
-    {activePaymentItems.map(item => {
-      const editable = editablePaymentItems.some(i => i.id === item.id);
+    {displayPaymentItems.map(item => {
+      const editable = isEditablePaymentItem(item.itemId, item.name);
+      const value = editable
+        ? getItemValue(editedPaymentItems, item.itemId)
+        : item.amount;
 
       return (
-        <div key={item.id} className="grid grid-cols-2 gap-4 items-center">
-          <Label htmlFor={`payment-${item.id}`}>
+        <div key={item.itemId} className="grid grid-cols-2 gap-4 items-center">
+          <Label htmlFor={`payment-${item.itemId}`}>
             {item.name}
-
             {!editable && (
               <span className="ml-2 text-xs text-muted-foreground">
                 (자동계산)
@@ -195,16 +237,12 @@ const editableDeductionItems = activeDeductionItems.filter(item =>
           </Label>
 
           <Input
-            id={`payment-${item.id}`}
+            id={`payment-${item.itemId}`}
             type="text"
-            value={formatCurrency(
-              editable
-                ? getItemValue(editedPaymentItems, item.id)
-                : getItemValue(record?.paymentItems || [], item.id)
-            )}
+            value={formatCurrency(value)}
             onChange={(e) => {
               if (editable) {
-                handlePaymentChange(item.id, item.name, e.target.value);
+                handlePaymentChange(item.itemId, item.name, e.target.value);
               }
             }}
             disabled={!editable}
@@ -217,12 +255,12 @@ const editableDeductionItems = activeDeductionItems.filter(item =>
   </div>
 )}
 
-          {activePaymentItems.length > 0 && activeDeductionItems.length > 0 && (
+          {displayPaymentItems.length > 0 && displayDeductionItems.length > 0 && (
   <Separator />
 )}
 
           {/* 공제 항목 */}
-{activeDeductionItems.length > 0 && (
+{displayDeductionItems.length > 0 && (
   <div className="space-y-4">
     <h4 className="font-medium text-sm text-muted-foreground">
       공제항목
@@ -231,14 +269,14 @@ const editableDeductionItems = activeDeductionItems.filter(item =>
       </span>
     </h4>
 
-    {activeDeductionItems.map(item => {
-      const editable = editableDeductionItems.some(i => i.id === item.id);
+    {displayDeductionItems.map(item => {
+      const editable = isEditableDeductionItem(item.itemId, item.name);
 
       const itemValue = editable
-        ? getItemValue(editedDeductionItems, item.id)
-        : getItemValue(record?.deductionItems || [], item.id);
+        ? getItemValue(editedDeductionItems, item.itemId)
+        : item.amount;
 
-      const rawInput = deductionRawInputs[item.id];
+      const rawInput = deductionRawInputs[item.itemId];
 
       const displayValue =
         rawInput !== undefined
@@ -248,10 +286,9 @@ const editableDeductionItems = activeDeductionItems.filter(item =>
             : formatCurrency(itemValue);
 
       return (
-        <div key={item.id} className="grid grid-cols-2 gap-4 items-center">
-          <Label htmlFor={`deduction-${item.id}`}>
+        <div key={item.itemId} className="grid grid-cols-2 gap-4 items-center">
+          <Label htmlFor={`deduction-${item.itemId}`}>
             {item.name}
-
             {!editable && (
               <span className="ml-2 text-xs text-muted-foreground">
                 (자동계산)
@@ -260,12 +297,12 @@ const editableDeductionItems = activeDeductionItems.filter(item =>
           </Label>
 
           <Input
-            id={`deduction-${item.id}`}
+            id={`deduction-${item.itemId}`}
             type="text"
             value={displayValue}
             onChange={(e) => {
               if (editable) {
-                handleDeductionChange(item.id, item.name, e.target.value);
+                handleDeductionChange(item.itemId, item.name, e.target.value);
               }
             }}
             onFocus={(e) => editable && e.target.select()}
@@ -273,7 +310,7 @@ const editableDeductionItems = activeDeductionItems.filter(item =>
               if (editable) {
                 setDeductionRawInputs(prev => {
                   const next = { ...prev };
-                  delete next[item.id];
+                  delete next[item.itemId];
                   return next;
                 });
               }
@@ -288,7 +325,7 @@ const editableDeductionItems = activeDeductionItems.filter(item =>
   </div>
 )}
 
-          {activePaymentItems.length === 0 && activeDeductionItems.length === 0 && (
+          {displayPaymentItems.length === 0 && displayDeductionItems.length === 0 && (
   <div className="text-center text-muted-foreground py-8">
     표시할 급여 항목이 없습니다.
     <br />
