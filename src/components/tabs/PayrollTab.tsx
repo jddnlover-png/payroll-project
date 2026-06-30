@@ -40,7 +40,6 @@ import {
   ClipboardList,
   Eye,
   Edit,
-  History,
   Loader2,
   Mail,
   Printer,
@@ -63,7 +62,6 @@ import { PayrollLedger } from "@/components/payroll/PayrollLedger";
 import { PaySlip } from "@/components/payroll/PaySlip";
 import { generatePayslipHtml } from "@/components/payroll/payslipHtml";
 import { PayrollItemEditor } from "@/components/payroll/PayrollItemEditor";
-import { PayrollHistory } from "@/components/payroll/PayrollHistory";
 import { EmployeeCombobox } from "@/components/employee/EmployeeCombobox";
 import { usePayrollSettingsStore } from "@/store/payrollSettingsStore";
 import { PayrollItemValue, Employee } from "@/types/employee";
@@ -147,8 +145,6 @@ function RegularPayrollContent() {
   const [selectedPayrollIndex, setSelectedPayrollIndex] = useState(0);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<any>(null);
-  const [historyOpen, setHistoryOpen] = useState(false);
-  const [historyEmployee, setHistoryEmployee] = useState<Employee | null>(null);
   const [payTypeFilter, setPayTypeFilter] = useState<"all" | "monthly" | "daily" | "hourly">("all");
   const [isCalculating, setIsCalculating] = useState(false);
   const [selectedRecordIds, setSelectedRecordIds] = useState<string[]>([]);
@@ -748,13 +744,6 @@ const filteredEmployees = calculableEmployees.filter(
     setEditorOpen(true);
   };
 
-  const handleViewHistory = (employeeId: string) => {
-    const emp = convertedEmployees.find((e) => e.id === employeeId);
-    if (emp) {
-      setHistoryEmployee(emp);
-      setHistoryOpen(true);
-    }
-  };
 
   const handleSavePayrollItems = (paymentItems: PayrollItemValue[], deductionItems: PayrollItemValue[]) => {
     if (!editingRecord) return;
@@ -1260,13 +1249,12 @@ const filteredEmployees = calculableEmployees.filter(
                     <TableHead className="text-center">상태</TableHead>
                     <TableHead className="text-center">편집</TableHead>
                     <TableHead className="text-center">명세서</TableHead>
-                    <TableHead className="text-center">히스토리</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredPayrollData.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={17} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={16} className="text-center py-8 text-muted-foreground">
                         해당 조건에 맞는 급여 데이터가 없습니다.
                       </TableCell>
                     </TableRow>
@@ -1418,16 +1406,7 @@ const filteredEmployees = calculableEmployees.filter(
                               <Eye className="w-4 h-4" />
                             </Button>
                           </TableCell>
-                          <TableCell className="text-center">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 px-2"
-                              onClick={() => handleViewHistory(record.employeeId)}
-                            >
-                              <History className="w-4 h-4" />
-                            </Button>
-                          </TableCell>
+                
                         </TableRow>
                       );
                     })
@@ -1792,7 +1771,6 @@ const filteredEmployees = calculableEmployees.filter(
         onSave={handleSavePayrollItems}
       />
 
-      <PayrollHistory open={historyOpen} onOpenChange={setHistoryOpen} employee={historyEmployee} />
     </div>
   );
 }
