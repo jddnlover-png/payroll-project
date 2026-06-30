@@ -63,7 +63,8 @@ export const MONTHLY_SALARY_EXCLUDE_IDS = new Set([
   "hol-shift-tier2",
   "hol-shift-tier3",
   "hol-shift-tier4",
-  "weekly-holiday-allowance", // 주휴수당 제외
+"public-holiday-work-pay", // 공휴일 실제 근로수당 제외
+"weekly-holiday-allowance", // 주휴수당 제외
   "bonus", // 비정기 상여 제외
   "vehicle-allowance", // 차량운전보조금 제외 (실비변상)
 ]);
