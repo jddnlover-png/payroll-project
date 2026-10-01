@@ -719,10 +719,16 @@ const filteredEmployees = calculableEmployees.filter(
 
   setIsCalculating(true);
     try {
-      await Promise.all([
-  calculatePayroll(selectedEmployeeIds),
-  calculateSalaryDetails.mutateAsync(selectedEmployeeIds),
-]);
+      await calculatePayroll(selectedEmployeeIds);
+
+      // 시급·일급제 전용 상세 계산기는 월급제 직원에게 실행하지 않습니다.
+      // 월급제만 선택한 경우 정상 급여 계산 뒤 "대상 없음" 알림이 뜨는 혼동을 방지합니다.
+      const nonMonthlyEmployeeIds = selectedEmployeeIds.filter((employeeId) =>
+        convertedEmployees.some((employee) => employee.id === employeeId && employee.payType !== "monthly"),
+      );
+      if (nonMonthlyEmployeeIds.length > 0) {
+        await calculateSalaryDetails.mutateAsync(nonMonthlyEmployeeIds);
+      }
       setPayrollDialogOpen(false);
       toast.success(`${selectedMonth} 급여계산이 완료되었습니다`, {
         description: `${selectedEmployeeIds.length}명의 급여가 계산되었습니다.`,
