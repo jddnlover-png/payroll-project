@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { captureMarketingClick, flushSignupConversion } from '@/lib/marketingAttribution';
 
 interface AuthContextType {
   user: User | null;
@@ -30,11 +31,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    captureMarketingClick();
+
     // 1. 먼저 기존 세션 확인
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
+      if (session?.user) void flushSignupConversion();
     });
 
     // 2. 이후 변경 감지
@@ -43,6 +47,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
+        if (session?.user) void flushSignupConversion();
       }
     );
 

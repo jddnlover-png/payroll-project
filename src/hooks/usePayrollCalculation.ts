@@ -14,6 +14,7 @@ import { calculateNightTierMinutes } from "@/hooks/useDailyWageSnapshots";
 import { calculateSalaryDetail, AttendanceRawRecord } from "@/utils/salaryDetailCalculation";
 import { calculateProductionExempt } from "@/utils/productionTaxExemption";
 import { calculateIncomeTax } from "@/lib/incomeTaxCalculation";
+import { notifyCoreActionCompleted } from "@/lib/marketingAttribution";
 
 const FALLBACK_NATIONAL_PENSION_RATE = 4.75;
 const FALLBACK_HEALTH_INSURANCE_RATE = 3.595;
@@ -1018,6 +1019,9 @@ const healthInsuranceAmount =
 
         // Supabase에 저장
         await createPayroll.mutateAsync(payrollRecords);
+
+        // 급여 저장 성공 이후에만 전환을 기록합니다. 실패해도 급여 업무는 계속됩니다.
+        void notifyCoreActionCompleted();
 
         queryClient.invalidateQueries({
           queryKey: ["production_tax_exempt_records", currentOrganization.id, year],

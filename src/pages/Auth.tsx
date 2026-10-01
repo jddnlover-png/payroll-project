@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { flushSignupConversion, queueSignupConversion } from '@/lib/marketingAttribution';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -150,8 +151,11 @@ export default function Auth() {
         return;
       }
 
+      queueSignupConversion();
+
       // 이메일 자동 확인이 활성화된 경우 즉시 로그인됨
       if (data.session) {
+        void flushSignupConversion();
         toast.success('회원가입 및 로그인 성공!');
         // 리다이렉트는 useEffect에서 조직 조회 완료 후 처리됨
       } else if (data.user && !data.session) {
