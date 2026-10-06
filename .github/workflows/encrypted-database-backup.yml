@@ -54,7 +54,7 @@ jobs:
           sha256sum "$encrypted" >"${encrypted}.sha256"
           printf '{"createdAt":"%s","format":"pg_dump-custom+aes-256-cbc","source":"payroll-system"}\n' \
             "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >"backup-output/metadata.json"
-          shred -u "$plain"
+          sudo shred -u "$plain"
           echo "artifact_name=payroll-db-${stamp}" >>"$GITHUB_OUTPUT"
 
       - name: Upload encrypted backup
