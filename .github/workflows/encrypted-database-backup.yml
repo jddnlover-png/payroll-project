@@ -109,7 +109,12 @@ jobs:
           docker cp "$restored_dump" "$container:/tmp/payroll-restore.dump"
           docker exec "$container" pg_restore \
             --exit-on-error --no-owner --no-privileges \
-            --schema=public \
+            --schema=public --section=pre-data \
+            --username=postgres --dbname=payroll_restore_check \
+            /tmp/payroll-restore.dump
+          docker exec "$container" pg_restore \
+            --exit-on-error --no-owner --no-privileges \
+            --schema=public --section=data \
             --username=postgres --dbname=payroll_restore_check \
             /tmp/payroll-restore.dump
 
@@ -126,7 +131,7 @@ jobs:
           docker exec "$container" rm -f /tmp/payroll-restore.dump
           sudo shred -u "$restored_dump"
           restored_dump="/tmp/payroll-restore-already-removed"
-          echo "Encrypted backup restored and core payroll tables verified in an isolated database."
+          echo "Encrypted backup schema and data restored; core payroll tables verified in an isolated database."
 
       - name: Upload encrypted backup
         uses: actions/upload-artifact@v4
