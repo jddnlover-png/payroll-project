@@ -26,3 +26,5 @@ supabase/.temp/
 
 backup.sql
 backups/
+*.dump
+*.dump.enc

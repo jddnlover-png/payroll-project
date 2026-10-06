@@ -1,0 +1,75 @@
+name: Encrypted database backup
+
+on:
+  schedule:
+    - cron: "0 18 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: payroll-database-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check required secrets
+        shell: bash
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          BACKUP_ENCRYPTION_PASSPHRASE: ${{ secrets.BACKUP_ENCRYPTION_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_DB_URL"
+          test "${#BACKUP_ENCRYPTION_PASSPHRASE}" -ge 24
+
+      - name: Create, verify, and encrypt backup
+        id: backup
+        shell: bash
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          BACKUP_ENCRYPTION_PASSPHRASE: ${{ secrets.BACKUP_ENCRYPTION_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          umask 077
+          stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+          mkdir -p backup-output
+          plain="backup-output/payroll-${stamp}.dump"
+          encrypted="${plain}.enc"
+          docker run --rm \
+            -v "$PWD/backup-output:/backup" \
+            postgres:17-alpine \
+            pg_dump "$SUPABASE_DB_URL" --format=custom --no-owner --no-privileges --file="/backup/$(basename "$plain")"
+          docker run --rm \
+            -v "$PWD/backup-output:/backup:ro" \
+            postgres:17-alpine \
+            pg_restore --list "/backup/$(basename "$plain")" >/dev/null
+          openssl enc -aes-256-cbc -pbkdf2 -salt \
+            -in "$plain" -out "$encrypted" \
+            -pass env:BACKUP_ENCRYPTION_PASSPHRASE
+          sha256sum "$encrypted" >"${encrypted}.sha256"
+          printf '{"createdAt":"%s","format":"pg_dump-custom+aes-256-cbc","source":"payroll-system"}\n' \
+            "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >"backup-output/metadata.json"
+          shred -u "$plain"
+          echo "artifact_name=payroll-db-${stamp}" >>"$GITHUB_OUTPUT"
+
+      - name: Upload encrypted backup
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.backup.outputs.artifact_name }}
+          path: backup-output/
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Ensure plaintext was removed
+        shell: bash
+        run: |
+          set -euo pipefail
+          if find backup-output -type f -name '*.dump' | grep -q .; then
+            echo "Plaintext backup remains" >&2
+            exit 1
+          fi
