@@ -83,13 +83,19 @@ jobs:
             -e POSTGRES_PASSWORD="$restore_password" \
             -e POSTGRES_DB=payroll_restore_check \
             postgres:17-alpine >/dev/null
-          for attempt in $(seq 1 30); do
+          stable_ready=0
+          for attempt in $(seq 1 60); do
             if docker exec "$container" psql \
               --username=postgres --dbname=payroll_restore_check \
               --command="select 1;" >/dev/null 2>&1; then
-              break
+              stable_ready=$((stable_ready + 1))
+              if [ "$stable_ready" -ge 3 ]; then
+                break
+              fi
+            else
+              stable_ready=0
             fi
-            if [ "$attempt" -eq 30 ]; then
+            if [ "$attempt" -eq 60 ]; then
               echo "Isolated PostgreSQL did not become ready" >&2
               exit 1
             fi
