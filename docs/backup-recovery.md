@@ -9,9 +9,11 @@ GitHub 저장소의 Settings > Secrets and variables > Actions에 다음 Reposit
 - `SUPABASE_DB_URL`: Supabase의 직접 또는 세션 풀러 PostgreSQL 연결 문자열. 비밀번호를 포함하므로 코드·채팅·로그에 넣지 않는다.
 - `BACKUP_ENCRYPTION_PASSPHRASE`: 24자 이상의 별도 백업 암호. DB 비밀번호와 다르게 만들고 안전한 비밀번호 관리 도구에 보관한다.
 
-설정 후 Actions > Encrypted database backup > Run workflow를 한 번 실행한다. 성공한 실행의 Artifacts에서 `.dump.enc`, `.sha256`, `metadata.json`만 존재하고 평문 `.dump`가 없는지 확인한다.
+설정 후 Actions > Encrypted database backup > Run workflow를 한 번 실행한다. 워크플로는 매 실행마다 별도의 일회성 빈 PostgreSQL 컨테이너를 만들고 암호화 백업을 복호화·복원한 뒤 `organizations`, `employees`, `attendance_records`, `payroll_records` 핵심 테이블을 확인한다. 검증이 끝나면 복호화된 평문과 컨테이너를 자동 폐기한다. 성공한 실행의 Artifacts에는 `.dump.enc`, `.sha256`, `metadata.json`만 존재해야 한다.
 
 ## 복구 리허설
+
+GitHub Actions의 일일 백업은 운영 DB에 덮어쓰지 않고 매번 일회성 빈 PostgreSQL 컨테이너에서 자동 복원 리허설을 수행한다. 아래 절차는 장애 대응 또는 별도 환경에서 수동으로 다시 검증할 때 사용한다.
 
 1. 운영 DB에 덮어쓰지 않는다. 별도의 빈 PostgreSQL/Supabase 프로젝트를 준비한다.
 2. 백업 artifact를 내려받아 SHA-256을 확인한다.
