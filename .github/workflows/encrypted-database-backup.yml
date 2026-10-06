@@ -84,7 +84,9 @@ jobs:
             -e POSTGRES_DB=payroll_restore_check \
             postgres:17-alpine >/dev/null
           for attempt in $(seq 1 30); do
-            if docker exec "$container" pg_isready -U postgres -d payroll_restore_check >/dev/null 2>&1; then
+            if docker exec "$container" psql \
+              --username=postgres --dbname=payroll_restore_check \
+              --command="select 1;" >/dev/null 2>&1; then
               break
             fi
             if [ "$attempt" -eq 30 ]; then
