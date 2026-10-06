@@ -78,8 +78,6 @@ jobs:
           openssl enc -d -aes-256-cbc -pbkdf2 \
             -in "$encrypted" -out "$restored_dump" \
             -pass env:BACKUP_ENCRYPTION_PASSPHRASE
-          pg_restore --list "$restored_dump" >/dev/null
-
           restore_password="$(openssl rand -hex 24)"
           docker run --detach --name "$container" \
             -e POSTGRES_PASSWORD="$restore_password" \
