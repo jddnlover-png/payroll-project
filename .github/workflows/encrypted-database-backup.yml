@@ -96,6 +96,10 @@ jobs:
             sleep 1
           done
 
+          docker exec "$container" psql \
+            --username=postgres --dbname=payroll_restore_check \
+            --set=ON_ERROR_STOP=1 \
+            --command="create schema if not exists extensions; create extension if not exists pgcrypto with schema extensions;"
           docker cp "$restored_dump" "$container:/tmp/payroll-restore.dump"
           docker exec "$container" pg_restore \
             --exit-on-error --no-owner --no-privileges \
