@@ -99,6 +99,7 @@ jobs:
           docker cp "$restored_dump" "$container:/tmp/payroll-restore.dump"
           docker exec "$container" pg_restore \
             --exit-on-error --no-owner --no-privileges \
+            --schema=public \
             --username=postgres --dbname=payroll_restore_check \
             /tmp/payroll-restore.dump
 
