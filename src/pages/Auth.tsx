@@ -16,6 +16,7 @@ const emailSchema = z.string().email('올바른 이메일 주소를 입력해주
 const passwordSchema = z.string().min(6, '비밀번호는 최소 6자 이상이어야 합니다');
 
 type AuthView = 'auth' | 'forgot-password' | 'reset-password';
+type AuthTab = 'signin' | 'signup';
 
 export default function Auth() {
   const navigate = useNavigate();
@@ -29,6 +30,13 @@ export default function Auth() {
   const [fullName, setFullName] = useState('');
   const [errors, setErrors] = useState<{ email?: string; password?: string; fullName?: string; newPassword?: string; confirmPassword?: string }>({});
   const [view, setView] = useState<AuthView>('auth');
+  const [authTab, setAuthTab] = useState<AuthTab>(() =>
+    new URLSearchParams(location.search).get('tab') === 'signup' ? 'signup' : 'signin',
+  );
+
+  useEffect(() => {
+    setAuthTab(new URLSearchParams(location.search).get('tab') === 'signup' ? 'signup' : 'signin');
+  }, [location.search]);
 
   // 인증 완료 시 메인 페이지로 이동 (ProtectedRoute가 조직 유무에 따라 리다이렉트 처리)
   useEffect(() => {
@@ -405,7 +413,7 @@ export default function Auth() {
           <CardDescription>SaaS 기반 통합 인사관리 솔루션</CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="signin" className="w-full">
+          <Tabs value={authTab} onValueChange={(value) => setAuthTab(value as AuthTab)} className="w-full">
             <TabsList className="grid w-full grid-cols-2 mb-6">
               <TabsTrigger value="signin">로그인</TabsTrigger>
               <TabsTrigger value="signup">회원가입</TabsTrigger>

@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import {
   Clock, Calculator, FileText, Users, Shield, BarChart3,
-  Check, ArrowRight, Star, Zap, ChevronRight,
+  Check, ArrowRight, Zap, ChevronRight,
 } from 'lucide-react';
 
 const fadeUp = {
@@ -89,7 +89,7 @@ export default function Landing() {
               로그인
             </Button>
             <Button size="sm" onClick={() => navigate('/auth?tab=signup')} className="group">
-              무료로 시작하기
+              첫 급여 계산 확인
               <ArrowRight className="ml-1 h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
             </Button>
           </div>
@@ -110,8 +110,8 @@ export default function Landing() {
             transition={{ duration: 0.6 }}
           >
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-medium mb-8">
-              <Star className="h-3.5 w-3.5" />
-              50개 업체가 이미 선택한 시스템
+              <Check className="h-3.5 w-3.5" />
+              근태부터 급여명세서까지 한 흐름으로 확인
             </div>
           </motion.div>
 
@@ -121,9 +121,9 @@ export default function Landing() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.1 }}
           >
-            3분 만에 끝나는
+            우리 회사 기준으로
             <br />
-            <span className="text-primary">급여관리</span>
+            <span className="text-primary">첫 급여 계산 흐름 확인</span>
           </motion.h1>
 
           <motion.p
@@ -132,9 +132,9 @@ export default function Landing() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.2 }}
           >
-            근태 → 급여 계산 → 급여명세서 발송까지 한번에.
+            근태 확인 → 수당·공제 검토 → 급여명세서 미리보기까지.
             <br className="hidden sm:block" />
-            중소기업 사장님을 위한 올인원 인사관리 솔루션.
+            예시 데이터로 급여 업무 흐름을 단계별로 살펴보세요.
           </motion.p>
 
           <motion.div
@@ -148,7 +148,7 @@ export default function Landing() {
               className="text-base px-8 h-12 group shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-shadow"
               onClick={() => navigate('/auth?tab=signup')}
             >
-              무료로 시작하기
+              첫 급여 계산 흐름 확인하기
               <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
             </Button>
           </motion.div>
@@ -165,7 +165,7 @@ export default function Landing() {
                 <div className="w-3 h-3 rounded-full bg-destructive/60" />
                 <div className="w-3 h-3 rounded-full bg-status-yellow-text/60" />
                 <div className="w-3 h-3 rounded-full bg-status-green-text/60" />
-                <span className="ml-2 text-xs text-muted-foreground">급여뚝딱 — 대시보드</span>
+                <span className="ml-2 text-xs text-muted-foreground">급여뚝딱 — 대시보드 예시</span>
               </div>
               <div className="p-6 sm:p-10 bg-gradient-to-b from-card to-muted/30">
                 <div className="grid grid-cols-3 gap-4 mb-6">
@@ -200,9 +200,9 @@ export default function Landing() {
       {/* Trust badges */}
       <section className="py-12 px-6 border-y bg-muted/30">
         <div className="max-w-5xl mx-auto text-center">
-          <p className="text-sm text-muted-foreground mb-6">50개 업체가 이미 선택한 시스템</p>
+          <p className="text-sm text-muted-foreground mb-6">중소기업 급여 업무 순서에 맞춘 구성</p>
           <div className="flex items-center justify-center gap-8 sm:gap-12 flex-wrap opacity-40">
-            {['건설A사', '유통B사', '제조C사', '물류D사', '서비스E사'].map((name) => (
+            {['근태 확인', '수당 검토', '공제 확인', '급여 계산', '명세서 미리보기'].map((name) => (
               <div key={name} className="text-lg font-bold tracking-tight">{name}</div>
             ))}
           </div>
@@ -389,7 +389,7 @@ export default function Landing() {
               className="text-base px-10 h-12 group shadow-lg shadow-primary/20"
               onClick={() => navigate('/auth?tab=signup')}
             >
-              무료로 시작하기
+              첫 급여 계산 흐름 확인하기
               <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
             </Button>
           </motion.div>
