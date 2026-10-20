@@ -17,6 +17,7 @@ import PayslipView from "./pages/PayslipView";
 import AccountSettings from "./pages/AccountSettings";
 import Expired from "./pages/Expired";
 import UpdatePassword from "./pages/UpdatePassword";
+import ShortParentalLeaveGuide from "./pages/ShortParentalLeaveGuide";
 
 import Admin from "./pages/Admin";
 import AdminLogin from "./pages/AdminLogin";
@@ -28,6 +29,7 @@ function AppRoutes() {
     <Routes>
       {/* 일반 페이지 */}
       <Route path="/landing" element={<Landing />} />
+      <Route path="/guides/2026-short-parental-leave-payroll" element={<ShortParentalLeaveGuide />} />
       <Route path="/auth" element={<Auth />} />
       <Route path="/admin-login" element={<AdminLogin />} />
       <Route path="/update-password" element={<UpdatePassword />} />
