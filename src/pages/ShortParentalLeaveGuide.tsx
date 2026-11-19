@@ -4,7 +4,7 @@ import { ArrowRight, CheckCircle2, ExternalLink, ShieldCheck } from "lucide-reac
 import { Button } from "@/components/ui/button";
 
 const canonicalUrl = "https://payroll-project-rho.vercel.app/guides/2026-short-parental-leave-payroll";
-const trackingUrl = "https://marketing-platform-ivory.vercel.app/r/c7b470d592fa";
+const trackingUrl = "https://marketing-platform-ivory.vercel.app/r/98c898cf9f35";
 const officialSourceUrl = "https://www.moel.go.kr/policy/policydata/view.do?bbs_seq=20260800579";
 
 const faqs = [
@@ -49,7 +49,7 @@ export default function ShortParentalLeaveGuide() {
           headline: "2026년 단기 육아휴직 시행 후 급여 담당자는 무엇을 확인해야 하나요?",
           description,
           datePublished: "2026-10-20",
-          dateModified: "2026-10-20",
+          dateModified: "2026-11-19",
           mainEntityOfPage: canonicalUrl,
           author: { "@type": "Organization", name: "급여뚝딱" },
           publisher: { "@type": "Organization", name: "급여뚝딱" },
@@ -85,14 +85,22 @@ export default function ShortParentalLeaveGuide() {
 
       <main>
         <article className="mx-auto max-w-3xl px-6 py-14 sm:py-20">
-          <p className="mb-4 text-sm font-semibold text-primary">급여 실무 가이드 · 2026년 10월 20일 기준</p>
-          <h1 className="text-3xl font-extrabold leading-tight sm:text-5xl">
+          <p className="mb-4 text-sm font-semibold text-primary">급여 실무 가이드 · 2026년 11월 19일 기준</p>
+          <h1 className="text-3xl font-extrabold leading-tight sm:text-4xl">
             2026년 단기 육아휴직 시행 후<br />급여 담당자는 무엇을 확인해야 하나요?
           </h1>
           <p className="mt-7 rounded-2xl border border-primary/20 bg-primary/5 p-6 text-lg leading-8">
             <strong>핵심 답변:</strong> 적용 시점과 대상, 신청 절차를 고용노동부 공식 안내에서 먼저 확인하고,
             회사의 근태·휴직·급여 처리 절차에서 달라지는 항목을 실제 급여 계산 전에 점검해야 합니다.
           </p>
+
+          <section className="mt-8 rounded-2xl border border-amber-200 bg-amber-50 p-6">
+            <h2 className="text-xl font-bold text-amber-950">휴직 처리 때마다 같은 자료를 다시 확인하고 있나요?</h2>
+            <p className="mt-3 leading-7 text-amber-950/80">
+              근태 마감, 휴직 기간, 수당·공제 기준이 서로 다른 곳에 흩어져 있으면 계산이 끝난 뒤에도 담당자는 원자료를 다시 대조해야 합니다.
+              아래 확인 순서로 입력값을 먼저 정리하고, 급여뚝딱의 예시 흐름에서 우리 회사 업무와 비교해 보세요.
+            </p>
+          </section>
 
           <section className="mt-12">
             <h2 className="text-2xl font-bold">급여 담당자 확인 순서</h2>
@@ -144,7 +152,7 @@ export default function ShortParentalLeaveGuide() {
           <section className="mt-12 rounded-2xl bg-primary p-8 text-center text-primary-foreground">
             <CheckCircle2 className="mx-auto h-9 w-9" />
             <h2 className="mt-4 text-2xl font-bold">우리 회사 급여 계산 흐름을 확인해 보세요</h2>
-            <p className="mt-3 opacity-90">예시 데이터로 근태 확인부터 급여명세서 미리보기까지 단계별로 살펴볼 수 있습니다.</p>
+            <p className="mt-3 opacity-90">설치나 결제 없이 예시 데이터로 근태 확인부터 급여명세서 미리보기까지 단계별로 살펴볼 수 있습니다.</p>
             <Button asChild variant="secondary" size="lg" className="mt-6">
               <a href={trackingUrl}>첫 급여 계산 흐름 확인하기 <ArrowRight className="ml-2 h-4 w-4" /></a>
             </Button>
