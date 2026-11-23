@@ -4,7 +4,7 @@ import { ArrowRight, CheckCircle2, ExternalLink, ShieldCheck } from "lucide-reac
 import { Button } from "@/components/ui/button";
 
 const canonicalUrl = "https://payroll-project-rho.vercel.app/guides/2026-short-parental-leave-payroll";
-const trackingUrl = "https://marketing-platform-ivory.vercel.app/r/98c898cf9f35";
+const trackingUrl = "https://marketing-platform-ivory.vercel.app/r/a1adf620ebb6";
 const officialSourceUrl = "https://www.moel.go.kr/policy/policydata/view.do?bbs_seq=20260800579";
 
 const faqs = [
