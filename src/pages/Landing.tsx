@@ -65,6 +65,9 @@ const faqs = [
 
 export default function Landing() {
   const navigate = useNavigate();
+  const scrollToPreview = () => {
+    document.getElementById('payroll-preview')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -88,8 +91,8 @@ export default function Landing() {
             <Button variant="ghost" size="sm" onClick={() => navigate('/auth')}>
               로그인
             </Button>
-            <Button size="sm" onClick={() => navigate('/auth?tab=signup')} className="group">
-              첫 급여 계산 확인
+            <Button size="sm" onClick={scrollToPreview} className="group">
+              예시 결과 먼저 보기
               <ArrowRight className="ml-1 h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
             </Button>
           </div>
@@ -146,10 +149,18 @@ export default function Landing() {
             <Button
               size="lg"
               className="text-base px-8 h-12 group shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-shadow"
+              onClick={scrollToPreview}
+            >
+              예시 급여 계산 결과 먼저 보기
+              <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              className="text-base px-8 h-12"
               onClick={() => navigate('/auth?tab=signup')}
             >
-              첫 급여 계산 흐름 확인하기
-              <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+              무료체험 시작하기
             </Button>
           </motion.div>
 
@@ -194,6 +205,60 @@ export default function Landing() {
               </div>
             </div>
           </motion.div>
+        </div>
+      </section>
+
+      <section id="payroll-preview" className="scroll-mt-20 py-20 px-6 bg-muted/30 border-y">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-10">
+            <p className="text-sm font-semibold text-primary mb-3">가입 전에 확인하는 예시 결과</p>
+            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight mb-4">
+              직원 1명의 급여 계산이 어떻게 이어지는지 먼저 보세요
+            </h2>
+            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+              근태를 다시 옮겨 적지 않고, 수당·공제를 검토한 뒤 명세서까지 연결되는 흐름입니다.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-4 mb-8">
+            {[
+              { step: '1', title: '근태 확인', detail: '기본 160시간 · 연장 8시간', icon: Clock },
+              { step: '2', title: '급여 계산·검토', detail: '지급 3,200,000원 · 공제 326,000원', icon: Calculator },
+              { step: '3', title: '명세서 결과', detail: '실수령액 2,874,000원', icon: FileText },
+            ].map(({ step, title, detail, icon: Icon }) => (
+              <Card key={step} className="relative overflow-hidden border-primary/15">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                      <Icon className="h-5 w-5 text-primary" />
+                    </div>
+                    <span className="text-xs font-bold text-primary/70">STEP {step}</span>
+                  </div>
+                  <CardTitle className="text-xl pt-3">{title}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground">{detail}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          <div className="rounded-2xl border bg-background p-6 sm:p-8 flex flex-col lg:flex-row gap-6 items-start lg:items-center justify-between shadow-sm">
+            <div>
+              <p className="font-bold text-lg mb-2">현재 엑셀 방식과 비교해 볼 준비가 되셨나요?</p>
+              <p className="text-sm text-muted-foreground">
+                무료체험으로 회사 정보를 등록하고 같은 순서로 첫 급여 계산을 확인하세요. 결제 정보는 가입 단계에서 요구하지 않습니다.
+              </p>
+            </div>
+            <Button
+              size="lg"
+              className="shrink-0 group"
+              onClick={() => navigate('/auth?tab=signup')}
+            >
+              무료로 내 회사 흐름 확인하기
+              <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+            </Button>
+          </div>
         </div>
       </section>
 
